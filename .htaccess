@@ -1,0 +1,5 @@
+RewriteEngine On
+# Pass Authorization header to PHP (required for JWT)
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [L]
