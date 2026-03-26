@@ -146,7 +146,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     $f = $base . '.md';
     $dir = dirname($f);
     if (!is_dir($dir)) { mkdir($dir, 0755, true); }
-    file_put_contents($f, $body['content'] ?? '');
+    $written = file_put_contents($f, $body['content'] ?? '');
+    if ($written === false) { json_out(500, ['error' => 'Could not write page to disk']); }
     json_out(200, ['ok' => true]);
 }
 ?><!DOCTYPE html>
@@ -157,7 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:system-ui,sans-serif;line-height:1.6;color:#222}
+body{line-height:1.6;color:#222;
+    font: normal 87.5%/1.4 Arial, system-ui,sans-serif;
+    /* default font size: 100% => 16px; 93.75% => 15px; 87.5% => 14px; 81.25% => 13px; 75% => 12px */
+    -webkit-text-size-adjust: 100%;
+}
 
 /* ── Login screen ── */
 #login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f4f5;padding:1rem}
@@ -179,9 +184,18 @@ header a{font-size:1.4rem;font-weight:700;color:#111;text-decoration:none}
 nav{font-size:.85rem;color:#666;margin-bottom:1.5rem;min-height:1.2rem}
 nav a{color:#05c;text-decoration:none}
 nav a:hover{text-decoration:underline}
+/*
 #content h1{font-size:1.9rem;margin:.25rem 0 .8rem}
 #content h2{font-size:1.3rem;margin:1.5rem 0 .4rem;padding-bottom:.2rem;border-bottom:1px solid #eee}
 #content h3{font-size:1.1rem;margin:1rem 0 .3rem}
+*/
+#content h1,h2,h3,h4,h5,h6 {font-weight: bold;padding: 0;line-height: 1.2;clear: left; color: #8A0808;font-family: Arial, sans-serif;clear: right;}
+#content h1 {font-size: 1.9em;margin: 0 0 0.444em;text-align: center;border-style: solid;border-width: 2px;padding:0.45em 0;margin:0.6em 0 1em 0;background-color:#8A0808;color:#FFF;}
+#content h2 {font-size: 1.9em;margin: 1em 0 0.5em;border-bottom-style: double;border-bottom-width: 6px; border-color: #8A0808 ;}
+#content h3 {font-size: 1.75em;margin: 0 0 0.888em;}
+#content h4 {font-size: 1.25em;margin: 0 0 1.0em;}
+#content h5 {font-size: 1em;margin: 0 0 1.1428em;}
+#content h6 {font-size: .75em;margin: 0 0 1.333em;}
 #content p{margin:.5rem 0}
 #content a{color:#05c}
 #content ul,#content ol{margin:.4rem 0 .4rem 1.5rem}
@@ -220,6 +234,10 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 #index-tree a{color:#05c;text-decoration:none}
 #index-tree a:hover{text-decoration:underline}
 #index-tree .folder{font-weight:600;color:#444;display:block;margin-top:.5rem}
+/* Toast notification */
+#toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(1rem);background:#1a7f37;color:#fff;padding:.6rem 1.2rem;border-radius:6px;font-size:.9rem;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.error{background:#c62828}
 </style>
 </head>
 <body>
@@ -244,7 +262,7 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 <!-- ── Wiki screen ──────────────────────────────────────── -->
 <div id="wiki-screen" style="display:none">
   <header>
-    <a href="" onclick="navigate('index');return false;">Wiki</a>
+    <a href="" onclick="navigate('index');return false;">WeKickWiki</a>
     <div id="header-right">
       <span id="user-badge"></span>
       <button class="btn" id="index-btn" title="Index" aria-label="Index" style="display:none" onclick="toggleIndex()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -272,7 +290,19 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
   </div>
 </div>
 
+<div id="toast"></div>
+
 <script>
+// ── Toast ───────────────────────────────────────────────────────────────────
+let _toastTimer;
+function showToast(msg, type = 'success', duration = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = type + ' show';
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
 // ── Icons ───────────────────────────────────────────────────────────────────
 const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
 const ICON_VIEW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -363,6 +393,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
 let currentPage = 'index';
 let rawMd = '';
 let editing = false;
+let isNewPage = false;
 
 async function load(page) {
   currentPage = page;
@@ -420,7 +451,7 @@ function resolvePath(base, rel) {
   window.scrollTo(0, 0);
 }
 
-function createPage() { rawMd = ''; openEdit(); }
+function createPage() { rawMd = ''; isNewPage = true; openEdit(); }
 
 // ── Page index panel ────────────────────────────────────────────────────────
 let indexOpen = false;
@@ -473,10 +504,11 @@ async function deletePage() {
     body: JSON.stringify({ page: currentPage })
   });
   if (res && res.ok) {
+    showToast('Page \u201c' + currentPage + '\u201d deleted.');
     navigate('index', true);
   } else {
     const data = await res.json().catch(() => ({}));
-    alert(data.error || 'Error deleting page');
+    showToast(data.error || 'Error deleting page', 'error');
   }
 }
 
@@ -494,6 +526,7 @@ function openEdit() {
 
 function cancelEdit() {
   editing = false;
+  isNewPage = false;
   document.getElementById('editor').style.display = 'none';
   document.getElementById('content').style.display = '';
   document.getElementById('edit-btn').innerHTML = ICON_EDIT;
@@ -510,17 +543,17 @@ async function save() {
     body: JSON.stringify({ page: currentPage, content })
   });
   if (res && res.ok) {
+    const wasNew = isNewPage;
     rawMd = content;
-    status.textContent = 'Saved \u2713';
-    setTimeout(() => {
-      status.textContent = '';
-      cancelEdit();
-      document.getElementById('content').innerHTML = marked.parse(rawMd);
-      if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
-    }, 800);
+    status.textContent = '';
+    cancelEdit();
+    document.getElementById('content').innerHTML = marked.parse(rawMd);
+    if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
+    showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
   } else {
     const data = await res.json().catch(() => ({}));
-    status.textContent = data.error || 'Error saving';
+    status.textContent = '';
+    showToast(data.error || 'Could not save the page. Please try again.', 'error');
   }
 }
 
