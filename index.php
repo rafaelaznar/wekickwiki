@@ -191,11 +191,12 @@ nav a:hover{text-decoration:underline}
 */
 #content h1,h2,h3,h4,h5,h6 {font-weight: bold;padding: 0;line-height: 1.2;clear: left; color: #8A0808;font-family: Arial, sans-serif;clear: right;}
 #content h1 {font-size: 1.9em;margin: 0 0 0.444em;text-align: center;border-style: solid;border-width: 2px;padding:0.45em 0;margin:0.6em 0 1em 0;background-color:#8A0808;color:#FFF;}
-#content h2 {font-size: 1.9em;margin: 1em 0 0.5em;border-bottom-style: double;border-bottom-width: 6px; border-color: #8A0808 ;}
-#content h3 {font-size: 1.75em;margin: 0 0 0.888em;}
+#content h2 {font-size: 1.7em;margin: 1em 0 0.5em;border-bottom-style: double;border-bottom-width: 6px; border-color: #8A0808 ;}
+#content h3 {font-size: 1.6em;margin: 0 0 0.888em;}
 #content h4 {font-size: 1.25em;margin: 0 0 1.0em;}
 #content h5 {font-size: 1em;margin: 0 0 1.1428em;}
 #content h6 {font-size: .75em;margin: 0 0 1.333em;}
+/* --- */
 #content p{margin:.5rem 0}
 #content a{color:#05c}
 #content ul,#content ol{margin:.4rem 0 .4rem 1.5rem}
@@ -234,6 +235,19 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 #index-tree a{color:#05c;text-decoration:none}
 #index-tree a:hover{text-decoration:underline}
 #index-tree .folder{font-weight:600;color:#444;display:block;margin-top:.5rem}
+/* TOC panel */
+#toc-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100}
+#toc-panel{display:none;position:fixed;top:0;left:0;bottom:0;width:min(300px,90vw);background:#fff;box-shadow:4px 0 20px rgba(0,0,0,.15);overflow-y:auto;padding:1.25rem 1.5rem;z-index:101}
+#toc-panel h3{font-size:1rem;font-weight:700;margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center}
+#toc-panel button.close-btn{background:none;border:none;font-size:1.2rem;cursor:pointer;color:#666;line-height:1}
+#toc-list{font-size:.88rem}
+#toc-list ul{list-style:none;padding-left:0;margin:0}
+#toc-list li{margin:.2rem 0}
+#toc-list a{color:#05c;text-decoration:none;display:block}
+#toc-list a:hover{text-decoration:underline}
+.toc-h1{font-weight:700;}
+.toc-h2{padding-left:1.5rem}
+.toc-h3{padding-left:2.5rem;font-size:.83rem;color:#555}
 /* Toast notification */
 #toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(1rem);background:#1a7f37;color:#fff;padding:.6rem 1.2rem;border-radius:6px;font-size:.9rem;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -265,6 +279,7 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
     <a href="" onclick="navigate('index');return false;">WeKickWiki</a>
     <div id="header-right">
       <span id="user-badge"></span>
+      <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="5" x2="21" y2="5"/><line x1="6" y1="10" x2="21" y2="10"/><line x1="10" y1="15" x2="21" y2="15"/><line x1="6" y1="20" x2="21" y2="20"/></svg></button>
       <button class="btn" id="index-btn" title="Index" aria-label="Index" style="display:none" onclick="toggleIndex()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
       <button class="btn btn-danger" id="delete-btn" title="Delete" aria-label="Delete" style="display:none" onclick="deletePage()"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
@@ -274,6 +289,12 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
   <nav id="nav"></nav>
   <main id="content"></main>
 
+  <!-- TOC panel -->
+  <div id="toc-overlay" onclick="toggleToc()"></div>
+  <div id="toc-panel">
+    <h3>Contents <button class="close-btn" onclick="toggleToc()">&times;</button></h3>
+    <div id="toc-list"></div>
+  </div>
   <!-- Index panel -->
   <div id="index-overlay" onclick="toggleIndex()"></div>
   <div id="index-panel">
@@ -354,6 +375,7 @@ function showWiki() {
   document.getElementById('wiki-screen').style.display = '';
   document.getElementById('user-badge').textContent = getUser();
   const isAdmin = getRole() === 'admin';
+  document.getElementById('toc-btn').style.display    = '';
   document.getElementById('edit-btn').style.display   = isAdmin ? '' : 'none';
   document.getElementById('index-btn').style.display  = isAdmin ? '' : 'none';
 }
@@ -398,6 +420,7 @@ let isNewPage = false;
 async function load(page) {
   currentPage = page;
   editing = false;
+  closeToc();
   document.getElementById('editor').style.display = 'none';
   document.getElementById('content').style.display = '';
   document.getElementById('edit-btn').innerHTML = ICON_EDIT;
@@ -416,6 +439,7 @@ async function load(page) {
   } else {
     document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
     document.getElementById('content').innerHTML = marked.parse(rawMd);
+    addHeadingIds();
   }
 
   const parts = page === 'index' ? [] : page.split('/');
@@ -452,6 +476,50 @@ function resolvePath(base, rel) {
 }
 
 function createPage() { rawMd = ''; isNewPage = true; openEdit(); }
+
+// ── TOC panel ────────────────────────────────────────────────────────────────
+function slugify(text) {
+  return text.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-') || 'heading';
+}
+
+function addHeadingIds() {
+  const seen = {};
+  document.querySelectorAll('#content h1, #content h2, #content h3').forEach(h => {
+    let slug = slugify(h.textContent);
+    if (seen[slug]) { seen[slug]++; slug += '-' + seen[slug]; } else { seen[slug] = 1; }
+    h.id = slug;
+  });
+}
+
+let tocOpen = false;
+function closeToc() {
+  if (!tocOpen) return;
+  tocOpen = false;
+  document.getElementById('toc-overlay').style.display = 'none';
+  document.getElementById('toc-panel').style.display   = 'none';
+}
+
+function toggleToc() {
+  const overlay = document.getElementById('toc-overlay');
+  const panel   = document.getElementById('toc-panel');
+  tocOpen = !tocOpen;
+  overlay.style.display = panel.style.display = tocOpen ? 'block' : 'none';
+  if (!tocOpen) return;
+
+  const headings = document.querySelectorAll('#content h1, #content h2, #content h3');
+  if (!headings.length) {
+    document.getElementById('toc-list').innerHTML = '<p style="color:#888;font-size:.85rem;padding:.25rem 0">No headings on this page.</p>';
+    return;
+  }
+  let html = '<ul>';
+  headings.forEach(h => {
+    const cls = 'toc-' + h.tagName.toLowerCase();
+    const id  = h.id;
+    html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});closeToc();return false;">' + h.textContent + '</a></li>';
+  });
+  html += '</ul>';
+  document.getElementById('toc-list').innerHTML = html;
+}
 
 // ── Page index panel ────────────────────────────────────────────────────────
 let indexOpen = false;
@@ -548,6 +616,7 @@ async function save() {
     status.textContent = '';
     cancelEdit();
     document.getElementById('content').innerHTML = marked.parse(rawMd);
+    addHeadingIds();
     if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
     showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
   } else {
