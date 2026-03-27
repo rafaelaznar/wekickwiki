@@ -189,7 +189,7 @@ nav a:hover{text-decoration:underline}
 #content h2{font-size:1.3rem;margin:1.5rem 0 .4rem;padding-bottom:.2rem;border-bottom:1px solid #eee}
 #content h3{font-size:1.1rem;margin:1rem 0 .3rem}
 */
-#content h1,h2,h3,h4,h5,h6 {font-weight: bold;padding: 0;line-height: 1.2;clear: left; color: #8A0808;font-family: Arial, sans-serif;clear: right;}
+#content h1,h2,h3,h4,h5,h6 {font-weight: bold;padding: 0;line-height: 1.2;clear: left; color: #8A0808;font-family: Arial, sans-serif;}
 #content h1 {font-size: 1.9em;margin: 0 0 0.444em;text-align: center;border-style: solid;border-width: 2px;padding:0.45em 0;margin:0.6em 0 1em 0;background-color:#8A0808;color:#FFF;}
 #content h2 {font-size: 1.7em;margin: 1em 0 0.5em;border-bottom-style: double;border-bottom-width: 6px; border-color: #8A0808 ;}
 #content h3 {font-size: 1.6em;margin: 0 0 0.888em;}
@@ -252,6 +252,17 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 #toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(1rem);background:#1a7f37;color:#fff;padding:.6rem 1.2rem;border-radius:6px;font-size:.9rem;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.error{background:#c62828}
+
+/* ── Inline TOC (floats right alongside content) ── */
+#content{position:relative}
+#toc-inline{float:right;width:185px;border:1px solid #8A0808;background:#f7f7f7;padding:.55rem .85rem;font-size:.83rem;line-height:1.5;border-radius: 10px;margin-left: 20px;}
+#toc-inline ul{list-style:none;padding:0;margin:0}
+#toc-inline li{margin:.15rem 0}
+#toc-inline a{color:#05c;text-decoration:none}
+#toc-inline a:hover{text-decoration:underline}
+#toc-inline .toc-h1{font-weight:700}
+#toc-inline .toc-h2{display:block;padding-left:1rem}
+#toc-inline .toc-h3{display:block;padding-left:2rem;font-size:.78rem;color:#555}
 
 /* ── Guest mode ── */
 .guest-mode header{border-bottom:none;padding-bottom:0;margin-bottom:0;min-height:0;position:fixed;top:.75rem;right:max(1.5rem,calc((100vw - 860px)/2 + 1.5rem));width:auto;z-index:50}
@@ -451,6 +462,7 @@ async function load(page) {
     document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
     document.getElementById('content').innerHTML = marked.parse(rawMd);
     addHeadingIds();
+    buildInlineToc();
   }
 
   const parts = page === 'index' ? [] : page.split('/');
@@ -500,6 +512,25 @@ function addHeadingIds() {
     if (seen[slug]) { seen[slug]++; slug += '-' + seen[slug]; } else { seen[slug] = 1; }
     h.id = slug;
   });
+}
+
+function buildInlineToc() {
+  const existing = document.getElementById('toc-inline');
+  if (existing) existing.remove();
+  const headings = document.querySelectorAll('#content h1, #content h2, #content h3');
+  if (headings.length < 2) return;
+  let html = '<ul>';
+  headings.forEach(h => {
+    const cls = 'toc-' + h.tagName.toLowerCase();
+    const id  = h.id;
+    html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});return false;">' + h.textContent + '</a></li>';
+  });
+  html += '</ul>';
+  const div = document.createElement('div');
+  div.id = 'toc-inline';
+  const content = document.getElementById('content');
+  div.innerHTML = html;
+  content.insertBefore(div, content.firstChild);
 }
 
 let tocOpen = false;
@@ -628,6 +659,7 @@ async function save() {
     cancelEdit();
     document.getElementById('content').innerHTML = marked.parse(rawMd);
     addHeadingIds();
+    buildInlineToc();
     if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
     showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
   } else {
