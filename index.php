@@ -252,6 +252,13 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 #toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(1rem);background:#1a7f37;color:#fff;padding:.6rem 1.2rem;border-radius:6px;font-size:.9rem;font-weight:500;box-shadow:0 4px 14px rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:200}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.error{background:#c62828}
+
+/* ── Guest mode ── */
+.guest-mode header{border-bottom:none;padding-bottom:0;margin-bottom:0;min-height:0;position:fixed;top:.75rem;right:max(1.5rem,calc((100vw - 860px)/2 + 1.5rem));width:auto;z-index:50}
+.guest-mode #header-title,
+.guest-mode #user-badge{display:none}
+.guest-mode #nav{display:none}
+.guest-mode #content{margin-top:2.5rem}
 </style>
 </head>
 <body>
@@ -276,14 +283,14 @@ button svg{display:block;width:1rem;height:1rem;stroke:currentColor;fill:none;st
 <!-- ── Wiki screen ──────────────────────────────────────── -->
 <div id="wiki-screen" style="display:none">
   <header>
-    <a href="" onclick="navigate('index');return false;">WeKickWiki</a>
+    <a id="header-title" href="" onclick="navigate('index');return false;">WeKickWiki</a>
     <div id="header-right">
       <span id="user-badge"></span>
       <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="5" x2="21" y2="5"/><line x1="6" y1="10" x2="21" y2="10"/><line x1="10" y1="15" x2="21" y2="15"/><line x1="6" y1="20" x2="21" y2="20"/></svg></button>
       <button class="btn" id="index-btn" title="Index" aria-label="Index" style="display:none" onclick="toggleIndex()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
       <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
       <button class="btn btn-danger" id="delete-btn" title="Delete" aria-label="Delete" style="display:none" onclick="deletePage()"><svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
-      <button class="btn btn-danger" title="Sign out" aria-label="Sign out" onclick="logout()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <button class="btn btn-danger" id="logout-btn" title="Sign out" aria-label="Sign out" onclick="logout()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
     </div>
   </header>
   <nav id="nav"></nav>
@@ -375,9 +382,13 @@ function showWiki() {
   document.getElementById('wiki-screen').style.display = '';
   document.getElementById('user-badge').textContent = getUser();
   const isAdmin = getRole() === 'admin';
-  document.getElementById('toc-btn').style.display    = '';
+  const isGuest = getRole() === 'guest';
+  document.getElementById('toc-btn').style.display    = isGuest ? 'none' : '';
   document.getElementById('edit-btn').style.display   = isAdmin ? '' : 'none';
   document.getElementById('index-btn').style.display  = isAdmin ? '' : 'none';
+  if (isGuest) {
+    document.getElementById('wiki-screen').classList.add('guest-mode');
+  }
 }
 
 // ── Login form ──────────────────────────────────────────────────────────────
