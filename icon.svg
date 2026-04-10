@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg24"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview26"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false"
+     inkscape:zoom="0.921875"
+     inkscape:cx="263.05085"
+     inkscape:cy="194.71186"
+     inkscape:window-width="1920"
+     inkscape:window-height="980"
+     inkscape:window-x="1920"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg24" />
+  <defs
+     id="defs4">
+    <style
+       id="style2">
+      .wkw-primary { fill: #0055cc; }
+      .wkw-accent { fill: #8A0808; }
+      .wkw-light { fill: #ffffff; }
+    </style>
+  </defs>
+  <!-- Background circle -->
+  <circle
+     cx="256"
+     cy="256"
+     class="wkw-primary"
+     id="circle6"
+     r="256"
+     style="fill:#8a0808;fill-opacity:1" />
+  <!-- Page and lightning bolt -->
+  <rect
+     x="117.61163"
+     y="87.963676"
+     width="276.77673"
+     height="322.90619"
+     rx="13.838837"
+     class="wkw-light"
+     id="rect8"
+     style="stroke-width:2.30647;stroke:none;stroke-opacity:1" />
+  <line
+     x1="152.20871"
+     y1="135.79582"
+     x2="359.79129"
+     y2="135.79582"
+     stroke="#0055cc"
+     stroke-width="6.07494"
+     opacity="0.4"
+     id="line10"
+     style="opacity:1;fill:#ff5555;stroke:#7f0000;stroke-width:20;stroke-dasharray:none;stroke-opacity:1" />
+  <line
+     x1="152.20871"
+     y1="199.2556"
+     x2="359.79129"
+     y2="199.2556"
+     stroke="#0055cc"
+     stroke-width="6.07494"
+     opacity="0.4"
+     id="line12"
+     style="opacity:1;fill:#ff5555;stroke:#7f0000;stroke-width:20;stroke-dasharray:none;stroke-opacity:1" />
+  <line
+     x1="152.20871"
+     y1="262.71536"
+     x2="359.79129"
+     y2="262.71536"
+     stroke="#0055cc"
+     stroke-width="6.07494"
+     opacity="0.4"
+     id="line14"
+     style="opacity:1;fill:#ff5555;stroke:#7f0000;stroke-width:20;stroke-dasharray:none;stroke-opacity:1" />
+  <line
+     x1="152.20871"
+     y1="326.17514"
+     x2="313.66183"
+     y2="326.17514"
+     stroke="#0055cc"
+     stroke-width="6.07494"
+     opacity="0.4"
+     id="line16"
+     style="opacity:1;fill:#ff5555;stroke:#7f0000;stroke-width:20;stroke-dasharray:none;stroke-opacity:1" />
+</svg>

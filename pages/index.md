@@ -6,6 +6,7 @@ This is the home page. Browse using the links below or use the **Index** button 
 
 - [About](about)
 - [Markdown Syntax](syntax)
+- [Markdown Demo](demo)
 
 ## Directory structure
 

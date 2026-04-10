@@ -182,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>WeKickWiki</title>
   <base href="<?= htmlspecialchars($baseHref) ?>">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     * {
@@ -814,7 +815,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   <!-- ── Login screen ─────────────────────────────────────── -->
   <div id="login-screen">
     <div id="login-box">
-      <h2>WeKickWiki — Sign in</h2>
+      <h2><img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt="">WeKickWiki — Sign in</h2>
       <form id="login-form" novalidate>
         <label>Username
           <input id="login-user" type="text" autocomplete="username" required autofocus>
@@ -835,7 +836,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   <!-- ── Wiki screen ──────────────────────────────────────── -->
   <div id="wiki-screen" style="display:none">
     <header>
-      <a id="header-title" href="" onclick="navigate('index');return false;">WeKickWiki</a>
+      <a id="header-title" href="" onclick="navigate('index');return false;"><img src="icon.svg" style="display:inline; width:1.5rem; height:1.5rem; margin-right:0.5rem; vertical-align:middle;" alt="">WeKickWiki</a>
       <div id="header-right">
         <span id="user-badge"></span>
         <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true">
@@ -913,6 +914,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   <div id="toast"></div>
 
   <script>
+    // ── Symbol substitution ─────────────────────────────────────────────────────
+    // Applied as a markdown preprocessor so it works with any marked version.
+    // Longer/more-specific patterns are listed before shorter overlapping ones.
+    const SYMBOL_SUBS = [
+      // Must come before their shorter prefixes
+      [/---/g,      '\u2014'],   // em dash
+      [/--/g,       '\u2013'],   // en dash
+      [/\.\.\./g,   '\u2026'],   // ellipsis
+      [/<=>/g,      '\u21D4'],   // left-right double arrow
+      [/=>/g,       '\u21D2'],   // right double arrow
+      [/<=/g,       '\u21D0'],   // left double arrow
+      [/->/g,       '\u2192'],   // right arrow
+      [/<-/g,       '\u2190'],   // left arrow
+      [/\+-/g,      '\u00B1'],   // plus-minus
+      [/\(c\)/gi,   '\u00A9'],   // copyright
+      [/\(r\)/gi,   '\u00AE'],   // registered
+      [/\(tm\)/gi,  '\u2122'],   // trademark
+      [/\(p\)/gi,   '\u2117'],   // sound-recording copyright
+      [/\(e\)/gi,   '\u20AC'],   // euro
+      [/\(deg\)/gi, '\u00B0'],   // degree
+      [/\(1\/2\)/g, '\u00BD'],   // one-half
+      [/\(1\/4\)/g, '\u00BC'],   // one-quarter
+      [/\(3\/4\)/g, '\u00BE'],   // three-quarters
+      [/\(x\)/gi,   '\u00D7'],   // multiplication sign
+      [/!=|\/=/g,   '\u2260'],   // not equal
+      [/>=/g,       '\u2265'],   // greater-or-equal
+    ];
+
+    function applySymbols(md) {
+      // Split on fenced code blocks and inline code spans — leave those untouched.
+      const parts = md.split(/(```[\s\S]*?```|`[^`]*`)/g);
+      return parts.map((chunk, i) => {
+        if (i % 2 === 1) return chunk; // inside code → leave untouched
+        // Process line by line so table separator rows (|---|---|) are never touched.
+        return chunk.split('\n').map(line => {
+          // A table separator line only contains |, -, :, and spaces (may be indented).
+          if (/^\s*\|[\s|:\-]+\|?\s*$/.test(line)) return line;
+          for (const [re, ch] of SYMBOL_SUBS) line = line.replace(re, ch);
+          return line;
+        }).join('\n');
+      }).join('');
+    }
+
+    function parseWiki(md) {
+      return marked.parse(applySymbols(md));
+    }
+
     // ── Toast ───────────────────────────────────────────────────────────────────
     let _toastTimer;
 
@@ -1068,7 +1116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
           '<button class="btn btn-primary" title="Create page" aria-label="Create page" onclick="createPage()">' + ICON_PLUS + '</button>';
       } else {
         document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
-        document.getElementById('content').innerHTML = marked.parse(rawMd);
+        document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
       }
@@ -1290,7 +1338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
         rawMd = content;
         status.textContent = '';
         cancelEdit();
-        document.getElementById('content').innerHTML = marked.parse(rawMd);
+        document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
