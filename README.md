@@ -6,6 +6,7 @@
 - JWT-based login with configurable users/roles (`admin`, `guest`)
 - Passwords are SHA-256 hashed client-side, then HMAC'd server-side before comparison
 - Tokens expire after 1 hour; stored in `sessionStorage`
+- Credentials: admin/admin123, guest/guest123
 
 **Content**
 - Pages stored as Markdown files under pages with arbitrary folder nesting
