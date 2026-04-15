@@ -57,18 +57,29 @@ function json_out(int $code, array $data): never
 // ═══════════════════════════════════════════════════════════════════════════
 // Config
 // Passwords are SHA-256'd client-side, then HMAC'd server-side before compare.
-// To regenerate a hash:
-//   php -r "define('S','<JWT_SECRET>'); echo hash_hmac('sha256', hash('sha256','<PASSWORD>'), S);"
+// Users are stored in users.json (blocked from HTTP via .htaccess).
 // ═══════════════════════════════════════════════════════════════════════════
-define('JWT_SECRET', 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
-define('TOKEN_TTL',  3600); // 1 hour
+define('JWT_SECRET',   'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
+define('TOKEN_TTL',    3600); // 1 hour
+define('USERS_FILE',   __DIR__ . '/users.json');
 
-$USERS = [
-  // admin:  password = admin123
-  'admin'  => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin'],
-  // guest: password = guest123
-  'guest'  => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest'],
+// Default users (used on first run to seed users.json if it doesn't exist)
+$USERS_DEFAULT = [
+  'admin' => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin'],
+  'guest' => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest'],
 ];
+
+function load_users(): array {
+  global $USERS_DEFAULT;
+  if (!is_file(USERS_FILE)) {
+    file_put_contents(USERS_FILE, json_encode($USERS_DEFAULT, JSON_PRETTY_PRINT), LOCK_EX);
+    return $USERS_DEFAULT;
+  }
+  $data = json_decode(file_get_contents(USERS_FILE), true);
+  return (is_array($data) && count($data) >= 2) ? $data : $USERS_DEFAULT;
+}
+
+$USERS = load_users();
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Base path detection
@@ -172,6 +183,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     json_out(500, ['error' => 'Could not write page to disk']);
   }
   json_out(200, ['ok' => true]);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Get usernames  GET ?action=get-users  (admin only)
+// Returns only usernames, never hashes.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-users') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $users  = load_users();
+  $admin  = '';
+  $guest  = '';
+  foreach ($users as $uname => $udata) {
+    if (($udata['role'] ?? '') === 'admin') $admin = $uname;
+    if (($udata['role'] ?? '') === 'guest') $guest = $uname;
+  }
+  json_out(200, ['adminUser' => $admin, 'guestUser' => $guest]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Save users  POST ?action=save-users  (admin only)
+// Body: { adminUser, adminHash (sha256hex|null), guestUser, guestHash (sha256hex|null) }
+// null hash means "keep existing password".
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-users') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+  $body      = json_decode(file_get_contents('php://input'), true) ?? [];
+  $adminUser = preg_replace('/[^a-z0-9_]/', '', strtolower($body['adminUser'] ?? ''));
+  $guestUser = preg_replace('/[^a-z0-9_]/', '', strtolower($body['guestUser'] ?? ''));
+
+  if (strlen($adminUser) < 2 || strlen($adminUser) > 32) json_out(400, ['error' => 'Admin username must be 2–32 chars (a-z, 0-9, _)']);
+  if (strlen($guestUser) < 2 || strlen($guestUser) > 32) json_out(400, ['error' => 'Guest username must be 2–32 chars (a-z, 0-9, _)']);
+  if ($adminUser === $guestUser) json_out(400, ['error' => 'Admin and guest usernames must be different']);
+
+  $existing = load_users();
+
+  // Resolve existing hashes for each role
+  $existingAdminHash = '';
+  $existingGuestHash = '';
+  foreach ($existing as $udata) {
+    if (($udata['role'] ?? '') === 'admin') $existingAdminHash = $udata['hash'];
+    if (($udata['role'] ?? '') === 'guest') $existingGuestHash = $udata['hash'];
+  }
+
+  // Validate and compute new hashes
+  $rawAdminHash = $body['adminHash'] ?? null;
+  $rawGuestHash = $body['guestHash'] ?? null;
+
+  if ($rawAdminHash !== null) {
+    $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawAdminHash));
+    if (strlen($rawAdminHash) !== 64) json_out(400, ['error' => 'Invalid admin password hash']);
+    $newAdminHash = hash_hmac('sha256', $rawAdminHash, JWT_SECRET);
+  } else {
+    $newAdminHash = $existingAdminHash;
+  }
+
+  if ($rawGuestHash !== null) {
+    $rawGuestHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawGuestHash));
+    if (strlen($rawGuestHash) !== 64) json_out(400, ['error' => 'Invalid guest password hash']);
+    $newGuestHash = hash_hmac('sha256', $rawGuestHash, JWT_SECRET);
+  } else {
+    $newGuestHash = $existingGuestHash;
+  }
+
+  $newUsers = [
+    $adminUser => ['hash' => $newAdminHash, 'role' => 'admin'],
+    $guestUser => ['hash' => $newGuestHash, 'role' => 'guest'],
+  ];
+
+  $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
+  if ($written === false) json_out(500, ['error' => 'Could not write users file']);
+
+  json_out(200, ['ok' => true, 'adminUser' => $adminUser, 'guestUser' => $guestUser]);
 }
 ?>
 <!DOCTYPE html>
@@ -807,6 +892,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     .guest-mode #content {
       margin-top: 2.5rem
     }
+
+    /* ── Users management panel ── */
+    #users-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .45);
+      z-index: 100
+    }
+
+    #users-panel {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(380px, 92vw);
+      background: #fff;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, .22);
+      border-radius: 8px;
+      padding: 1.5rem 1.75rem 1.75rem;
+      z-index: 101
+    }
+
+    #users-panel h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center
+    }
+
+    #users-panel button.close-btn {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #666;
+      line-height: 1
+    }
+
+    #users-form fieldset {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: .75rem 1rem .85rem;
+      margin-bottom: 1rem
+    }
+
+    #users-form legend {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #555;
+      padding: 0 .35rem
+    }
+
+    #users-form label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #333;
+      margin-top: .6rem
+    }
+
+    #users-form label:first-of-type {
+      margin-top: 0
+    }
+
+    #users-form input[type="text"],
+    #users-form input[type="password"] {
+      display: block;
+      width: 100%;
+      margin-top: .2rem;
+      padding: .45rem .65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .92rem;
+      outline: none;
+      font-family: inherit
+    }
+
+    #users-form input:focus {
+      border-color: #05c
+    }
+
+    #users-form-actions {
+      display: flex;
+      gap: .6rem;
+      justify-content: flex-end;
+      margin-top: .25rem
+    }
+
+    #users-save-status {
+      font-size: .8rem;
+      color: #666;
+      flex: 1;
+      line-height: 2.1
+    }
   </style>
 </head>
 
@@ -850,6 +1035,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg></button>
+        <button class="btn" id="users-btn" title="Manage users" aria-label="Manage users" style="display:none" onclick="toggleUsersPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+            <circle cx="19" cy="8" r="3" stroke-width="1.5" />
+            <line x1="19" y1="11" x2="19" y2="14" />
+            <line x1="17.5" y1="12.5" x2="20.5" y2="12.5" />
+          </svg></button>
         <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -890,6 +1082,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     <div id="index-panel">
       <h3>Pages <button class="close-btn" onclick="toggleIndex()">&times;</button></h3>
       <div id="index-tree"></div>
+    </div>
+    <!-- Users management panel -->
+    <div id="users-overlay" onclick="toggleUsersPanel()"></div>
+    <div id="users-panel">
+      <h3>Manage users <button class="close-btn" onclick="toggleUsersPanel()">&times;</button></h3>
+      <form id="users-form" novalidate>
+        <fieldset>
+          <legend>Admin</legend>
+          <label>Username
+            <input type="text" id="users-admin-name" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
+          </label>
+          <label>New password <span style="font-weight:400;color:#888">(leave blank to keep)</span>
+            <input type="password" id="users-admin-pass" autocomplete="new-password" placeholder="••••••••">
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Guest</legend>
+          <label>Username
+            <input type="text" id="users-guest-name" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
+          </label>
+          <label>New password <span style="font-weight:400;color:#888">(leave blank to keep)</span>
+            <input type="password" id="users-guest-pass" autocomplete="new-password" placeholder="••••••••">
+          </label>
+        </fieldset>
+        <div id="users-form-actions">
+          <span id="users-save-status"></span>
+          <button type="button" class="btn" onclick="toggleUsersPanel()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
     </div>
     <div id="editor">
       <div id="editor-bar">
@@ -977,6 +1199,85 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     const ICON_VIEW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
 
+    // ── Users management panel ──────────────────────────────────────────────────
+    let usersOpen = false;
+
+    async function toggleUsersPanel() {
+      const overlay = document.getElementById('users-overlay');
+      const panel   = document.getElementById('users-panel');
+      usersOpen = !usersOpen;
+      overlay.style.display = panel.style.display = usersOpen ? 'block' : 'none';
+      if (!usersOpen) {
+        document.getElementById('users-save-status').textContent = '';
+        document.getElementById('users-admin-pass').value = '';
+        document.getElementById('users-guest-pass').value = '';
+        return;
+      }
+      // Pre-load current usernames from server
+      const res = await apiFetch('?action=get-users');
+      if (!res || !res.ok) {
+        document.getElementById('users-save-status').textContent = 'Could not load users.';
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('users-admin-name').value = data.adminUser || '';
+      document.getElementById('users-guest-name').value = data.guestUser || '';
+      document.getElementById('users-admin-pass').value = '';
+      document.getElementById('users-guest-pass').value = '';
+      document.getElementById('users-save-status').textContent = '';
+    }
+
+    document.getElementById('users-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('users-save-status');
+      statusEl.textContent = 'Saving…';
+
+      const adminUser = document.getElementById('users-admin-name').value.trim().toLowerCase();
+      const guestUser = document.getElementById('users-guest-name').value.trim().toLowerCase();
+      const adminPass = document.getElementById('users-admin-pass').value;
+      const guestPass = document.getElementById('users-guest-pass').value;
+
+      if (!/^[a-z0-9_]{2,32}$/.test(adminUser)) {
+        statusEl.textContent = 'Admin username: 2–32 chars, only a-z, 0-9, _';
+        return;
+      }
+      if (!/^[a-z0-9_]{2,32}$/.test(guestUser)) {
+        statusEl.textContent = 'Guest username: 2–32 chars, only a-z, 0-9, _';
+        return;
+      }
+      if (adminUser === guestUser) {
+        statusEl.textContent = 'Admin and guest usernames must be different.';
+        return;
+      }
+
+      const adminHash = adminPass ? await sha256(adminPass) : null;
+      const guestHash = guestPass ? await sha256(guestPass) : null;
+
+      try {
+        const res = await apiFetch('?action=save-users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          const currentUser = getUser();
+          toggleUsersPanel();
+          // If admin renamed themselves, force re-login
+          if (currentUser !== adminUser) {
+            showToast('Admin username changed — please sign in again.', 'success', 4000);
+            setTimeout(logout, 500);
+          } else {
+            showToast('Users updated successfully.');
+          }
+        } else {
+          statusEl.textContent = data.error || 'Error saving users.';
+        }
+      } catch {
+        statusEl.textContent = 'Connection error.';
+      }
+    });
+
     // ── Base & routing helpers ──────────────────────────────────────────────────
     const BASE = <?= json_encode($baseHref) ?>;
 
@@ -1005,8 +1306,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
     }
 
     async function sha256(msg) {
-      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
-      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      // crypto.subtle requires a secure context (HTTPS/localhost).
+      // Fall back to a pure-JS SHA-256 so the app works over plain HTTP too.
+      if (typeof crypto !== 'undefined' && crypto.subtle) {
+        const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      return sha256Fallback(msg);
+    }
+
+    // Pure-JS SHA-256 (RFC 6234 / FIPS 180-4) — used when crypto.subtle is unavailable.
+    function sha256Fallback(msg) {
+      const K = [
+        0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+        0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+        0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+        0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+        0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+        0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+        0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+        0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2,
+      ];
+      const bytes = new TextEncoder().encode(msg);
+      const bits  = bytes.length * 8;
+      const padLen = ((bytes.length % 64) < 56 ? 56 : 120) - (bytes.length % 64);
+      const buf    = new Uint8Array(bytes.length + padLen + 8);
+      buf.set(bytes);
+      buf[bytes.length] = 0x80;
+      const dv = new DataView(buf.buffer);
+      dv.setUint32(buf.length - 4, bits >>> 0,  false);
+      dv.setUint32(buf.length - 8, Math.floor(bits / 2**32), false);
+
+      let [h0,h1,h2,h3,h4,h5,h6,h7] =
+        [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+
+      const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+      for (let i = 0; i < buf.length; i += 64) {
+        const w = new Uint32Array(64);
+        for (let j = 0; j < 16; j++) w[j] = dv.getUint32(i + j * 4, false);
+        for (let j = 16; j < 64; j++) {
+          const s0 = rotr(w[j-15],7)  ^ rotr(w[j-15],18) ^ (w[j-15] >>> 3);
+          const s1 = rotr(w[j-2], 17) ^ rotr(w[j-2], 19) ^ (w[j-2]  >>> 10);
+          w[j] = (w[j-16] + s0 + w[j-7] + s1) >>> 0;
+        }
+        let [a,b,c,d,e,f,g,h] = [h0,h1,h2,h3,h4,h5,h6,h7];
+        for (let j = 0; j < 64; j++) {
+          const S1  = rotr(e,6) ^ rotr(e,11) ^ rotr(e,25);
+          const ch  = (e & f) ^ (~e & g);
+          const t1  = (h + S1 + ch + K[j] + w[j]) >>> 0;
+          const S0  = rotr(a,2) ^ rotr(a,13) ^ rotr(a,22);
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const t2  = (S0 + maj) >>> 0;
+          [h,g,f,e,d,c,b,a] = [g,f,e,(d+t1)>>>0,c,b,a,(t1+t2)>>>0];
+        }
+        h0=(h0+a)>>>0; h1=(h1+b)>>>0; h2=(h2+c)>>>0; h3=(h3+d)>>>0;
+        h4=(h4+e)>>>0; h5=(h5+f)>>>0; h6=(h6+g)>>>0; h7=(h7+h)>>>0;
+      }
+      return [h0,h1,h2,h3,h4,h5,h6,h7].map(n => n.toString(16).padStart(8,'0')).join('');
     }
 
     async function apiFetch(url, opts = {}) {
@@ -1043,6 +1399,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
       document.getElementById('toc-btn').style.display = isGuest ? 'none' : '';
       document.getElementById('edit-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('index-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('users-btn').style.display = isAdmin ? '' : 'none';
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
         document.getElementById('home-btn').style.display = '';
