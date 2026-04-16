@@ -2,6 +2,10 @@
 
 **WeKickWiki** is a single-file PHP wiki with a JavaScript SPA frontend.
 
+**Default Credentials**
+- admin: admin123
+- guest: guest123
+
 **Authentication**
 - JWT-based login with configurable users/roles (`admin`, `guest`)
 - Passwords are SHA-256 hashed client-side, then HMAC'd server-side before comparison
