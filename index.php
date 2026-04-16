@@ -176,11 +176,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   $f = $base . '.md';
   $dir = dirname($f);
   if (!is_dir($dir)) {
-    mkdir($dir, 0755, true);
+    @mkdir($dir, 0755, true);
   }
-  $written = file_put_contents($f, $body['content'] ?? '');
+  ob_start();
+  $written = @file_put_contents($f, $body['content'] ?? '');
+  ob_end_clean();
   if ($written === false) {
-    json_out(500, ['error' => 'Could not write page to disk']);
+    json_out(500, ['error' =>
+      'Could not write page to disk. ' .
+      'Check that the web server user has write permission on pages/. ' .
+      'Hint: run "chown -R www-data:www-data pages/" inside the container.'
+    ]);
   }
   json_out(200, ['ok' => true]);
 }
@@ -257,6 +263,160 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
   if ($written === false) json_out(500, ['error' => 'Could not write users file']);
 
   json_out(200, ['ok' => true, 'adminUser' => $adminUser, 'guestUser' => $guestUser]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Backup  GET ?action=backup  (admin only)
+// Streams all pages as a single structured text file for download.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'backup') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+  $pagesDir = __DIR__ . '/pages';
+  $files    = [];
+  if (is_dir($pagesDir)) {
+    $iter = new RecursiveIteratorIterator(
+      new RecursiveDirectoryIterator($pagesDir, FilesystemIterator::SKIP_DOTS),
+      RecursiveIteratorIterator::LEAVES_ONLY
+    );
+    foreach ($iter as $file) {
+      if ($file->isFile() && $file->getExtension() === 'md') {
+        $files[] = str_replace('\\', '/', $file->getPathname());
+      }
+    }
+  }
+  sort($files);
+
+  $timestamp = gmdate('Y-m-d\TH:i:s\Z');
+  $filename  = 'wkw-backup-' . gmdate('Ymd-His') . '.txt';
+  $count     = count($files);
+
+  header('Content-Type: text/plain; charset=utf-8');
+  header('Content-Disposition: attachment; filename="' . $filename . '"');
+  header('Cache-Control: no-store');
+
+  echo "# WeKickWiki Backup\n";
+  echo "# Generated: $timestamp\n";
+  echo "# Pages: $count\n";
+  echo "# This file can be used to restore the wiki. Do not modify the page markers.\n";
+
+  foreach ($files as $f) {
+    $rel  = substr($f, strlen($pagesDir) + 1);
+    $page = preg_replace('/\.md$/', '', $rel);
+    echo "\n===PAGE=== $page\n";
+    $content = file_get_contents($f);
+    echo $content;
+    // Ensure content ends with a newline so the next marker starts on its own line
+    if (substr($content, -1) !== "\n") echo "\n";
+  }
+  exit;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Helper: delete all contents of a directory but keep the directory itself.
+// Returns true on success, false if any entry could not be removed.
+// Uses @ to suppress PHP warnings; caller checks the return value.
+// ═══════════════════════════════════════════════════════════════════════════
+function clear_dir_contents(string $dir): bool {
+  if (!is_dir($dir)) return true;
+  $iter = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::CHILD_FIRST
+  );
+  foreach ($iter as $entry) {
+    $ok = $entry->isDir() ? @rmdir($entry->getPathname()) : @unlink($entry->getPathname());
+    if (!$ok) return false;
+  }
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Restore  POST ?action=restore  (admin only, multipart/form-data)
+// Wipes pages/ directory and recreates all pages from the uploaded backup.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restore') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+  if (empty($_FILES['backup']) || $_FILES['backup']['error'] !== UPLOAD_ERR_OK) {
+    json_out(400, ['error' => 'No backup file received or upload error']);
+  }
+  if ($_FILES['backup']['size'] > 10 * 1024 * 1024) {
+    json_out(400, ['error' => 'Backup file exceeds 10 MB limit']);
+  }
+
+  $raw = file_get_contents($_FILES['backup']['tmp_name']);
+  if ($raw === false) json_out(500, ['error' => 'Could not read uploaded file']);
+
+  // Parse backup: split into pages
+  $pages   = [];
+  $curPage = null;
+  $curLines = [];
+
+  foreach (explode("\n", $raw) as $line) {
+    if (preg_match('/^===PAGE=== (.+)$/', $line, $m)) {
+      // Save previous page block
+      if ($curPage !== null) {
+        $pages[$curPage] = implode("\n", $curLines);
+      }
+      // Sanitize path: same rules as all other endpoints + no path traversal
+      $p = preg_replace('/[^a-zA-Z0-9\/\-_]/', '', trim($m[1]));
+      $p = trim($p, '/');
+      if ($p === '' || strpos($p, '..') !== false) {
+        json_out(400, ['error' => 'Invalid page path in backup: ' . htmlspecialchars(trim($m[1]))]);
+      }
+      $curPage  = $p;
+      $curLines = [];
+    } else {
+      if ($curPage !== null) {
+        $curLines[] = $line;
+      }
+    }
+  }
+  // Save last page block
+  if ($curPage !== null) {
+    $pages[$curPage] = implode("\n", $curLines);
+  }
+
+  if (empty($pages)) {
+    json_out(400, ['error' => 'No valid pages found in backup file']);
+  }
+
+  // Clear all existing pages (keep the pages/ directory itself so we don't
+  // need write permission on its parent directory).
+  // Output buffering ensures PHP warnings never corrupt the JSON response.
+  $pagesDir = __DIR__ . '/pages';
+  if (!is_dir($pagesDir)) @mkdir($pagesDir, 0755, true);
+  ob_start();
+  $cleared = clear_dir_contents($pagesDir);
+  ob_end_clean();
+  if (!$cleared) {
+    json_out(500, ['error' =>
+      'Cannot clear pages/ directory contents. ' .
+      'Make sure the web server user has write permission on all files inside pages/. ' .
+      'Hint: run "chown -R www-data:www-data pages/" inside the container.'
+    ]);
+  }
+
+  // Recreate pages from backup
+  $written = 0;
+  foreach ($pages as $page => $content) {
+    $f   = $pagesDir . '/' . $page . '.md';
+    $dir = dirname($f);
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    // Strip the trailing newline added by the parser's line-joining
+    $content = rtrim($content, "\n");
+    if (@file_put_contents($f, $content) === false) {
+      json_out(500, ['error' =>
+        'Could not write page: ' . $page . '. ' .
+        'Check web server write permissions on pages/.'
+      ]);
+    }
+    $written++;
+  }
+
+  json_out(200, ['ok' => true, 'pages' => $written]);
 }
 ?>
 <!DOCTYPE html>
@@ -1042,6 +1202,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
             <line x1="19" y1="11" x2="19" y2="14" />
             <line x1="17.5" y1="12.5" x2="20.5" y2="12.5" />
           </svg></button>
+        <button class="btn" id="backup-btn" title="Download backup" aria-label="Download backup" style="display:none" onclick="downloadBackup()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="8 17 12 21 16 17" />
+            <line x1="12" y1="12" x2="12" y2="21" />
+            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+          </svg></button>
+        <button class="btn btn-danger" id="restore-btn" title="Restore backup" aria-label="Restore backup" style="display:none" onclick="restoreBackup()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <polyline points="16 16 12 12 8 16" />
+            <line x1="12" y1="12" x2="12" y2="21" />
+            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
+          </svg></button>
+        <input type="file" id="restore-input" accept=".txt" style="display:none">
         <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -1198,6 +1369,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     const ICON_VIEW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+    // ── Backup & Restore ────────────────────────────────────────────────────────
+    async function downloadBackup() {
+      const btn = document.getElementById('backup-btn');
+      btn.disabled = true;
+      try {
+        const res = await apiFetch('?action=backup');
+        if (!res || !res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(data.error || 'Error generating backup', 'error');
+          return;
+        }
+        // Derive filename from Content-Disposition header or build a fallback
+        let filename = 'wkw-backup.txt';
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m  = cd.match(/filename="?([^";\s]+)"?/);
+        if (m) filename = m[1];
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Backup downloaded: ' + filename);
+      } catch {
+        showToast('Connection error during backup', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function restoreBackup() {
+      document.getElementById('restore-input').click();
+    }
+
+    document.getElementById('restore-input').addEventListener('change', async function () {
+      const file = this.files[0];
+      if (!file) return;
+
+      const confirmed = confirm(
+        '⚠️ RESTORE BACKUP\n\n' +
+        'This will permanently DELETE the entire pages/ directory and replace ALL wiki content with the uploaded backup.\n\n' +
+        'This operation CANNOT be undone.\n\n' +
+        'Are you sure you want to continue?'
+      );
+      this.value = ''; // reset input regardless
+      if (!confirmed) return;
+
+      const btn = document.getElementById('restore-btn');
+      btn.disabled = true;
+      const fd = new FormData();
+      fd.append('backup', file);
+      try {
+        const res = await apiFetch('?action=restore', { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res && res.ok) {
+          showToast('Backup restored — ' + data.pages + ' page(s) recovered.', 'success', 5000);
+          load(currentPage);
+        } else {
+          showToast(data.error || 'Error restoring backup', 'error');
+        }
+      } catch {
+        showToast('Connection error during restore', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
 
     // ── Users management panel ──────────────────────────────────────────────────
     let usersOpen = false;
@@ -1400,6 +1642,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
       document.getElementById('edit-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('index-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('users-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
         document.getElementById('home-btn').style.display = '';

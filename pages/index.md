@@ -1,4 +1,4 @@
-# Welcome to the WeKickWiki Wiki
+# Welcome to the WeKickWiki Wikixxxxxxx1111
 
 **WeKickWiki** is a single-file PHP wiki with a JavaScript SPA frontend.
 
@@ -35,7 +35,7 @@
 - SVG icon set throughout; icon.svg used as favicon and in login/header
 - No external dependencies except marked.js CDN
 
-## Pages
+## Pagessssssswwwwww
 
 This is the home page. Browse using the links below or use the **Index** button in the top bar to see all pages.
 
