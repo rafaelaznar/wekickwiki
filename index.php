@@ -64,9 +64,11 @@ define('TOKEN_TTL',    3600); // 1 hour
 define('USERS_FILE',   __DIR__ . '/users.json');
 
 // Default users (used on first run to seed users.json if it doesn't exist)
+// guestLoginEnabled is stored as a top-level key alongside the user entries.
 $USERS_DEFAULT = [
   'admin' => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin'],
   'guest' => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest'],
+  'guestLoginEnabled' => true,
 ];
 
 function load_users(): array {
@@ -96,7 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
   $hash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
   if (strlen($hash) !== 64) json_out(401, ['error' => 'Invalid credentials']);
   $serverHash = hash_hmac('sha256', $hash, JWT_SECRET);
-  if (isset($USERS[$user]) && hash_equals($USERS[$user]['hash'], $serverHash)) {
+  if (isset($USERS[$user]) && is_array($USERS[$user]) && hash_equals($USERS[$user]['hash'], $serverHash)) {
+    if (($USERS[$user]['role'] ?? '') === 'guest' && !($USERS['guestLoginEnabled'] ?? true)) {
+      json_out(401, ['error' => 'Guest login is currently disabled']);
+    }
     json_out(200, [
       'token' => jwt_make(['sub' => $user, 'role' => $USERS[$user]['role'], 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
       'role'  => $USERS[$user]['role'],
@@ -201,10 +206,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-use
   $admin  = '';
   $guest  = '';
   foreach ($users as $uname => $udata) {
+    if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') $admin = $uname;
     if (($udata['role'] ?? '') === 'guest') $guest = $uname;
   }
-  json_out(200, ['adminUser' => $admin, 'guestUser' => $guest]);
+  json_out(200, [
+    'adminUser'         => $admin,
+    'guestUser'         => $guest,
+    'guestLoginEnabled' => (bool)($users['guestLoginEnabled'] ?? true),
+  ]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -230,6 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
   $existingAdminHash = '';
   $existingGuestHash = '';
   foreach ($existing as $udata) {
+    if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') $existingAdminHash = $udata['hash'];
     if (($udata['role'] ?? '') === 'guest') $existingGuestHash = $udata['hash'];
   }
@@ -254,9 +265,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     $newGuestHash = $existingGuestHash;
   }
 
+  // Preserve guestLoginEnabled; allow updating it from body
+  $guestLoginEnabled = isset($body['guestLoginEnabled'])
+    ? (bool)$body['guestLoginEnabled']
+    : (bool)($existing['guestLoginEnabled'] ?? true);
+
   $newUsers = [
-    $adminUser => ['hash' => $newAdminHash, 'role' => 'admin'],
-    $guestUser => ['hash' => $newGuestHash, 'role' => 'guest'],
+    $adminUser          => ['hash' => $newAdminHash, 'role' => 'admin'],
+    $guestUser          => ['hash' => $newGuestHash, 'role' => 'guest'],
+    'guestLoginEnabled' => $guestLoginEnabled,
   ];
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
@@ -1277,6 +1294,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
             <input type="password" id="users-guest-pass" autocomplete="new-password" placeholder="••••••••">
           </label>
         </fieldset>
+        <div id="guest-login-setting" style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem">
+          <input type="checkbox" id="guest-login-enabled" style="width:auto;cursor:pointer">
+          <label for="guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest login</label>
+        </div>
         <div id="users-form-actions">
           <span id="users-save-status"></span>
           <button type="button" class="btn" onclick="toggleUsersPanel()">Cancel</button>
@@ -1467,6 +1488,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       document.getElementById('users-admin-pass').value = '';
       document.getElementById('users-guest-pass').value = '';
       document.getElementById('users-save-status').textContent = '';
+      document.getElementById('guest-login-enabled').checked = data.guestLoginEnabled !== false;
     }
 
     document.getElementById('users-form').addEventListener('submit', async e => {
@@ -1494,12 +1516,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
 
       const adminHash = adminPass ? await sha256(adminPass) : null;
       const guestHash = guestPass ? await sha256(guestPass) : null;
+      const guestLoginEnabled = document.getElementById('guest-login-enabled').checked;
 
       try {
         const res = await apiFetch('?action=save-users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash })
+          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash, guestLoginEnabled })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
