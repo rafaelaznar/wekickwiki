@@ -930,10 +930,6 @@ Example of using separate Markdown tables as alternative:
 | Europe | 20k  | 30k  | 40k  |
 | USA    | 30k  | 45k  | 60k  |
 
-**Above table as two separate sections (alternative to rowspan):**
-
-----
-
 ## 18. Icons and Emoji
 
 The wiki has no *shortcode* system (`:smile:` etc.), but it accepts emoji

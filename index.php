@@ -1483,7 +1483,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
         let j = 0;
         while (j < rawLines.length) {
           // HTML table block: collect lines until </table>
-          if (/<table(\s[^>]*)?>/.test(rawLines[j])) {
+          // Strip inline code spans before testing so `<table>` inside backticks is ignored.
+          if (/<table(\s[^>]*)?>/.test(rawLines[j].replace(/`[^`]*`/g, ''))) {
             let html = '';
             while (j < rawLines.length) {
               html += rawLines[j] + ' ';
