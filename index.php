@@ -1249,6 +1249,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
             <line x1="12" y1="19" x2="12" y2="5" />
             <polyline points="5 12 12 5 19 12" />
           </svg></button>
+        <button class="btn" id="odt-btn" title="Download as ODT" aria-label="Download as ODT" style="display:none" onclick="downloadOdt()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="12" y1="18" x2="12" y2="12" />
+            <polyline points="9 15 12 18 15 15" />
+          </svg></button>
         <button class="btn btn-danger" id="logout-btn" title="Sign out" aria-label="Sign out" onclick="logout()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
             <polyline points="16 17 21 12 16 7" />
@@ -1390,6 +1396,360 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
     const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     const ICON_VIEW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
     const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+    // ── ODT download (client-side generation) ───────────────────────────────────
+    function odtXmlEsc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function odtInline(text) {
+      // Decode a handful of HTML entities that may come from applySymbols / inline HTML
+      function decEnt(s) {
+        return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+                .replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&nbsp;/g,'\u00a0')
+                .replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(+n))
+                .replace(/&#x([0-9a-f]+);/gi,(_,h)=>String.fromCodePoint(parseInt(h,16)));
+      }
+      let out = ''; let i = 0;
+      while (i < text.length) {
+        // HTML tags
+        if (text[i] === '<') {
+          const tag = text.slice(i).match(/^<(\/?)(strong|b|em|i|code|s|del|strike|u|ins|mark|br)(\s[^>]*)?\/?>|^<a(\s[^>]*)?>|^<\/a>/i);
+          if (tag) {
+            const full = tag[0];
+            const closing = full.startsWith('</');
+            const tagName = (tag[1] !== undefined ? tag[2] : (full.match(/<(a|br)/i)||[])[1]||'').toLowerCase();
+            if (tagName === 'br') { out += '<text:line-break/>'; }
+            else if (!closing) {
+              const style = {strong:'C_Bold',b:'C_Bold',em:'C_Italic',i:'C_Italic',
+                            code:'C_Code',s:'C_Strike',del:'C_Strike',strike:'C_Strike',
+                            u:'C_Under',ins:'C_Under',mark:'C_Mark',a:''}[tagName];
+              if (style) out += '<text:span text:style-name="'+style+'">';
+              else if (tagName === 'a') out += '<text:span>'; // plain span for links
+            } else {
+              out += '</text:span>';
+            }
+            i += full.length; continue;
+          }
+          // HTML entity starting with &
+          const ent = text.slice(i).match(/^&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/);
+          if (ent) { out += odtXmlEsc(decEnt(ent[0])); i += ent[0].length; continue; }
+        }
+        if (text[i] === '&') {
+          const ent = text.slice(i).match(/^&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/);
+          if (ent) { out += odtXmlEsc(decEnt(ent[0])); i += ent[0].length; continue; }
+        }
+        if (text.startsWith('**', i)) {
+          const j = text.indexOf('**', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Bold">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text.startsWith('__', i)) {
+          const j = text.indexOf('__', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Bold">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text.startsWith('~~', i)) {
+          const j = text.indexOf('~~', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Strike">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text[i] === '*' && !text.startsWith('**', i)) {
+          const j = text.indexOf('*', i + 1);
+          if (j !== -1 && !text.startsWith('**', j)) { out += '<text:span text:style-name="C_Italic">' + odtInline(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '_' && !text.startsWith('__', i)) {
+          const j = text.indexOf('_', i + 1);
+          if (j !== -1 && !text.startsWith('__', j)) { out += '<text:span text:style-name="C_Italic">' + odtInline(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '`') {
+          const j = text.indexOf('`', i + 1);
+          if (j !== -1) { out += '<text:span text:style-name="C_Code">' + odtXmlEsc(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '!' && text[i+1] === '[') {
+          const m = text.slice(i).match(/^!\[([^\]]*)\]\([^)]*\)/);
+          if (m) { if (m[1]) out += odtXmlEsc('['+m[1]+']'); i += m[0].length; continue; }
+        }
+        if (text[i] === '[') {
+          const m = text.slice(i).match(/^\[([^\]]*)\]\([^)]*\)/);
+          if (m) { out += odtInline(m[1]); i += m[0].length; continue; }
+        }
+        out += odtXmlEsc(text[i]); i++;
+      }
+      return out;
+    }
+
+    function odtBody(md, inQuote) {
+      // Pre-process: collect GFM tables and blockquotes into token objects.
+      function parseBlocks(rawLines) {
+        const tokens = [];
+        let j = 0;
+        while (j < rawLines.length) {
+          // Blockquote: one or more consecutive lines starting with >
+          if (/^>/.test(rawLines[j])) {
+            const qLines = [];
+            while (j < rawLines.length && /^>/.test(rawLines[j])) {
+              qLines.push(rawLines[j].replace(/^>\s?/, '')); j++;
+            }
+            tokens.push({ type: 'quote', content: qLines.join('\n') });
+            continue;
+          }
+          // A GFM table needs at least 3 lines: header | sep | body...
+          // Header: contains |   Sep: only |, -, :, space
+          if (j + 2 < rawLines.length
+              && /\|/.test(rawLines[j])
+              && /^\s*\|?[\s|:\-]+\|?\s*$/.test(rawLines[j+1])) {
+            const splitCells = line => line.replace(/^\|/,'').replace(/\|$/,'').split('|').map(c => c.trim());
+            const headers = splitCells(rawLines[j]);
+            let k = j + 2;
+            const rows = [];
+            while (k < rawLines.length && /\|/.test(rawLines[k])
+                   && !/^\s*\|?[\s|:\-]+\|?\s*$/.test(rawLines[k])) {
+              rows.push(splitCells(rawLines[k])); k++;
+            }
+            tokens.push({ type: 'table', headers, rows });
+            j = k;
+          } else {
+            tokens.push({ type: 'line', text: rawLines[j] }); j++;
+          }
+        }
+        return tokens;
+      }
+      const S_BODY = inQuote ? 'P_Quote' : 'P_Body';
+      const S_PRE  = inQuote ? 'P_QuotePre' : 'P_Pre';
+      const S_LI   = inQuote ? 'P_QuoteLi' : 'P_Li';
+
+      let tableCounter = 0;
+      function odtTable(headers, rows) {
+        tableCounter++;
+        const tname = 'Tbl' + tableCounter;
+        const cols = headers.length;
+        let t = '<table:table table:name="'+odtXmlEsc(tname)+'" table:style-name="T_Table">';
+        for (let c = 0; c < cols; c++) t += '<table:table-column table:style-name="T_Col"/>';
+        // header row
+        t += '<table:table-header-rows><table:table-row>';
+        for (const h of headers)
+          t += '<table:table-cell table:style-name="T_CellH" office:value-type="string"><text:p text:style-name="P_TH">'+odtInline(h)+'</text:p></table:table-cell>';
+        t += '</table:table-row></table:table-header-rows>';
+        // body rows
+        for (const row of rows) {
+          t += '<table:table-row>';
+          for (let c = 0; c < cols; c++) {
+            const cell = row[c] !== undefined ? row[c] : '';
+            t += '<table:table-cell table:style-name="T_Cell" office:value-type="string"><text:p text:style-name="P_TD">'+odtInline(cell)+'</text:p></table:table-cell>';
+          }
+          t += '</table:table-row>';
+        }
+        t += '</table:table>';
+        return t;
+      }
+
+      const rawLines = md.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+      const tokens = parseBlocks(rawLines);
+      const lines = tokens.map(t =>
+        t.type === 'line'  ? t.text :
+        t.type === 'table' ? '\x00TABLE\x00' + JSON.stringify({h:t.headers,r:t.rows}) :
+        /* quote */          '\x00QUOTE\x00' + t.content
+      );
+
+      let out = '', i = 0, inList = false, lstType = '', inCode = false, codeBuf = [];
+      while (i < lines.length) {
+        const line = lines[i];
+        if (/^```/.test(line)) {
+          if (inCode) {
+            inCode = false;
+            if (inList) { out += '</text:list>'; inList = false; }
+            for (const cl of codeBuf) out += '<text:p text:style-name="'+S_PRE+'">' + odtXmlEsc(cl) + '</text:p>';
+            codeBuf = [];
+          } else {
+            if (inList) { out += '</text:list>'; inList = false; }
+            inCode = true;
+          }
+          i++; continue;
+        }
+        if (inCode) { codeBuf.push(line); i++; continue; }
+        const isUL = /^(\s*)[-*+]\s+(.*)$/.exec(line);
+        const isOL = !isUL && /^\d+\.\s+(.*)$/.exec(line);
+        if (inList && !isUL && !isOL && line.trim() !== '') { out += '</text:list>'; inList = false; }
+        if (line.startsWith('\x00TABLE\x00')) {
+          const td = JSON.parse(line.slice(7));
+          out += odtTable(td.h, td.r);
+        } else if (line.startsWith('\x00QUOTE\x00')) {
+          if (inList) { out += '</text:list>'; inList = false; }
+          out += odtBody(line.slice(7), true);
+        } else {
+          const hd = /^(#{1,6})\s+(.+)$/.exec(line);
+          if (hd) {
+            const lvl = hd[1].length;
+            out += '<text:h text:style-name="P_H'+lvl+'" text:outline-level="'+lvl+'">'+odtInline(hd[2])+'</text:h>';
+          } else if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+            out += '<text:p text:style-name="P_HR"/>';
+          } else if (isUL) {
+            if (!inList || lstType !== 'ul') { if (inList) out += '</text:list>'; out += '<text:list text:style-name="LS_Bullet">'; inList = true; lstType = 'ul'; }
+            out += '<text:list-item><text:p text:style-name="'+S_LI+'">'+odtInline(isUL[2])+'</text:p></text:list-item>';
+          } else if (isOL) {
+            if (!inList || lstType !== 'ol') { if (inList) out += '</text:list>'; out += '<text:list text:style-name="LS_Number">'; inList = true; lstType = 'ol'; }
+            out += '<text:list-item><text:p text:style-name="'+S_LI+'">'+odtInline(isOL[1])+'</text:p></text:list-item>';
+          } else if (line.trim() === '') {
+            // blank
+          } else {
+            const pl = [line];
+            while (i+1 < lines.length && lines[i+1].trim() !== ''
+              && !/^#{1,6}\s/.test(lines[i+1]) && !/^```/.test(lines[i+1])
+              && !/^(\s*)[-*+]\s/.test(lines[i+1]) && !/^\d+\.\s/.test(lines[i+1])
+              && !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i+1])
+              && !lines[i+1].startsWith('\x00TABLE\x00')
+              && !lines[i+1].startsWith('\x00QUOTE\x00')
+            ) { i++; pl.push(lines[i]); }
+            out += '<text:p text:style-name="'+S_BODY+'">'+odtInline(pl.join(' '))+'</text:p>';
+          }
+        }
+        i++;
+      }
+      if (inList) out += '</text:list>';
+      return out;
+    }
+
+    function buildOdtManifest() { /* not used in flat-ODT mode */ }
+
+    function buildOdtContent(md) {
+      const xmlns =
+        ' xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+        +' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"'
+        +' xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"'
+        +' xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
+        +' xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"'
+        +' xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"';
+      const astyles =
+        '<style:style style:name="P_Body" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.1cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="12pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H1" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.5cm" fo:margin-bottom="0.25cm"/>'
+        +'<style:text-properties fo:font-size="18pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H2" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.4cm" fo:margin-bottom="0.2cm"/>'
+        +'<style:text-properties fo:font-size="15pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H3" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.35cm" fo:margin-bottom="0.15cm"/>'
+        +'<style:text-properties fo:font-size="13pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H4" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.3cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H5" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.25cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="11pt" fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H6" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.2cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="10pt" fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Pre" style:family="paragraph">'
+        +'<style:paragraph-properties fo:background-color="#f5f5f5" fo:padding="0.1cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_HR" style:family="paragraph">'
+        +'<style:paragraph-properties fo:border-bottom="0.05cm solid #cccccc" fo:padding-bottom="0.15cm" fo:margin-bottom="0.15cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Li" style:family="paragraph">'
+        +'<style:text-properties fo:font-size="12pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Bold" style:family="text">'
+        +'<style:text-properties fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Italic" style:family="text">'
+        +'<style:text-properties fo:font-style="italic"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Code" style:family="text">'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt" fo:background-color="#f0f0f0"/>'
+        +'</style:style>'
+        +'<text:list-style style:name="LS_Bullet">'
+        +'<text:list-level-style-bullet text:level="1" text:bullet-char="&#x2022;">'
+        +'<style:list-level-properties text:space-before="0.5cm" text:min-label-width="0.5cm"/>'
+        +'</text:list-level-style-bullet>'
+        +'</text:list-style>'
+        +'<text:list-style style:name="LS_Number">'
+        +'<text:list-level-style-number text:level="1" style:num-format="1" style:num-suffix=".">'
+        +'<style:list-level-properties text:space-before="0.5cm" text:min-label-width="0.5cm"/>'
+        +'</text:list-level-style-number>'
+        +'</text:list-style>'
+        +'<style:style style:name="T_Table" style:family="table">'
+        +'<style:table-properties style:width="16cm" fo:margin-top="0.3cm" fo:margin-bottom="0.3cm" table:border-model="collapsing"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_Col" style:family="table-column">'
+        +'<style:table-column-properties style:column-width="4cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_CellH" style:family="table-cell">'
+        +'<style:table-cell-properties fo:border="0.05cm solid #dddddd" fo:background-color="#f5f5f5" fo:padding="0.12cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_Cell" style:family="table-cell">'
+        +'<style:table-cell-properties fo:border="0.05cm solid #dddddd" fo:padding="0.12cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_TH" style:family="paragraph">'
+        +'<style:text-properties fo:font-weight="bold" fo:font-size="11pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_TD" style:family="paragraph">'
+        +'<style:text-properties fo:font-size="11pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Quote" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm" fo:padding-left="0.3cm" fo:border-left="0.1cm solid #cccccc" fo:margin-top="0.05cm" fo:margin-bottom="0.05cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_QuotePre" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm" fo:padding-left="0.3cm" fo:border-left="0.1cm solid #cccccc" fo:background-color="#f5f5f5" fo:padding="0.1cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_QuoteLi" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Strike" style:family="text">'
+        +'<style:text-properties style:text-line-through-style="solid"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Under" style:family="text">'
+        +'<style:text-properties style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Mark" style:family="text">'
+        +'<style:text-properties fo:background-color="#ffff00"/>'
+        +'</style:style>';
+      return '\x3C?xml version="1.0" encoding="UTF-8"?>'
+        +'<office:document'
+        +xmlns
+        +' office:version="1.3"'
+        +' office:mimetype="application/vnd.oasis.opendocument.text">'
+        +'<office:font-face-decls>'
+        +'<style:font-face style:name="Liberation Mono" svg:font-family="&apos;Liberation Mono&apos;" style:font-family-generic="modern" style:font-pitch="fixed"/>'
+        +'</office:font-face-decls>'
+        +'<office:automatic-styles>'+astyles+'</office:automatic-styles>'
+        +'<office:body><office:text>'
+        +odtBody(applySymbols(md))
+        +'</office:text></office:body>'
+        +'</office:document>';
+    }
+
+    async function downloadOdt() {
+      if (!rawMd) return;
+      const btn = document.getElementById('odt-btn');
+      btn.disabled = true;
+      try {
+        const xml = buildOdtContent(rawMd);
+        const blob = new Blob([xml], {type: 'application/vnd.oasis.opendocument.text-flat-xml'});
+        const filename = currentPage.split('/').pop() + '.fodt';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Downloaded: ' + filename);
+      } catch(e) {
+        console.error('ODT error:', e);
+        showToast('Error generating ODT: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
 
     // ── Backup & Restore ────────────────────────────────────────────────────────
     async function downloadBackup() {
@@ -1735,11 +2095,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       const isAdmin = getRole() === 'admin';
       if (res.status === 404 && isAdmin) {
         document.getElementById('delete-btn').style.display = 'none';
+        document.getElementById('odt-btn').style.display = 'none';
         document.getElementById('content').innerHTML =
           '<p style="color:#888;margin-bottom:.75rem">This page does not exist yet.</p>' +
           '<button class="btn btn-primary" title="Create page" aria-label="Create page" onclick="createPage()">' + ICON_PLUS + '</button>';
       } else {
         document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
+        document.getElementById('odt-btn').style.display = '';
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
@@ -1966,6 +2328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
         addHeadingIds();
         buildInlineToc();
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
+        document.getElementById('odt-btn').style.display = '';
         showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
       } else {
         const data = await res.json().catch(() => ({}));
