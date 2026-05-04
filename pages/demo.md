@@ -792,7 +792,149 @@ Indented separator (inside list):
 
 ---
 
-## 17. Icons and Emoji
+## 17. Merged Cells in Tables
+
+**Note:** Standard Markdown does not natively support merged cells (colspan/rowspan).
+The following examples use inline HTML `<table>` elements to demonstrate merged cells.
+
+### 17.1 Row Spans (colspan)
+
+<table>
+<tr>
+  <th colspan="3">Merged Header (3 columns)</th>
+</tr>
+<tr>
+  <td>Col 1</td>
+  <td>Col 2</td>
+  <td>Col 3</td>
+</tr>
+</table>
+
+### 17.2 Column Spans (rowspan)
+
+<table>
+<tr>
+  <th rowspan="3">Category</th>
+  <th>Q1</th>
+  <td>100</td>
+</tr>
+<tr>
+  <th>Q2</th>
+  <td>150</td>
+</tr>
+<tr>
+  <th>Q3</th>
+  <td>200</td>
+</tr>
+</table>
+
+### 17.3 Complex Merged Cells
+
+<table>
+<tr>
+  <th colspan="2" rowspan="2">Project</th>
+  <th colspan="2">Progress</th>
+</tr>
+<tr>
+  <th>Done</th>
+  <th>Pending</th>
+</tr>
+<tr>
+  <td rowspan="2">Phase 1</td>
+  <td>Design</td>
+  <td>100%</td>
+  <td>0%</td>
+</tr>
+<tr>
+  <td>Dev</td>
+  <td>75%</td>
+  <td>25%</td>
+</tr>
+<tr>
+  <td colspan="2">Phase 2</td>
+  <td>50%</td>
+  <td>50%</td>
+</tr>
+</table>
+
+### 17.4 Matrix with Axis Labels (rowspan + colspan)
+
+<table>
+<tr>
+  <th colspan="1" rowspan="1"></th>
+  <th>2024</th>
+  <th>2025</th>
+  <th>2026</th>
+</tr>
+<tr>
+  <th>Sales</th>
+  <td>50k</td>
+  <td>75k</td>
+  <td>100k</td>
+</tr>
+<tr>
+  <th>Costs</th>
+  <td>30k</td>
+  <td>35k</td>
+  <td>40k</td>
+</tr>
+<tr>
+  <th>Profit</th>
+  <td>20k</td>
+  <td>40k</td>
+  <td>60k</td>
+</tr>
+</table>
+
+### 17.5 Table with Mixed Styling and Merged Cells
+
+<table border="1" cellpadding="10">
+<tr style="background-color: #f0f0f0;">
+  <th colspan="4">Product Catalog</th>
+</tr>
+<tr>
+  <th>Name</th>
+  <th colspan="2">Price by Region</th>
+  <th>Stock</th>
+</tr>
+<tr>
+  <td>Widget A</td>
+  <td>Europe: €50</td>
+  <td>USA: $60</td>
+  <td rowspan="3" style="text-align: center;"><strong>In Stock</strong></td>
+</tr>
+<tr>
+  <td>Widget B</td>
+  <td colspan="2">Special pricing available</td>
+</tr>
+<tr>
+  <td>Widget C</td>
+  <td>Europe: €45</td>
+  <td>USA: $55</td>
+</tr>
+</table>
+
+### 17.6 Limitation Notes
+
+- **Standard Markdown:** Does not support `colspan` or `rowspan`.
+- **Workaround 1:** Use inline HTML `<table>` elements (shown above).
+- **Workaround 2:** For simple layouts, use separate tables or reorganize data.
+- **Workaround 3:** Use Markdown variants (e.g., Pandoc extended tables) if supported by parser.
+
+Example of using separate Markdown tables as alternative:
+
+**Sales by Region:**
+
+| Region | 2024 | 2025 | 2026 |
+|--------|------|------|------|
+| Europe | 20k  | 30k  | 40k  |
+| USA    | 30k  | 45k  | 60k  |
+
+**Above table as two separate sections (alternative to rowspan):**
+
+----
+
+## 18. Icons and Emoji
 
 The wiki has no *shortcode* system (`:smile:` etc.), but it accepts emoji
 and Unicode symbols in three ways:
@@ -803,7 +945,7 @@ and Unicode symbols in three ways:
 
 The file is stored as UTF-8, so any Unicode character is valid.
 
-### 17.1 Emoji directly in text
+### 18.1 Emoji directly in text
 
 These are Unicode characters pasted directly into Markdown:
 
@@ -823,7 +965,7 @@ These are Unicode characters pasted directly into Markdown:
 
 ⌚ ⌛ ⏰ ⏱️ ⏲️ 🕰️ ⏳ 📅 📆 📇 📈 📉 📊 📋 📌 📍 📎 🖇️ 📏 📐
 
-### 17.2 Classic Unicode symbols (non-emoji)
+### 18.2 Classic Unicode symbols (non-emoji)
 
 Arrows and mathematical operators, also available via `applySymbols`:
 
@@ -872,7 +1014,7 @@ Arrows and mathematical operators, also available via `applySymbols`:
 | ' | `&lsquo;` | Left single quotation mark |
 | ' | `&rsquo;` | Right single quotation mark |
 
-### 17.3 Card suits, circled numbers, and geometric shapes
+### 18.3 Card suits, circled numbers, and geometric shapes
 
 &#9824; &#9827; &#9829; &#9830; (♠ ♣ ♥ ♦) — card suits via numeric entity.
 
@@ -880,7 +1022,7 @@ Arrows and mathematical operators, also available via `applySymbols`:
 
 &#9632; &#9633; &#9650; &#9651; &#9670; &#9671; (■ □ ▲ △ ◆ ◇) — geometric shapes.
 
-### 17.4 Status and check symbols
+### 18.4 Status and check symbols
 
 | Symbol | Entity / Unicode | Common use |
 |---|---|---|
@@ -897,7 +1039,7 @@ Arrows and mathematical operators, also available via `applySymbols`:
 | 🔒 | `&#128274;` | Locked |
 | 🔓 | `&#128275;` | Unlocked |
 
-### 17.5 Emoji in special positions
+### 18.5 Emoji in special positions
 
 **Bold:** 🚀 **Launch**
 
@@ -921,7 +1063,7 @@ Arrows and mathematical operators, also available via `applySymbols`:
 | New | 🆕 | Recently added |
 | Locked | 🔒 | No access |
 
-### 17.6 Note on ODT export
+### 18.6 Note on ODT export
 
 Emoji and Unicode symbols are included in the exported `.fodt` file as
 UTF-8 text. Correct rendering depends on whether the font used by the

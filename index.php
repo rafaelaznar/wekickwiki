@@ -1482,6 +1482,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
         const tokens = [];
         let j = 0;
         while (j < rawLines.length) {
+          // HTML table block: collect lines until </table>
+          if (/<table(\s[^>]*)?>/.test(rawLines[j])) {
+            let html = '';
+            while (j < rawLines.length) {
+              html += rawLines[j] + ' ';
+              j++;
+              if (/<\/table>/i.test(html)) break;
+            }
+            tokens.push({ type: 'htmltable', html: html.trim() });
+            continue;
+          }
           // Blockquote: one or more consecutive lines starting with >
           if (/^>/.test(rawLines[j])) {
             const qLines = [];
@@ -1517,6 +1528,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       const S_LI   = inQuote ? 'P_QuoteLi' : 'P_Li';
 
       let tableCounter = 0;
+
+      function odtHtmlTable(html) {
+        // Parse all <tr> rows from the HTML table
+        const parsedRows = [];
+        const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+        let rowMatch;
+        while ((rowMatch = rowRe.exec(html)) !== null) {
+          const cells = [];
+          const cellRe = /<(td|th)([^>]*)>([\s\S]*?)<\/\1>/gi;
+          let cellMatch;
+          while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
+            const tag = cellMatch[1].toLowerCase();
+            const attrs = cellMatch[2];
+            const content = cellMatch[3].trim();
+            const cM = attrs.match(/colspan\s*=\s*["']?(\d+)["']?/i);
+            const rM = attrs.match(/rowspan\s*=\s*["']?(\d+)["']?/i);
+            cells.push({
+              isHeader: tag === 'th',
+              content,
+              colspan: cM ? Math.max(1, parseInt(cM[1])) : 1,
+              rowspan: rM ? Math.max(1, parseInt(rM[1])) : 1
+            });
+          }
+          if (cells.length > 0) parsedRows.push(cells);
+        }
+        if (parsedRows.length === 0) return '';
+
+        const numRows = parsedRows.length;
+        // Track which column positions are occupied by rowspans from above rows
+        const occupancy = Array.from({length: numRows + 5}, () => new Set());
+        const placement = [];
+        let numCols = 0;
+
+        for (let r = 0; r < numRows; r++) {
+          placement[r] = [];
+          let col = 0, cellIdx = 0;
+          while (true) {
+            // Drain all columns occupied by rowspans before placing the next cell
+            while (occupancy[r].has(col)) {
+              placement[r].push({ covered: true });
+              col++;
+            }
+            if (cellIdx >= parsedRows[r].length) break;
+            const cell = parsedRows[r][cellIdx++];
+            placement[r].push({ ...cell, covered: false });
+            // Immediately add covered cells for colspan within the same row
+            for (let dc = 1; dc < cell.colspan; dc++) {
+              placement[r].push({ covered: true });
+            }
+            // Mark future rows' columns as occupied by this cell's rowspan
+            for (let dr = 1; dr < cell.rowspan; dr++) {
+              for (let dc = 0; dc < cell.colspan; dc++) {
+                occupancy[r + dr].add(col + dc);
+              }
+            }
+            col += cell.colspan;
+            numCols = Math.max(numCols, col);
+          }
+          // Fill any remaining occupied positions at the end of this row
+          while (col < numCols) { placement[r].push({ covered: true }); col++; }
+        }
+        // Ensure every row has exactly numCols entries
+        for (let r = 0; r < numRows; r++) {
+          while (placement[r].length < numCols) placement[r].push({ covered: true });
+        }
+
+        tableCounter++;
+        const tname = 'Tbl' + tableCounter;
+        let t = '<table:table table:name="' + odtXmlEsc(tname) + '" table:style-name="T_Table">';
+        for (let c = 0; c < numCols; c++) t += '<table:table-column table:style-name="T_Col"/>';
+        for (const row of placement) {
+          t += '<table:table-row>';
+          for (const cell of row) {
+            if (cell.covered) {
+              t += '<table:covered-table-cell/>';
+            } else {
+              const cs = cell.isHeader ? 'T_CellH' : 'T_Cell';
+              const ps = cell.isHeader ? 'P_TH' : 'P_TD';
+              let attrs = ' office:value-type="string"';
+              if (cell.colspan > 1) attrs += ' table:number-columns-spanned="' + cell.colspan + '"';
+              if (cell.rowspan > 1) attrs += ' table:number-rows-spanned="' + cell.rowspan + '"';
+              t += '<table:table-cell table:style-name="' + cs + '"' + attrs + '>';
+              t += '<text:p text:style-name="' + ps + '">' + odtInline(cell.content) + '</text:p>';
+              t += '</table:table-cell>';
+            }
+          }
+          t += '</table:table-row>';
+        }
+        t += '</table:table>';
+        return t;
+      }
+
       function odtTable(headers, rows) {
         tableCounter++;
         const tname = 'Tbl' + tableCounter;
@@ -1544,9 +1647,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       const rawLines = md.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
       const tokens = parseBlocks(rawLines);
       const lines = tokens.map(t =>
-        t.type === 'line'  ? t.text :
-        t.type === 'table' ? '\x00TABLE\x00' + JSON.stringify({h:t.headers,r:t.rows}) :
-        /* quote */          '\x00QUOTE\x00' + t.content
+        t.type === 'line'      ? t.text :
+        t.type === 'table'     ? '\x00TABLE\x00' + JSON.stringify({h:t.headers,r:t.rows}) :
+        t.type === 'htmltable' ? '\x00HTMLTABLE\x00' + t.html :
+        /* quote */               '\x00QUOTE\x00' + t.content
       );
 
       let out = '', i = 0, inList = false, lstType = '', inCode = false, codeBuf = [];
@@ -1571,6 +1675,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
         if (line.startsWith('\x00TABLE\x00')) {
           const td = JSON.parse(line.slice(7));
           out += odtTable(td.h, td.r);
+        } else if (line.startsWith('\x00HTMLTABLE\x00')) {
+          if (inList) { out += '</text:list>'; inList = false; }
+          out += odtHtmlTable(line.slice(11));
         } else if (line.startsWith('\x00QUOTE\x00')) {
           if (inList) { out += '</text:list>'; inList = false; }
           out += odtBody(line.slice(7), true);
@@ -1596,6 +1703,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
               && !/^(\s*)[-*+]\s/.test(lines[i+1]) && !/^\d+\.\s/.test(lines[i+1])
               && !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i+1])
               && !lines[i+1].startsWith('\x00TABLE\x00')
+              && !lines[i+1].startsWith('\x00HTMLTABLE\x00')
               && !lines[i+1].startsWith('\x00QUOTE\x00')
             ) { i++; pl.push(lines[i]); }
             out += '<text:p text:style-name="'+S_BODY+'">'+odtInline(pl.join(' '))+'</text:p>';
