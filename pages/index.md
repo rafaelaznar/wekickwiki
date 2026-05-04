@@ -2,6 +2,10 @@
 
 **WeKickWiki** is a single-file PHP wiki with a JavaScript SPA frontend.
 
+**Default Credentials**
+- admin: admin123
+- guest: guest123
+
 **Authentication**
 - JWT-based login with configurable users/roles (`admin`, `guest`)
 - Passwords are SHA-256 hashed client-side, then HMAC'd server-side before comparison
@@ -58,6 +62,12 @@ Update admin and guest usernames and/or passwords:
 - Both usernames must be 2–32 characters (lowercase alphanumeric + underscore)
 - Admin and guest usernames must be different
 - Changes take effect immediately; if admin username is changed, you will be logged out and must sign in again
+
+**Guest Login Control (Admin only)**
+- The `guestLoginEnabled` flag in `users.json` controls whether guest user authentication is allowed
+- When `guestLoginEnabled` is `false`, the guest login option is disabled
+- When `guestLoginEnabled` is `true`, guest users can authenticate with their credentials
+- This setting is managed in the `users.json` configuration file or in the popup from **Manage users** button in admin the toolbar
 
 **UI**
 - Responsive, single-column layout (max 860px)
