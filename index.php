@@ -62,6 +62,7 @@ function json_out(int $code, array $data): never
 define('JWT_SECRET',   'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
 define('TOKEN_TTL',    3600); // 1 hour
 define('USERS_FILE',   __DIR__ . '/users.json');
+define('SETTINGS_FILE', __DIR__ . '/settings.json');
 
 // Default users (used on first run to seed users.json if it doesn't exist)
 // guestLoginEnabled is stored as a top-level key alongside the user entries.
@@ -79,6 +80,24 @@ function load_users(): array {
   }
   $data = json_decode(file_get_contents(USERS_FILE), true);
   return (is_array($data) && count($data) >= 2) ? $data : $USERS_DEFAULT;
+}
+
+function load_settings(): array {
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css'];
+  if (!is_file(SETTINGS_FILE)) return $defaults;
+  $data = json_decode(file_get_contents(SETTINGS_FILE), true);
+  if (!is_array($data)) return $defaults;
+  $name  = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
+  $theme = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
+  return ['wikiName' => $name, 'theme' => $theme];
+}
+
+function list_templates(): array {
+  $dir = __DIR__ . '/templates';
+  if (!is_dir($dir)) return ['default.css'];
+  $files = glob($dir . '/*.css') ?: [];
+  sort($files);
+  return array_map('basename', $files);
 }
 
 $USERS = load_users();
@@ -349,6 +368,51 @@ function clear_dir_contents(string $dir): bool {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// API: Get settings  GET ?action=get-settings  (admin only)
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-settings') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  json_out(200, load_settings());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Get templates  GET ?action=get-templates  (admin only)
+// Lists all .css files found in the templates/ directory.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-templates') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  json_out(200, ['templates' => list_templates()]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Save settings  POST ?action=save-settings  (admin only)
+// Body: { wikiName: string, theme: string }
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-settings') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $wikiName = trim($body['wikiName'] ?? '');
+  $theme    = basename($body['theme'] ?? '');
+  if ($wikiName === '' || mb_strlen($wikiName) > 64) {
+    json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
+  }
+  if (!preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme)) {
+    json_out(400, ['error' => 'Invalid theme filename']);
+  }
+  if (!is_file(__DIR__ . '/templates/' . $theme)) {
+    json_out(400, ['error' => 'Theme file not found']);
+  }
+  $newSettings = ['wikiName' => $wikiName, 'theme' => $theme];
+  if (file_put_contents(SETTINGS_FILE, json_encode($newSettings, JSON_PRETTY_PRINT), LOCK_EX) === false) {
+    json_out(500, ['error' => 'Could not write settings file']);
+  }
+  json_out(200, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // API: Restore  POST ?action=restore  (admin only, multipart/form-data)
 // Wipes pages/ directory and recreates all pages from the uploaded backup.
 // ═══════════════════════════════════════════════════════════════════════════
@@ -435,6 +499,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
 
   json_out(200, ['ok' => true, 'pages' => $written]);
 }
+
+$settings = load_settings();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -442,738 +508,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>WeKickWiki</title>
+  <title><?= htmlspecialchars($settings['wikiName']) ?></title>
   <base href="<?= htmlspecialchars($baseHref) ?>">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0
-    }
-
-    body {
-      line-height: 1.6;
-      color: #222;
-      font: normal 87.5%/1.4 Arial, system-ui, sans-serif;
-      /* default font size: 100% => 16px; 93.75% => 15px; 87.5% => 14px; 81.25% => 13px; 75% => 12px */
-      -webkit-text-size-adjust: 100%;
-      background: #fbfaf9;
-    }
-
-    /* ── Login screen ── */
-    #login-screen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      background: #f4f4f5;
-      padding: 1rem
-    }
-
-    #login-box {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 2.5rem 2rem;
-      width: 100%;
-      max-width: 360px;
-      box-shadow: 0 4px 24px rgba(0, 0, 0, .07)
-    }
-
-    #login-box h2 {
-      font-size: 1.3rem;
-      margin-bottom: 1.5rem;
-      text-align: center
-    }
-
-    #login-box label {
-      display: block;
-      font-size: .85rem;
-      font-weight: 600;
-      margin-bottom: .9rem
-    }
-
-    #login-box input {
-      display: block;
-      width: 100%;
-      margin-top: .25rem;
-      padding: .55rem .75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-      outline: none
-    }
-
-    #login-box input:focus {
-      border-color: #05c
-    }
-
-    #login-box button {
-      width: 100%;
-      margin-top: 1.2rem;
-      padding: .65rem;
-      background: #05c;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      font-size: 1rem;
-      cursor: pointer;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center
-    }
-
-    #login-box button:hover {
-      background: #004ab3
-    }
-
-    #login-error {
-      margin-top: .75rem;
-      font-size: .85rem;
-      color: #c00;
-      text-align: center;
-      min-height: 1.2rem
-    }
-
-    /* ── Wiki screen ── */
-    #wiki-screen {
-      max-width: 860px;
-      margin: 50px auto;
-      padding: 1rem 1.5rem 2rem;
-      clear: both;
-      background: #fff;
-      color: inherit;
-      border: 1px solid #eee;
-      box-shadow: 0 0 .5em #999;
-      border-radius: 2px;
-      overflow: hidden;
-      word-wrap: break-word;
-    }
-
-    header {
-      border-bottom: 2px solid #222;
-      padding-bottom: .5rem;
-      margin-bottom: .75rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between
-    }
-
-    header a {
-      font-size: 1.4rem;
-      font-weight: 700;
-      color: #111;
-      text-decoration: none
-    }
-
-    #header-right {
-      display: flex;
-      gap: .5rem;
-      align-items: center
-    }
-
-    #user-badge {
-      font-size: .78rem;
-      color: #666;
-      padding: .2rem .6rem;
-      background: #f0f0f0;
-      border-radius: 3px
-    }
-
-    nav {
-      font-size: .85rem;
-      color: #666;
-      margin-bottom: 1.5rem;
-      min-height: 1.2rem
-    }
-
-    nav a {
-      color: #05c;
-      text-decoration: none
-    }
-
-    nav a:hover {
-      text-decoration: underline
-    }
-
-    /* ── headers ── */
-    /*
-#content h1{font-size:1.9rem;margin:.25rem 0 .8rem}
-#content h2{font-size:1.3rem;margin:1.5rem 0 .4rem;padding-bottom:.2rem;border-bottom:1px solid #eee}
-#content h3{font-size:1.1rem;margin:1rem 0 .3rem}
-*/
-    #content h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6 {
-      font-weight: bold;
-      padding: 0;
-      line-height: 1.2;
-      clear: left;
-      color: #8A0808;
-      font-family: Arial, sans-serif;
-    }
-
-    #content h1 {
-      font-size: 1.9em;
-      margin: 0 0 0.444em;
-      text-align: center;
-      border-style: solid;
-      border-width: 2px;
-      padding: 0.45em 1em;
-      margin: 0.6em 0 1em 0;
-      background-color: #8A0808;
-      color: #FFF;
-    }
-
-    #content h2 {
-      font-size: 1.7em;
-      margin: 1em 0 0.5em;
-      border-bottom-style: double;
-      border-bottom-width: 6px;
-      border-color: #8A0808;
-    }
-
-    #content h3 {
-      font-size: 1.6em;
-      margin: 0.5em 0;
-    }
-
-    #content h4 {
-      font-size: 1.25em;
-      margin: 0.4em 0;
-    }
-
-    #content h5 {
-      font-size: 1em;
-      margin: 0.3em 0;
-    }
-
-    #content h6 {
-      font-size: .75em;
-      margin: 0.3em 0;
-    }
-
-    /* --- */
-    #content p {
-      margin: .5rem 0
-    }
-
-    #content a {
-      color: #05c
-    }
-
-    #content ul,
-    #content ol {
-      margin: 0rem 0 0rem 1.5rem
-    }
-
-    #content pre {
-      background: #f5f5f5;
-      padding: .8rem 1rem;
-      border-radius: 4px;
-      overflow-x: auto;
-      margin: .8rem 0
-    }
-
-    #content code {
-      background: #f0f0f0;
-      padding: .1em .3em;
-      border-radius: 3px;
-      font-size: .9em
-    }
-
-    #content pre code {
-      background: none;
-      padding: 0
-    }
-
-    #content blockquote {
-      font-family: 'Times New Roman', Times, serif;
-      font-size: 1.1em;
-      border: 2px dashed #ccc;
-      border-left: 8px solid #ccc;
-      padding: 1.1rem 1rem;
-      color: #555;
-      margin: 1.5rem 0;
-      background-color: #fff6f6;
-    }
-
-    #content table {
-      border-collapse: collapse;
-      width: 100%;
-      margin: .8rem 0
-    }
-
-    #content th,
-    #content td {
-      border: 1px solid #ddd;
-      padding: .35rem .7rem;
-      text-align: left
-    }
-
-    #content th {
-      background: #f5f5f5
-    }
-
-    #content img {
-      max-width: 100%;
-      height: auto
-    }
-
-    #content hr {
-      border: none;
-      border-top: 1px solid #ddd;
-      margin: 1.2rem 0
-    }
-
-    /* Editor */
-    #editor {
-      display: none;
-      flex-direction: column;
-      gap: .5rem
-    }
-
-    #editor textarea {
-      width: 100%;
-      height: 70vh;
-      font-family: ui-monospace, monospace;
-      font-size: .9rem;
-      line-height: 1.5;
-      padding: .75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      resize: vertical;
-      outline: none
-    }
-
-    #editor textarea:focus {
-      border-color: #05c
-    }
-
-    #editor-bar {
-      display: flex;
-      gap: .5rem
-    }
-
-    .btn {
-      padding: .4rem .55rem;
-      font-size: .85rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      cursor: pointer;
-      background: #fff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center
-    }
-
-    .btn:hover {
-      background: #f5f5f5
-    }
-
-    button svg {
-      display: block;
-      width: 1rem;
-      height: 1rem;
-      stroke: currentColor;
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      overflow: visible
-    }
-
-    .btn-primary {
-      background: #05c;
-      color: #fff;
-      border-color: #05c
-    }
-
-    .btn-primary:hover {
-      background: #004ab3
-    }
-
-    .btn-danger {
-      color: #c00;
-      border-color: #c00
-    }
-
-    .btn-danger:hover {
-      background: #fff5f5
-    }
-
-    #save-status {
-      font-size: .8rem;
-      color: #666;
-      line-height: 2
-    }
-
-    /* Index panel */
-    #index-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .35);
-      z-index: 100
-    }
-
-    #index-panel {
-      display: none;
-      position: fixed;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: min(340px, 90vw);
-      background: #fff;
-      box-shadow: -4px 0 20px rgba(0, 0, 0, .15);
-      overflow-y: auto;
-      padding: 1.25rem 1.5rem;
-      z-index: 101
-    }
-
-    #index-panel h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center
-    }
-
-    #index-panel button.close-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      color: #666;
-      line-height: 1
-    }
-
-    #index-tree {
-      font-size: .88rem
-    }
-
-    #index-tree ul {
-      list-style: none;
-      padding-left: 1rem;
-      margin: 0
-    }
-
-    #index-tree>ul {
-      padding-left: 0
-    }
-
-    #index-tree li {
-      margin: .2rem 0
-    }
-
-    #index-tree a {
-      color: #05c;
-      text-decoration: none
-    }
-
-    #index-tree a:hover {
-      text-decoration: underline
-    }
-
-    #index-tree .folder {
-      font-weight: 600;
-      color: #444;
-      display: block;
-      margin-top: .5rem
-    }
-
-    /* TOC panel */
-    #toc-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .35);
-      z-index: 100
-    }
-
-    #toc-panel {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      bottom: 0;
-      width: min(300px, 90vw);
-      background: #fff;
-      box-shadow: 4px 0 20px rgba(0, 0, 0, .15);
-      overflow-y: auto;
-      padding: 1.25rem 1.5rem;
-      z-index: 101
-    }
-
-    #toc-panel h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center
-    }
-
-    #toc-panel button.close-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      color: #666;
-      line-height: 1
-    }
-
-    #toc-list {
-      font-size: .88rem
-    }
-
-    #toc-list ul {
-      list-style: none;
-      padding-left: 0;
-      margin: 0
-    }
-
-    #toc-list li {
-      margin: .2rem 0
-    }
-
-    #toc-list a {
-      color: #05c;
-      text-decoration: none;
-      display: block
-    }
-
-    #toc-list a:hover {
-      text-decoration: underline
-    }
-
-    .toc-h1 {
-      font-weight: 700;
-    }
-
-    .toc-h2 {
-      padding-left: 1.5rem
-    }
-
-    .toc-h3 {
-      padding-left: 2.5rem;
-      font-size: .83rem;
-      color: #555
-    }
-
-    /* Toast notification */
-    #toast {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(1rem);
-      background: #1a7f37;
-      color: #fff;
-      padding: .6rem 1.2rem;
-      border-radius: 6px;
-      font-size: .9rem;
-      font-weight: 500;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .25s, transform .25s;
-      z-index: 200
-    }
-
-    #toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0)
-    }
-
-    #toast.error {
-      background: #c62828
-    }
-
-    /* ── Inline TOC (floats right alongside content) ── */
-    #content {
-      position: relative
-    }
-
-    #toc-inline {
-      float: right;
-      width: 200px;
-      border: 1px solid #8A0808;
-      background: #f7f7f7;
-      padding: .55rem .85rem;
-      font-size: .83rem;
-      line-height: 1.5;
-      border-radius: 10px;
-      margin: 2px 2px 20px 20px;
-    }
-
-    #toc-inline ul {
-      list-style: none;
-      padding: 0;
-      margin: 0
-    }
-
-    #toc-inline li {
-      margin: .15rem 0
-    }
-
-    #toc-inline a {
-      color: #05c;
-      text-decoration: none
-    }
-
-    #toc-inline a:hover {
-      text-decoration: underline
-    }
-
-    #toc-inline .toc-h1 {
-      font-weight: 700
-    }
-
-    #toc-inline .toc-h2 {
-      display: block;
-      padding-left: 1rem
-    }
-
-    #toc-inline .toc-h3 {
-      display: block;
-      padding-left: 2rem;
-      font-size: .78rem;
-      color: #555
-    }
-
-    /* ── Guest mode ── */
-    .guest-mode header {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-bottom: 0;
-      min-height: 0;
-      position: fixed;
-      top: .75rem;
-      right: max(1.5rem, calc((100vw - 860px)/2 + 1.5rem));
-      width: auto;
-      z-index: 50
-    }
-
-    .guest-mode #header-title,
-    .guest-mode #user-badge {
-      display: none
-    }
-
-    .guest-mode #nav {
-      display: none
-    }
-
-    .guest-mode #content {
-      margin-top: 2.5rem
-    }
-
-    /* ── Users management panel ── */
-    #users-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .45);
-      z-index: 100
-    }
-
-    #users-panel {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: min(380px, 92vw);
-      background: #fff;
-      box-shadow: 0 8px 40px rgba(0, 0, 0, .22);
-      border-radius: 8px;
-      padding: 1.5rem 1.75rem 1.75rem;
-      z-index: 101
-    }
-
-    #users-panel h3 {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 1.25rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center
-    }
-
-    #users-panel button.close-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      color: #666;
-      line-height: 1
-    }
-
-    #users-form fieldset {
-      border: 1px solid #e0e0e0;
-      border-radius: 6px;
-      padding: .75rem 1rem .85rem;
-      margin-bottom: 1rem
-    }
-
-    #users-form legend {
-      font-size: .78rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      color: #555;
-      padding: 0 .35rem
-    }
-
-    #users-form label {
-      display: block;
-      font-size: .82rem;
-      font-weight: 600;
-      color: #333;
-      margin-top: .6rem
-    }
-
-    #users-form label:first-of-type {
-      margin-top: 0
-    }
-
-    #users-form input[type="text"],
-    #users-form input[type="password"] {
-      display: block;
-      width: 100%;
-      margin-top: .2rem;
-      padding: .45rem .65rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: .92rem;
-      outline: none;
-      font-family: inherit
-    }
-
-    #users-form input:focus {
-      border-color: #05c
-    }
-
-    #users-form-actions {
-      display: flex;
-      gap: .6rem;
-      justify-content: flex-end;
-      margin-top: .25rem
-    }
-
-    #users-save-status {
-      font-size: .8rem;
-      color: #666;
-      flex: 1;
-      line-height: 2.1
-    }
-  </style>
+  <link rel="stylesheet" href="templates/<?= htmlspecialchars($settings['theme'], ENT_QUOTES) ?>">
 </head>
 
 <body>
@@ -1181,7 +520,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   <!-- ── Login screen ─────────────────────────────────────── -->
   <div id="login-screen">
     <div id="login-box">
-      <h2><img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt="">WeKickWiki — Sign in</h2>
+      <h2><img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt=""><?= htmlspecialchars($settings['wikiName']) ?> — Sign in</h2>
       <form id="login-form" novalidate>
         <label>Username
           <input id="login-user" type="text" autocomplete="username" required autofocus>
@@ -1202,7 +541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   <!-- ── Wiki screen ──────────────────────────────────────── -->
   <div id="wiki-screen" style="display:none">
     <header>
-      <a id="header-title" href="" onclick="navigate('index');return false;"><img src="icon.svg" style="display:inline; width:1.5rem; height:1.5rem; margin-right:0.5rem; vertical-align:middle;" alt="">WeKickWiki</a>
+      <a id="header-title" href="" onclick="navigate('index');return false;"><img src="icon.svg" style="display:inline; width:1.5rem; height:1.5rem; margin-right:0.5rem; vertical-align:middle;" alt=""><?= htmlspecialchars($settings['wikiName']) ?></a>
       <div id="header-right">
         <span id="user-badge"></span>
         <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1234,6 +573,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
             <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
           </svg></button>
         <input type="file" id="restore-input" accept=".txt" style="display:none">
+        <button class="btn" id="settings-btn" title="Settings" aria-label="Settings" style="display:none" onclick="toggleSettingsPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg></button>
         <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -1249,7 +592,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <polyline points="9 22 9 12 15 12 15 22" />
           </svg></button>
-        <button class="btn" id="top-btn" title="Ir arriba" aria-label="Ir arriba" style="display:none" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg viewBox="0 0 24 24" aria-hidden="true">
+        <button class="btn" id="top-btn" title="Go to top" aria-label="Go to top" style="display:none" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg viewBox="0 0 24 24" aria-hidden="true">
             <line x1="12" y1="19" x2="12" y2="5" />
             <polyline points="5 12 12 5 19 12" />
           </svg></button>
@@ -1315,6 +658,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
         </div>
       </form>
     </div>
+    <!-- Settings panel -->
+    <div id="settings-overlay" onclick="toggleSettingsPanel()"></div>
+    <div id="settings-panel">
+      <h3>Settings <button class="close-btn" onclick="toggleSettingsPanel()">&times;</button></h3>
+      <form id="settings-form" novalidate>
+        <label>Wiki name
+          <input type="text" id="settings-wiki-name" autocomplete="off" maxlength="64">
+        </label>
+        <label>Theme
+          <select id="settings-theme"></select>
+        </label>
+        <div id="settings-form-actions">
+          <span id="settings-save-status"></span>
+          <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
     <div id="editor">
       <div id="editor-bar">
         <button class="btn btn-primary" title="Save" aria-label="Save" onclick="save()"><svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1331,8 +692,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       <textarea id="editor-area" spellcheck="false"></textarea>
     </div>
   </div>
-  <div style="text-align:center;font-size:.75rem;color:#999;margin:1rem auto 2rem">    
-    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - WeKickWiki. MIT License. Rafael Aznar</a>
+
+  <div id="footer">    
+    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - <?= htmlspecialchars($settings['wikiName']) ?>. MIT License. Rafael Aznar</a>
   </div>
 
   <div id="toast"></div>
@@ -2016,6 +1378,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       }
     });
 
+    // ── Settings panel ──────────────────────────────────────────────────────────
+    let settingsOpen = false;
+
+    async function toggleSettingsPanel() {
+      const overlay = document.getElementById('settings-overlay');
+      const panel   = document.getElementById('settings-panel');
+      settingsOpen = !settingsOpen;
+      overlay.style.display = panel.style.display = settingsOpen ? 'block' : 'none';
+      if (!settingsOpen) {
+        document.getElementById('settings-save-status').textContent = '';
+        return;
+      }
+      // Load current settings and available templates in parallel
+      const [sRes, tRes] = await Promise.all([
+        apiFetch('?action=get-settings'),
+        apiFetch('?action=get-templates'),
+      ]);
+      if (!sRes || !sRes.ok || !tRes || !tRes.ok) {
+        document.getElementById('settings-save-status').textContent = 'Could not load settings.';
+        return;
+      }
+      const settings  = await sRes.json();
+      const templates = await tRes.json();
+      document.getElementById('settings-wiki-name').value = settings.wikiName || '';
+      const sel = document.getElementById('settings-theme');
+      sel.innerHTML = '';
+      for (const t of (templates.templates || [])) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === settings.theme) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      document.getElementById('settings-save-status').textContent = '';
+    }
+
+    document.getElementById('settings-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('settings-save-status');
+      statusEl.textContent = 'Saving\u2026';
+      const wikiName = document.getElementById('settings-wiki-name').value.trim();
+      const theme    = document.getElementById('settings-theme').value;
+      if (!wikiName) {
+        statusEl.textContent = 'Wiki name cannot be empty.';
+        return;
+      }
+      try {
+        const res = await apiFetch('?action=save-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wikiName, theme }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toggleSettingsPanel();
+          showToast('Settings saved. Reloading\u2026', 'success', 2000);
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          statusEl.textContent = data.error || 'Error saving settings.';
+        }
+      } catch {
+        statusEl.textContent = 'Connection error.';
+      }
+    });
+
     // ── Base & routing helpers ──────────────────────────────────────────────────
     const BASE = <?= json_encode($baseHref) ?>;
 
@@ -2140,6 +1567,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
       document.getElementById('users-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
         document.getElementById('home-btn').style.display = '';

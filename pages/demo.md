@@ -204,7 +204,7 @@ For URLs with those characters use HTML entities in markdown or reference links:
 &rarr; &larr; &hArr; &rArr; &lArr; &ne; &ge; &le;
 &euro; &deg; &frac12; &frac14; &frac34; &times;
 
----
+
 
 ## 3. Horizontal Rules
 
@@ -220,7 +220,7 @@ ___
 **Note:** The line `---` is converted into a horizontal rule because markdown treats it as a section separator when it stands alone on its line.
 However, `---` in the middle of a paragraph → --- (em dash).
 
----
+
 
 ## 4. Emphasis
 
@@ -266,7 +266,7 @@ _(tm)_ — symbol in italic → should be _™_
 
 **->** — arrow in bold → **→**
 
----
+
 
 ## 5. Blockquotes
 
@@ -307,7 +307,7 @@ _(tm)_ — symbol in italic → should be _™_
 
 > Quote with (c) 2024 and -> direction and +- tolerance.
 
----
+
 
 ## 6. Lists
 
@@ -404,7 +404,7 @@ _(tm)_ — symbol in italic → should be _™_
 - Path: start -> end — should be →
 - Range: min <= max — should be ⇐ (**note:** `<=` is ⇐, not ≤)
 
----
+
 
 ## 7. Code
 
@@ -459,7 +459,7 @@ Use `` ` `` for a literal backtick inside inline code.
 Symbols WILL be substituted here.
 ~~~
 
----
+
 
 ## 8. Tables
 
@@ -540,7 +540,7 @@ Symbols WILL be substituted here.
 
 3. Item after table
 
----
+
 
 ## 9. Links
 
@@ -583,7 +583,7 @@ Solution: use URL-encoded links:
 
 [Safe URL](https://example.com?a%3E%3D1)
 
----
+
 
 ## 10. Images
 
@@ -603,8 +603,6 @@ Solution: use URL-encoded links:
 
 ![Icon (c) 2024](https://octodex.github.com/images/minion.png)
 
----
-
 ## 11. HTML Entities
 
 HTML entities are passed directly to the browser without modification:
@@ -620,8 +618,6 @@ HTML entities are passed directly to the browser without modification:
 &#169; (©) &#174; (®) &#8482; (™) &#8364; (€) &#177; (±)
 
 &#8212; (—) &#8211; (–) &#8230; (…) &#8594; (→) &#8592; (←)
-
----
 
 ## 12. Inline HTML
 
@@ -641,7 +637,7 @@ The parser (marked) allows inline HTML without escaping:
 
 Symbol in raw HTML: <span>(c) 2024</span> — the `(c)` WILL be substituted (preprocessor acts first).
 
----
+
 
 ## 13. Escaped Characters
 
@@ -670,7 +666,7 @@ There is no way to escape the substitutions of `applySymbols` in normal text
 
 `--` → not substituted
 
----
+
 
 ## 14. Complex Combinations
 
