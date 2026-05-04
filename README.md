@@ -63,6 +63,12 @@ Update admin and guest usernames and/or passwords:
 - Admin and guest usernames must be different
 - Changes take effect immediately; if admin username is changed, you will be logged out and must sign in again
 
+**Guest Login Control (Admin only)**
+- The `guestLoginEnabled` flag in `users.json` controls whether guest user authentication is allowed
+- When `guestLoginEnabled` is `false`, the guest login option is disabled
+- When `guestLoginEnabled` is `true`, guest users can authenticate with their credentials
+- This setting is managed in the `users.json` configuration file or in the popup from **Manage users** button in admin the toolbar
+
 **UI**
 - Responsive, single-column layout (max 860px)
 - Toast notifications for save/delete/error feedback
