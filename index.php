@@ -1322,7 +1322,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
     </div>
   </div>
   <div style="text-align:center;font-size:.75rem;color:#999;margin:1rem auto 2rem">    
-    <a href="https://github.com/rafaelaznar">2026 - WeKickWiki. MIT License. Rafael Aznar</a>
+    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - WeKickWiki. MIT License. Rafael Aznar</a>
   </div>
 
   <div id="toast"></div>
