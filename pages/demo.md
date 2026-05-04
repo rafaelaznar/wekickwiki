@@ -789,3 +789,145 @@ Indented separator (inside list):
     | col1 | col2 |
     |------|------|
     | val1 | val2 |
+
+---
+
+## 17. Icons and Emoji
+
+The wiki has no *shortcode* system (`:smile:` etc.), but it accepts emoji
+and Unicode symbols in three ways:
+
+1. **Direct entry** — paste a UTF-8 character straight into the text.
+2. **Numeric HTML entities** — `&#NNNN;` (decimal) or `&#xHHHH;` (hex).
+3. **Named HTML entities** — `&name;` recognised by the browser.
+
+The file is stored as UTF-8, so any Unicode character is valid.
+
+### 17.1 Emoji directly in text
+
+These are Unicode characters pasted directly into Markdown:
+
+😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 😉 😍 🥰 😘 😎 🥳 😴 🤔 🤗
+
+😢 😭 😤 😠 😡 🤬 😱 😰 😨 🤯 🥶 🥵 🫠 😵 🤪 🤩 🥸 🤓 👻 💀
+
+👍 👎 👏 🙌 🤝 👋 ✌️ 🤞 🫶 ❤️ 🧡 💛 💚 💙 💜 🖤 🤍 ❤️‍🔥 💔 💯
+
+🌍 🌎 🌏 🌐 🗺️ 🏔️ 🏕️ 🌋 🗻 🏠 🏢 🏣 🏤 🏥 🏦 🏧 🏨 🏩 🏪 🏫
+
+🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🐔 🐧 🐦 🦆 🦅
+
+🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🫒 🥑 🍆
+
+🚀 🛸 🛩️ ✈️ 🚂 🚃 🚄 🚅 🚆 🚇 🚈 🚉 🚊 🚝 🚞 🚋 🚌 🚍 🚎 🚐
+
+⌚ ⌛ ⏰ ⏱️ ⏲️ 🕰️ ⏳ 📅 📆 📇 📈 📉 📊 📋 📌 📍 📎 🖇️ 📏 📐
+
+### 17.2 Classic Unicode symbols (non-emoji)
+
+Arrows and mathematical operators, also available via `applySymbols`:
+
+| Character | HTML Entity | Description |
+|---|---|---|
+| ← | `&larr;` | Left arrow |
+| → | `&rarr;` | Right arrow |
+| ↑ | `&uarr;` | Up arrow |
+| ↓ | `&darr;` | Down arrow |
+| ↔ | `&harr;` | Left-right arrow |
+| ⇐ | `&lArr;` | Left double arrow |
+| ⇒ | `&rArr;` | Right double arrow |
+| ⇔ | `&hArr;` | Double implication |
+| ± | `&plusmn;` | Plus-minus |
+| × | `&times;` | Multiplication |
+| ÷ | `&divide;` | Division |
+| ≠ | `&ne;` | Not equal |
+| ≤ | `&le;` | Less than or equal |
+| ≥ | `&ge;` | Greater than or equal |
+| ≈ | `&asymp;` | Approximately equal |
+| ∞ | `&infin;` | Infinity |
+| √ | `&radic;` | Square root |
+| ∑ | `&sum;` | Summation |
+| ∏ | `&prod;` | Product |
+| ∫ | `&int;` | Integral |
+| ° | `&deg;` | Degree |
+| ½ | `&frac12;` | One half |
+| ¼ | `&frac14;` | One quarter |
+| ¾ | `&frac34;` | Three quarters |
+| © | `&copy;` | Copyright |
+| ® | `&reg;` | Registered trademark |
+| ™ | `&trade;` | Trademark |
+| € | `&euro;` | Euro |
+| £ | `&pound;` | Pound sterling |
+| ¥ | `&yen;` | Yen |
+| § | `&sect;` | Section |
+| ¶ | `&para;` | Paragraph |
+| † | `&dagger;` | Dagger |
+| ‡ | `&Dagger;` | Double dagger |
+| • | `&bull;` | Bullet |
+| … | `&hellip;` | Ellipsis |
+| — | `&mdash;` | Em dash |
+| – | `&ndash;` | En dash |
+| " | `&ldquo;` | Left double quotation mark |
+| " | `&rdquo;` | Right double quotation mark |
+| ' | `&lsquo;` | Left single quotation mark |
+| ' | `&rsquo;` | Right single quotation mark |
+
+### 17.3 Card suits, circled numbers, and geometric shapes
+
+&#9824; &#9827; &#9829; &#9830; (♠ ♣ ♥ ♦) — card suits via numeric entity.
+
+&#9312; &#9313; &#9314; &#9315; &#9316; (① ② ③ ④ ⑤) — circled numbers.
+
+&#9632; &#9633; &#9650; &#9651; &#9670; &#9671; (■ □ ▲ △ ◆ ◇) — geometric shapes.
+
+### 17.4 Status and check symbols
+
+| Symbol | Entity / Unicode | Common use |
+|---|---|---|
+| ✓ | `&#10003;` | Verified / OK |
+| ✗ | `&#10007;` | Error / Failure |
+| ✔ | `&#10004;` | Heavy check mark |
+| ✘ | `&#10008;` | Heavy ballot X |
+| ⚠ | `&#9888;` | Warning |
+| ℹ | `&#8505;` | Information |
+| 🔴 | `&#128308;` | Red status / error |
+| 🟡 | `&#128993;` | Yellow status / warning |
+| 🟢 | `&#128994;` | Green status / OK |
+| ⭐ | `&#11088;` | Star |
+| 🔒 | `&#128274;` | Locked |
+| 🔓 | `&#128275;` | Unlocked |
+
+### 17.5 Emoji in special positions
+
+**Bold:** 🚀 **Launch**
+
+*Italic:* 🤔 *Pending review*
+
+~~Strikethrough:~~ ~~❌ Discarded~~
+
+> 💡 Tip: emoji also work inside blockquotes.
+
+- ✅ Task completed
+- ❌ Task cancelled
+- ⏳ In progress
+- 📌 Pending
+
+| Status | Icon | Description |
+|---|---|---|
+| OK | ✅ | Completed without errors |
+| Error | ❌ | Failure detected |
+| Warning | ⚠️ | Requires attention |
+| Info | ℹ️ | Additional information |
+| New | 🆕 | Recently added |
+| Locked | 🔒 | No access |
+
+### 17.6 Note on ODT export
+
+Emoji and Unicode symbols are included in the exported `.fodt` file as
+UTF-8 text. Correct rendering depends on whether the font used by the
+word processor (LibreOffice, Word) includes the corresponding glyphs;
+otherwise the substitution character □ will appear.
+
+Symbols from §17.2 (named/numeric HTML entities) are resolved by the
+browser and reach the exporter as Unicode characters, so they are also
+included correctly in the ODT.
