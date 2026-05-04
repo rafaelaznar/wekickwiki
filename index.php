@@ -694,10 +694,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
     }
 
     #content blockquote {
-      border-left: 3px solid #ccc;
-      padding: .1rem .8rem;
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 1.1em;
+      border: 2px dashed #ccc;
+      border-left: 8px solid #ccc;
+      padding: 1.1rem 1rem;
       color: #555;
-      margin: .8rem 0
+      margin: 1.5rem 0;
+      background-color: #fff6f6;
     }
 
     #content table {
