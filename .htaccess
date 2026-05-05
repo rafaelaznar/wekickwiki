@@ -1,8 +1,15 @@
 RewriteEngine On
+
 # Pass Authorization header to PHP (required for JWT)
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+# !-f prevents existing files from being overwritten to index.php
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^ index.php [L]
+
+# Explicitly allow static assets to be served directly
+# <FilesMatch "\.(js|css|svg|ico|png|jpg|gif|woff|woff2|ttf)$">
+#  Require all granted
+# </FilesMatch>
 
 # Block direct HTTP access to sensitive config files
 <Files "users.json">
