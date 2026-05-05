@@ -1,6 +1,6 @@
 # Welcome to the WeKickWiki Wiki
 
-**WeKickWiki** is a single-file PHP wiki with a JavaScript SPA frontend.
+**WeKickWiki** is a single-file PHP wiki with an AJAX JavaScript SPA frontend.
 
 **Default Credentials**
 - admin: admin123
@@ -36,6 +36,12 @@
 - Inline floating TOC (auto-generated from headings, rendered inside the content area)
 - Minimal UI ("guest mode"): header hidden, home/top buttons visible
 
+**UI**
+- Responsive, single-column layout (max 860px)
+- Toast notifications for save/delete/error feedback
+- SVG icon set throughout; icon.svg used as favicon and in login/header
+- No external dependencies except marked.js CDN
+  
 ## Backup & Restore
 
 **Backup (Admin only)**
@@ -97,12 +103,6 @@ The `users.json` file stores user credentials and authentication settings:
 **Modifying Guest Login Setting**:
 - **Via UI**: Click **Manage users** → toggle the **Enable guest login** checkbox → save
 - **Via File**: Manually edit `users.json`, change `"guestLoginEnabled": true` to `false` (or vice versa), and reload the page
-
-**UI**
-- Responsive, single-column layout (max 860px)
-- Toast notifications for save/delete/error feedback
-- SVG icon set throughout; icon.svg used as favicon and in login/header
-- No external dependencies except marked.js CDN
 
 ## HTML Support in Markdown
 
