@@ -40,7 +40,7 @@
 - Responsive, single-column layout (max 860px)
 - Toast notifications for save/delete/error feedback
 - SVG icon set throughout; icon.svg used as favicon and in login/header
-- No external dependencies except marked.js CDN
+- No external dependencies (all assets served locally from `vendor/`)
   
 ## Backup & Restore
 
@@ -125,23 +125,42 @@ The `settings.json` file stores global wiki configuration:
 {
   "wikiName": "WeKickWiki",
   "theme": "impact.css",
+  "hljsTheme": "highlight-github.min.css",
   "disabledPlugins": []
 }
 ```
 
 - **`wikiName`** (string): The display name of the wiki, shown in the header
 - **`theme`** (string): The active CSS template file name from the `templates/` directory (e.g., `default.css`, `impact.css`)
+- **`hljsTheme`** (string): The active highlight.js theme file name from `vendor/highlight-themes/` (e.g., `highlight-github.min.css`, `monokai.css`)
 - **`disabledPlugins`** (array of strings): List of plugin IDs that are disabled in memory. Plugins in this list load but their hooks are not executed
 
 ## Theme & Template Selection (Admin)
 
-**Change Theme & Wiki Name (Admin only)**
+**Change Theme, Code Highlight Theme & Wiki Name (Admin only)**
 - Click the **Settings** button (gear icon) in the toolbar
 - A modal dialog opens with:
   - **Wiki Name** text field: modify the title displayed in the header
   - **Theme** dropdown: select from all available CSS templates in the `templates/` directory
+  - **Code highlight theme** dropdown: select the highlight.js theme applied to all fenced code blocks; choices come from `vendor/highlight-themes/`
 - Changes are persisted to `settings.json` immediately
-- Page styling updates without reload when a new theme is selected
+- Page reloads after saving so the new theme and code highlight style take effect for all users
+
+### Available Code Highlight Themes
+
+Theme CSS files are stored in `vendor/highlight-themes/`. The following themes are included:
+
+| File | Description |
+|------|-------------|
+| `atom-one-dark.css` | Dark background, vibrant colours |
+| `atom-one-light.css` | Light background, Atom One palette |
+| `highlight-github.min.css` | GitHub-style light theme (default) |
+| `monokai.css` | Classic Monokai dark theme |
+| `obsidian.css` | Dark high-contrast theme |
+| `tomorrow-night-blue.css` | Blue-toned dark theme |
+| `tomorrow-night-bright.css` | Bright Tomorrow Night variant |
+
+To add a new theme, download any highlight.js theme CSS file into `vendor/highlight-themes/` — it will appear automatically in the dropdown.
 
 ## Creating a Custom Template
 
@@ -251,26 +270,6 @@ WKW.registerPlugin({
   - Add custom ODT styles (e.g., `<style:style>` elements) to the exported document
   - Signature: `() → odt_xml_styles_string`
   - Use case: Define custom text or paragraph styles for ODT export
-
-### Example Plugin: Syntax Highlighting
-
-```javascript
-WKW.registerPlugin({
-  id:      'syntax-highlight',
-  name:    'Syntax Highlighter',
-  version: '1.0.0',
-  author:  'Developer',
-  hooks:   ['wkw.page.afterLoad']
-}, {
-  'wkw.page.afterLoad': (pagePath, contentEl) => {
-    // Apply syntax highlighting to <code> blocks
-    contentEl.querySelectorAll('code').forEach(el => {
-      el.classList.add('hljs');
-      hljs.highlightElement(el);
-    });
-  }
-});
-```
 
 ### The `table-colrowspan` Plugin
 

@@ -83,18 +83,27 @@ function load_users(): array {
 }
 
 function load_settings(): array {
-  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css'];
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css'];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
-  $name  = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
-  $theme = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
-  return ['wikiName' => $name, 'theme' => $theme];
+  $name      = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
+  $theme     = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
+  $hljsTheme = (isset($data['hljsTheme']) && is_string($data['hljsTheme']) && preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $data['hljsTheme']) && is_file(__DIR__ . '/vendor/highlight-themes/' . $data['hljsTheme'])) ? $data['hljsTheme'] : $defaults['hljsTheme'];
+  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme];
 }
 
 function list_templates(): array {
   $dir = __DIR__ . '/templates';
   if (!is_dir($dir)) return ['default.css'];
+  $files = glob($dir . '/*.css') ?: [];
+  sort($files);
+  return array_map('basename', $files);
+}
+
+function list_hljs_themes(): array {
+  $dir = __DIR__ . '/vendor/highlight-themes';
+  if (!is_dir($dir)) return ['highlight-github.min.css'];
   $files = glob($dir . '/*.css') ?: [];
   sort($files);
   return array_map('basename', $files);
@@ -399,15 +408,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-tem
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// API: Get hljs themes  GET ?action=get-hljs-themes  (admin only)
+// Lists all .css files found in the vendor/highlight-themes/ directory.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-hljs-themes') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  json_out(200, ['themes' => list_hljs_themes()]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // API: Save settings  POST ?action=save-settings  (admin only)
-// Body: { wikiName: string, theme: string }
+// Body: { wikiName: string, theme: string, hljsTheme: string }
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-settings') {
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
-  $wikiName = trim($body['wikiName'] ?? '');
-  $theme    = basename($body['theme'] ?? '');
+  $body      = json_decode(file_get_contents('php://input'), true) ?? [];
+  $wikiName  = trim($body['wikiName'] ?? '');
+  $theme     = basename($body['theme'] ?? '');
+  $hljsTheme = basename($body['hljsTheme'] ?? '');
   if ($wikiName === '' || mb_strlen($wikiName) > 64) {
     json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
   }
@@ -417,10 +437,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   if (!is_file(__DIR__ . '/templates/' . $theme)) {
     json_out(400, ['error' => 'Theme file not found']);
   }
+  if (!preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $hljsTheme)) {
+    json_out(400, ['error' => 'Invalid highlight theme filename']);
+  }
+  if (!is_file(__DIR__ . '/vendor/highlight-themes/' . $hljsTheme)) {
+    json_out(400, ['error' => 'Highlight theme file not found']);
+  }
   $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
   if (!is_array($existing)) $existing = [];
-  $existing['wikiName'] = $wikiName;
-  $existing['theme']    = $theme;
+  $existing['wikiName']  = $wikiName;
+  $existing['theme']     = $theme;
+  $existing['hljsTheme'] = $hljsTheme;
   if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
     json_out(500, ['error' => 'Could not write settings file']);
   }
@@ -560,7 +587,9 @@ $settings = load_settings();
   <title><?= htmlspecialchars($settings['wikiName']) ?></title>
   <base href="<?= htmlspecialchars($baseHref) ?>">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+  <link id="hljs-theme-link" rel="stylesheet" href="vendor/highlight-themes/<?= htmlspecialchars($settings['hljsTheme'], ENT_QUOTES) ?>">
   <link rel="stylesheet" href="templates/<?= htmlspecialchars($settings['theme'], ENT_QUOTES) ?>">
 </head>
 
@@ -729,6 +758,9 @@ $settings = load_settings();
         </label>
         <label>Theme
           <select id="settings-theme"></select>
+        </label>
+        <label>Code highlight theme
+          <select id="settings-hljs-theme"></select>
         </label>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>

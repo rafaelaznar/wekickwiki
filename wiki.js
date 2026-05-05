@@ -118,6 +118,14 @@
       return html;
     }
 
+    function highlightContent(contentEl) {
+      if (window.hljs) {
+        contentEl.querySelectorAll('pre code').forEach(function (block) {
+          hljs.highlightElement(block);
+        });
+      }
+    }
+
     // ── Toast ───────────────────────────────────────────────────────────────────
     let _toastTimer;
 
@@ -685,16 +693,18 @@
         return;
       }
       // Load current settings and available templates in parallel
-      const [sRes, tRes] = await Promise.all([
+      const [sRes, tRes, hRes] = await Promise.all([
         apiFetch('?action=get-settings'),
         apiFetch('?action=get-templates'),
+        apiFetch('?action=get-hljs-themes'),
       ]);
-      if (!sRes || !sRes.ok || !tRes || !tRes.ok) {
+      if (!sRes || !sRes.ok || !tRes || !tRes.ok || !hRes || !hRes.ok) {
         document.getElementById('settings-save-status').textContent = 'Could not load settings.';
         return;
       }
-      const settings  = await sRes.json();
-      const templates = await tRes.json();
+      const settings   = await sRes.json();
+      const templates  = await tRes.json();
+      const hljsThemes = await hRes.json();
       document.getElementById('settings-wiki-name').value = settings.wikiName || '';
       const sel = document.getElementById('settings-theme');
       sel.innerHTML = '';
@@ -705,6 +715,15 @@
         if (t === settings.theme) opt.selected = true;
         sel.appendChild(opt);
       }
+      const hSel = document.getElementById('settings-hljs-theme');
+      hSel.innerHTML = '';
+      for (const t of (hljsThemes.themes || [])) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t.replace(/\.css$/, '').replace(/[-_]/g, ' ');
+        if (t === settings.hljsTheme) opt.selected = true;
+        hSel.appendChild(opt);
+      }
       document.getElementById('settings-save-status').textContent = '';
     }
 
@@ -712,8 +731,9 @@
       e.preventDefault();
       const statusEl = document.getElementById('settings-save-status');
       statusEl.textContent = 'Saving\u2026';
-      const wikiName = document.getElementById('settings-wiki-name').value.trim();
-      const theme    = document.getElementById('settings-theme').value;
+      const wikiName  = document.getElementById('settings-wiki-name').value.trim();
+      const theme     = document.getElementById('settings-theme').value;
+      const hljsTheme = document.getElementById('settings-hljs-theme').value;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
@@ -722,7 +742,7 @@
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -941,6 +961,7 @@
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
+        highlightContent(document.getElementById('content'));
         WKW.doAction('wkw.page.afterLoad', page, document.getElementById('content'));
       }
 
@@ -1164,6 +1185,7 @@
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
+        highlightContent(document.getElementById('content'));
         WKW.doAction('wkw.page.afterLoad', currentPage, document.getElementById('content'));
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
         document.getElementById('odt-btn').style.display = '';
