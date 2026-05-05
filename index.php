@@ -100,6 +100,18 @@ function list_templates(): array {
   return array_map('basename', $files);
 }
 
+// Returns basenames of all *.js files in front-plugins/ (safe filenames only)
+function front_plugins(): array {
+  $dir = __DIR__ . '/front-plugins';
+  if (!is_dir($dir)) return [];
+  $files = glob($dir . '/*.js') ?: [];
+  sort($files);
+  return array_values(array_filter(
+    array_map('basename', $files),
+    fn($f) => (bool) preg_match('/^[a-zA-Z0-9_\-]+\.js$/', $f)
+  ));
+}
+
 $USERS = load_users();
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -701,6 +713,9 @@ $settings = load_settings();
 
   <script>window.WKW_BASE = <?= json_encode($baseHref) ?>;</script>
   <script src="wiki.js"></script>
+<?php foreach (front_plugins() as $pf): ?>
+  <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
+<?php endforeach; ?>
 </body>
 
 </html>

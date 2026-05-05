@@ -1,3 +1,60 @@
+    // ══════════════════════════════════════════════════════════════════════════════
+    // WKW Plugin Engine — Hooks / Filters (WordPress-style)
+    // Initialised here so plugins loaded after wiki.js can call registerPlugin().
+    // ══════════════════════════════════════════════════════════════════════════════
+    window.WKW = (() => {
+      const _filters = {};  // hook → [{fn, prio, plugin}]
+      const _plugins = {};  // id   → meta
+      return {
+        /**
+         * Declare a plugin and bind its hook handlers.
+         * @param {object} meta     - {id, name, version, description, author, hooks[], priority?}
+         * @param {object} handlers - { 'hook.name': fn, ... }
+         */
+        registerPlugin(meta, handlers = {}) {
+          if (!meta?.id) { console.warn('[WKW] Plugin missing id'); return; }
+          if (_plugins[meta.id]) { console.warn('[WKW] Already registered:', meta.id); return; }
+          _plugins[meta.id] = { ...meta, loadedAt: Date.now() };
+          const prio = meta.priority ?? 10;
+          for (const [hook, fn] of Object.entries(handlers)) {
+            (_filters[hook] ??= []).push({ fn, prio, plugin: meta.id });
+          }
+          console.info(`[WKW Plugin] ${meta.id} ${meta.version ?? ''} loaded`);
+        },
+        /**
+         * Pass a value through all handlers registered on a filter hook.
+         * @param  {string} hook  - Hook name
+         * @param  {*}      value - Initial value
+         * @param  {...*}   args  - Extra arguments forwarded to every handler
+         * @returns {*} Transformed value
+         */
+        applyFilters(hook, value, ...args) {
+          return (_filters[hook] ?? [])
+            .slice()
+            .sort((a, b) => a.prio - b.prio)
+            .reduce((val, { fn }) => fn(val, ...args), value);
+        },
+        /**
+         * Fire all action handlers registered on a hook (return value ignored).
+         * @param {string} hook - Hook name
+         * @param {...*}   args - Arguments forwarded to every handler
+         */
+        doAction(hook, ...args) {
+          (_filters[hook] ?? [])
+            .slice()
+            .sort((a, b) => a.prio - b.prio)
+            .forEach(({ fn }) => fn(...args));
+        },
+        /** Returns a snapshot of all registered plugin metadata. */
+        getPlugins() { return { ..._plugins }; },
+        /**
+         * Namespace for ODT utilities exposed to plugins.
+         * Populated at the bottom of wiki.js once the functions are defined.
+         */
+        odt: {}
+      };
+    })();
+
     // ── Symbol substitution ─────────────────────────────────────────────────────
     // Applied as a markdown preprocessor so it works with any marked version.
     // Longer/more-specific patterns are listed before shorter overlapping ones.
@@ -42,7 +99,10 @@
     }
 
     function parseWiki(md) {
-      return marked.parse(applySymbols(md));
+      md = WKW.applyFilters('wkw.md.preprocess', md);
+      let html = marked.parse(applySymbols(md));
+      html = WKW.applyFilters('wkw.html.postrender', html);
+      return html;
     }
 
     // ── Toast ───────────────────────────────────────────────────────────────────
@@ -140,6 +200,9 @@
       return out;
     }
 
+    // Shared ODT table counter — reset by buildOdtContent, incremented per table.
+    let _odtTableCounter = 0;
+
     function odtBody(md, inQuote) {
       // Pre-process: collect GFM tables and blockquotes into token objects.
       function parseBlocks(rawLines) {
@@ -192,102 +255,9 @@
       const S_PRE  = inQuote ? 'P_QuotePre' : 'P_Pre';
       const S_LI   = inQuote ? 'P_QuoteLi' : 'P_Li';
 
-      let tableCounter = 0;
-
-      function odtHtmlTable(html) {
-        // Parse all <tr> rows from the HTML table
-        const parsedRows = [];
-        const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-        let rowMatch;
-        while ((rowMatch = rowRe.exec(html)) !== null) {
-          const cells = [];
-          const cellRe = /<(td|th)([^>]*)>([\s\S]*?)<\/\1>/gi;
-          let cellMatch;
-          while ((cellMatch = cellRe.exec(rowMatch[1])) !== null) {
-            const tag = cellMatch[1].toLowerCase();
-            const attrs = cellMatch[2];
-            const content = cellMatch[3].trim();
-            const cM = attrs.match(/colspan\s*=\s*["']?(\d+)["']?/i);
-            const rM = attrs.match(/rowspan\s*=\s*["']?(\d+)["']?/i);
-            cells.push({
-              isHeader: tag === 'th',
-              content,
-              colspan: cM ? Math.max(1, parseInt(cM[1])) : 1,
-              rowspan: rM ? Math.max(1, parseInt(rM[1])) : 1
-            });
-          }
-          if (cells.length > 0) parsedRows.push(cells);
-        }
-        if (parsedRows.length === 0) return '';
-
-        const numRows = parsedRows.length;
-        // Track which column positions are occupied by rowspans from above rows
-        const occupancy = Array.from({length: numRows + 5}, () => new Set());
-        const placement = [];
-        let numCols = 0;
-
-        for (let r = 0; r < numRows; r++) {
-          placement[r] = [];
-          let col = 0, cellIdx = 0;
-          while (true) {
-            // Drain all columns occupied by rowspans before placing the next cell
-            while (occupancy[r].has(col)) {
-              placement[r].push({ covered: true });
-              col++;
-            }
-            if (cellIdx >= parsedRows[r].length) break;
-            const cell = parsedRows[r][cellIdx++];
-            placement[r].push({ ...cell, covered: false });
-            // Immediately add covered cells for colspan within the same row
-            for (let dc = 1; dc < cell.colspan; dc++) {
-              placement[r].push({ covered: true });
-            }
-            // Mark future rows' columns as occupied by this cell's rowspan
-            for (let dr = 1; dr < cell.rowspan; dr++) {
-              for (let dc = 0; dc < cell.colspan; dc++) {
-                occupancy[r + dr].add(col + dc);
-              }
-            }
-            col += cell.colspan;
-            numCols = Math.max(numCols, col);
-          }
-          // Fill any remaining occupied positions at the end of this row
-          while (col < numCols) { placement[r].push({ covered: true }); col++; }
-        }
-        // Ensure every row has exactly numCols entries
-        for (let r = 0; r < numRows; r++) {
-          while (placement[r].length < numCols) placement[r].push({ covered: true });
-        }
-
-        tableCounter++;
-        const tname = 'Tbl' + tableCounter;
-        let t = '<table:table table:name="' + odtXmlEsc(tname) + '" table:style-name="T_Table">';
-        for (let c = 0; c < numCols; c++) t += '<table:table-column table:style-name="T_Col"/>';
-        for (const row of placement) {
-          t += '<table:table-row>';
-          for (const cell of row) {
-            if (cell.covered) {
-              t += '<table:covered-table-cell/>';
-            } else {
-              const cs = cell.isHeader ? 'T_CellH' : 'T_Cell';
-              const ps = cell.isHeader ? 'P_TH' : 'P_TD';
-              let attrs = ' office:value-type="string"';
-              if (cell.colspan > 1) attrs += ' table:number-columns-spanned="' + cell.colspan + '"';
-              if (cell.rowspan > 1) attrs += ' table:number-rows-spanned="' + cell.rowspan + '"';
-              t += '<table:table-cell table:style-name="' + cs + '"' + attrs + '>';
-              t += '<text:p text:style-name="' + ps + '">' + odtInline(cell.content) + '</text:p>';
-              t += '</table:table-cell>';
-            }
-          }
-          t += '</table:table-row>';
-        }
-        t += '</table:table>';
-        return t;
-      }
-
       function odtTable(headers, rows) {
-        tableCounter++;
-        const tname = 'Tbl' + tableCounter;
+        _odtTableCounter++;
+        const tname = 'Tbl' + _odtTableCounter;
         const cols = headers.length;
         let t = '<table:table table:name="'+odtXmlEsc(tname)+'" table:style-name="T_Table">';
         for (let c = 0; c < cols; c++) t += '<table:table-column table:style-name="T_Col"/>';
@@ -342,7 +312,7 @@
           out += odtTable(td.h, td.r);
         } else if (line.startsWith('\x00HTMLTABLE\x00')) {
           if (inList) { out += '</text:list>'; inList = false; }
-          out += odtHtmlTable(line.slice(11));
+          out += WKW.applyFilters('wkw.odt.htmlTable', '', line.slice(11), { odtXmlEsc, odtInline, nextTableName: () => 'Tbl' + (++_odtTableCounter) });
         } else if (line.startsWith('\x00QUOTE\x00')) {
           if (inList) { out += '</text:list>'; inList = false; }
           out += odtBody(line.slice(7), true);
@@ -383,6 +353,7 @@
     function buildOdtManifest() { /* not used in flat-ODT mode */ }
 
     function buildOdtContent(md) {
+      _odtTableCounter = 0;
       const xmlns =
         ' xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
         +' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"'
@@ -487,6 +458,7 @@
         +'<style:style style:name="C_Mark" style:family="text">'
         +'<style:text-properties fo:background-color="#ffff00"/>'
         +'</style:style>';
+      const extraStyles = WKW.applyFilters('wkw.odt.styles', '');
       return '\x3C?xml version="1.0" encoding="UTF-8"?>'
         +'<office:document'
         +xmlns
@@ -495,7 +467,7 @@
         +'<office:font-face-decls>'
         +'<style:font-face style:name="Liberation Mono" svg:font-family="&apos;Liberation Mono&apos;" style:font-family-generic="modern" style:font-pitch="fixed"/>'
         +'</office:font-face-decls>'
-        +'<office:automatic-styles>'+astyles+'</office:automatic-styles>'
+        +'<office:automatic-styles>'+astyles+extraStyles+'</office:automatic-styles>'
         +'<office:body><office:text>'
         +odtBody(applySymbols(md))
         +'</office:text></office:body>'
@@ -944,6 +916,7 @@
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
+        WKW.doAction('wkw.page.afterLoad', page, document.getElementById('content'));
       }
 
       const parts = page === 'index' ? [] : page.split('/');
@@ -1166,6 +1139,7 @@
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
+        WKW.doAction('wkw.page.afterLoad', currentPage, document.getElementById('content'));
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
         document.getElementById('odt-btn').style.display = '';
         showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
@@ -1195,5 +1169,9 @@
       showWiki();
       load(getPage());
     }
+    // Expose ODT utilities for plugins (functions are defined above in this file)
+    WKW.odt.xmlEsc = odtXmlEsc;
+    WKW.odt.inline = odtInline;
+
     window.addEventListener('popstate', route);
     route();
