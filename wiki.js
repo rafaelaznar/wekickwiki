@@ -118,10 +118,18 @@
       return html;
     }
 
+    function addLineNumbers(block) {
+      const lines = block.innerHTML.split('\n');
+      if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+      block.innerHTML = lines.map(line => `<span class="ln-line">${line}</span>`).join('');
+      block.parentElement.classList.add('ln-enabled');
+    }
+
     function highlightContent(contentEl) {
       if (window.hljs) {
         contentEl.querySelectorAll('pre code').forEach(function (block) {
           hljs.highlightElement(block);
+          if (window.WKW_CODE_LINE_NUMBERS) addLineNumbers(block);
         });
       }
     }
@@ -725,15 +733,17 @@
         hSel.appendChild(opt);
       }
       document.getElementById('settings-save-status').textContent = '';
+      document.getElementById('settings-code-line-numbers').checked = !!settings.codeLineNumbers;
     }
 
     document.getElementById('settings-form').addEventListener('submit', async e => {
       e.preventDefault();
       const statusEl = document.getElementById('settings-save-status');
       statusEl.textContent = 'Saving\u2026';
-      const wikiName  = document.getElementById('settings-wiki-name').value.trim();
-      const theme     = document.getElementById('settings-theme').value;
-      const hljsTheme = document.getElementById('settings-hljs-theme').value;
+      const wikiName        = document.getElementById('settings-wiki-name').value.trim();
+      const theme           = document.getElementById('settings-theme').value;
+      const hljsTheme       = document.getElementById('settings-hljs-theme').value;
+      const codeLineNumbers = document.getElementById('settings-code-line-numbers').checked;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
@@ -742,7 +752,7 @@
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {

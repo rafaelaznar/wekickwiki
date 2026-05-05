@@ -269,6 +269,32 @@ h6 {
   padding: 0;
 }
 
+/* ── Line numbers ── */
+#content pre.ln-enabled {
+  padding: 0.8rem 0;
+}
+#content pre.ln-enabled code {
+  counter-reset: ln;
+  display: block;
+}
+#content pre.ln-enabled .ln-line {
+  counter-increment: ln;
+  display: block;
+  padding: 0 1rem 0 0;
+}
+#content pre.ln-enabled .ln-line::before {
+  content: counter(ln);
+  display: inline-block;
+  width: 2.5em;
+  margin-right: 0.75em;
+  padding-right: 0.5em;
+  text-align: right;
+  border-right: 1px solid #444;
+  color: #666;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 #content blockquote {
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: 1.05em;

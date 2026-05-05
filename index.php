@@ -83,14 +83,15 @@ function load_users(): array {
 }
 
 function load_settings(): array {
-  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css'];
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
-  $name      = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
-  $theme     = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
-  $hljsTheme = (isset($data['hljsTheme']) && is_string($data['hljsTheme']) && preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $data['hljsTheme']) && is_file(__DIR__ . '/vendor/highlight-themes/' . $data['hljsTheme'])) ? $data['hljsTheme'] : $defaults['hljsTheme'];
-  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme];
+  $name            = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
+  $theme           = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
+  $hljsTheme       = (isset($data['hljsTheme']) && is_string($data['hljsTheme']) && preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $data['hljsTheme']) && is_file(__DIR__ . '/vendor/highlight-themes/' . $data['hljsTheme'])) ? $data['hljsTheme'] : $defaults['hljsTheme'];
+  $codeLineNumbers = isset($data['codeLineNumbers']) ? (bool)$data['codeLineNumbers'] : $defaults['codeLineNumbers'];
+  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers];
 }
 
 function list_templates(): array {
@@ -419,15 +420,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-hlj
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Save settings  POST ?action=save-settings  (admin only)
-// Body: { wikiName: string, theme: string, hljsTheme: string }
+// Body: { wikiName: string, theme: string, hljsTheme: string, codeLineNumbers: bool }
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-settings') {
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-  $body      = json_decode(file_get_contents('php://input'), true) ?? [];
-  $wikiName  = trim($body['wikiName'] ?? '');
-  $theme     = basename($body['theme'] ?? '');
-  $hljsTheme = basename($body['hljsTheme'] ?? '');
+  $body            = json_decode(file_get_contents('php://input'), true) ?? [];
+  $wikiName        = trim($body['wikiName'] ?? '');
+  $theme           = basename($body['theme'] ?? '');
+  $hljsTheme       = basename($body['hljsTheme'] ?? '');
+  $codeLineNumbers = isset($body['codeLineNumbers']) ? (bool)$body['codeLineNumbers'] : false;
   if ($wikiName === '' || mb_strlen($wikiName) > 64) {
     json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
   }
@@ -445,9 +447,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   }
   $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
   if (!is_array($existing)) $existing = [];
-  $existing['wikiName']  = $wikiName;
-  $existing['theme']     = $theme;
-  $existing['hljsTheme'] = $hljsTheme;
+  $existing['wikiName']        = $wikiName;
+  $existing['theme']           = $theme;
+  $existing['hljsTheme']       = $hljsTheme;
+  $existing['codeLineNumbers'] = $codeLineNumbers;
   if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
     json_out(500, ['error' => 'Could not write settings file']);
   }
@@ -762,6 +765,10 @@ $settings = load_settings();
         <label>Code highlight theme
           <select id="settings-hljs-theme"></select>
         </label>
+        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
+          <input type="checkbox" id="settings-code-line-numbers" style="width:auto;cursor:pointer">
+          <label for="settings-code-line-numbers" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Show line numbers in code blocks</label>
+        </div>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>
           <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>
@@ -792,7 +799,7 @@ $settings = load_settings();
 
   <div id="toast"></div>
 
-  <script>window.WKW_BASE = <?= json_encode($baseHref) ?>;</script>
+  <script>window.WKW_BASE = <?= json_encode($baseHref) ?>;window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;</script>
   <script src="wiki.js"></script>
 <?php foreach (front_plugins() as $pf): ?>
   <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
