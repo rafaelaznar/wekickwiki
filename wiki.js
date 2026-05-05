@@ -222,6 +222,17 @@
         const tokens = [];
         let j = 0;
         while (j < rawLines.length) {
+          // Fenced code block: pass all lines through as-is so that blockquote
+          // lines (>) and table lines (|) inside fences are never mis-classified.
+          if (/^```/.test(rawLines[j])) {
+            tokens.push({ type: 'line', text: rawLines[j] }); j++; // opening fence
+            while (j < rawLines.length) {
+              tokens.push({ type: 'line', text: rawLines[j] });
+              if (/^```/.test(rawLines[j])) { j++; break; }
+              j++;
+            }
+            continue;
+          }
           // HTML table block: collect lines until </table>
           // Strip inline code spans before testing so `<table>` inside backticks is ignored.
           if (/<table(\s[^>]*)?>/.test(rawLines[j].replace(/`[^`]*`/g, ''))) {
