@@ -67,7 +67,36 @@ Update admin and guest usernames and/or passwords:
 - The `guestLoginEnabled` flag in `users.json` controls whether guest user authentication is allowed
 - When `guestLoginEnabled` is `false`, the guest login option is disabled
 - When `guestLoginEnabled` is `true`, guest users can authenticate with their credentials
-- This setting is managed in the `users.json` configuration file or in the popup from **Manage users** button in admin the toolbar
+- This setting is managed in the `users.json` configuration file or in the popup from **Manage users** button in the admin toolbar
+
+**`users.json` File Structure**
+
+The `users.json` file stores user credentials and authentication settings:
+
+```json
+{
+  "admin": {
+    "hash": "f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61",
+    "role": "admin"
+  },
+  "guest": {
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest"
+  },
+  "guestLoginEnabled": true
+}
+```
+
+- **User entries** (e.g., `"admin"`, `"guest"`): Each username is a key with an object containing:
+  - **`hash`** (string): SHA-256 HMAC hash of the password (computed client-side then server-side)
+  - **`role`** (string): User role (`admin` or `guest`); determines access permissions
+- **`guestLoginEnabled`** (boolean): 
+  - `true`: Guest users can log in with their credentials; guest login button appears on login screen
+  - `false`: Guest login is disabled; only admin login is available
+
+**Modifying Guest Login Setting**:
+- **Via UI**: Click **Manage users** → toggle the **Enable guest login** checkbox → save
+- **Via File**: Manually edit `users.json`, change `"guestLoginEnabled": true` to `false` (or vice versa), and reload the page
 
 **UI**
 - Responsive, single-column layout (max 860px)
