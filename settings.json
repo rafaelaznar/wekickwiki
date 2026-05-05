@@ -1,4 +1,5 @@
 {
     "wikiName": "WeKickWiki",
-    "theme": "impact.css"
+    "theme": "impact.css",
+    "disabledPlugins": []
 }

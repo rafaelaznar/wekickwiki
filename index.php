@@ -417,8 +417,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   if (!is_file(__DIR__ . '/templates/' . $theme)) {
     json_out(400, ['error' => 'Theme file not found']);
   }
-  $newSettings = ['wikiName' => $wikiName, 'theme' => $theme];
-  if (file_put_contents(SETTINGS_FILE, json_encode($newSettings, JSON_PRETTY_PRINT), LOCK_EX) === false) {
+  $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
+  if (!is_array($existing)) $existing = [];
+  $existing['wikiName'] = $wikiName;
+  $existing['theme']    = $theme;
+  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
+    json_out(500, ['error' => 'Could not write settings file']);
+  }
+  json_out(200, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Get plugin state  GET ?action=get-plugin-state  (any authenticated user)
+// Returns the list of disabled plugin ids from settings.json.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-plugin-state') {
+  require_auth();
+  $data = is_file(SETTINGS_FILE) ? json_decode(file_get_contents(SETTINGS_FILE), true) : [];
+  $disabled = (is_array($data) && is_array($data['disabledPlugins'] ?? null))
+    ? array_values(array_filter($data['disabledPlugins'], fn($v) => is_string($v) && preg_match('/^[a-zA-Z0-9_\-]+$/', $v)))
+    : [];
+  json_out(200, ['disabled' => $disabled]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Save plugin state  POST ?action=save-plugin-state  (admin only)
+// Body: { disabled: string[] }  — array of disabled plugin ids
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-plugin-state') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $disabled = array_values(array_filter(
+    $body['disabled'] ?? [],
+    fn($v) => is_string($v) && preg_match('/^[a-zA-Z0-9_\-]+$/', $v)
+  ));
+  $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
+  if (!is_array($existing)) $existing = [];
+  $existing['disabledPlugins'] = $disabled;
+  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
     json_out(500, ['error' => 'Could not write settings file']);
   }
   json_out(200, ['ok' => true]);
@@ -589,6 +626,11 @@ $settings = load_settings();
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
           </svg></button>
+        <button class="btn" id="plugins-btn" title="Plugins" aria-label="Plugins" style="display:none" onclick="togglePluginsPanel()"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
+            <line x1="16" y1="8" x2="2" y2="22" />
+            <line x1="17.5" y1="15" x2="9" y2="15" />
+          </svg></button>
         <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -623,6 +665,13 @@ $settings = load_settings();
     </header>
     <nav id="nav"></nav>
     <main id="content"></main>
+
+    <!-- Plugins panel -->
+    <div id="plugins-overlay" onclick="togglePluginsPanel()"></div>
+    <div id="plugins-panel">
+      <h3>Plugins <button class="close-btn" onclick="togglePluginsPanel()">&times;</button></h3>
+      <div id="plugins-list"></div>
+    </div>
 
     <!-- TOC panel -->
     <div id="toc-overlay" onclick="toggleToc()"></div>

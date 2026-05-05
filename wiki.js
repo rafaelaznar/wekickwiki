@@ -3,8 +3,9 @@
     // Initialised here so plugins loaded after wiki.js can call registerPlugin().
     // ══════════════════════════════════════════════════════════════════════════════
     window.WKW = (() => {
-      const _filters = {};  // hook → [{fn, prio, plugin}]
-      const _plugins = {};  // id   → meta
+      const _filters = {};      // hook → [{fn, prio, plugin}]
+      const _plugins = {};      // id   → meta
+      const _disabled = new Set(); // disabled plugin ids (server-side state)
       return {
         /**
          * Declare a plugin and bind its hook handlers.
@@ -23,6 +24,7 @@
         },
         /**
          * Pass a value through all handlers registered on a filter hook.
+         * Handlers whose plugin is disabled are skipped.
          * @param  {string} hook  - Hook name
          * @param  {*}      value - Initial value
          * @param  {...*}   args  - Extra arguments forwarded to every handler
@@ -32,10 +34,11 @@
           return (_filters[hook] ?? [])
             .slice()
             .sort((a, b) => a.prio - b.prio)
-            .reduce((val, { fn }) => fn(val, ...args), value);
+            .reduce((val, { fn, plugin }) => _disabled.has(plugin) ? val : fn(val, ...args), value);
         },
         /**
          * Fire all action handlers registered on a hook (return value ignored).
+         * Handlers whose plugin is disabled are skipped.
          * @param {string} hook - Hook name
          * @param {...*}   args - Arguments forwarded to every handler
          */
@@ -43,10 +46,20 @@
           (_filters[hook] ?? [])
             .slice()
             .sort((a, b) => a.prio - b.prio)
+            .filter(({ plugin }) => !_disabled.has(plugin))
             .forEach(({ fn }) => fn(...args));
         },
         /** Returns a snapshot of all registered plugin metadata. */
         getPlugins() { return { ..._plugins }; },
+        /** Returns true if the plugin with the given id is enabled. */
+        isEnabled(id) { return !_disabled.has(id); },
+        /** Enable or disable a plugin in memory (call save-plugin-state to persist). */
+        setEnabled(id, val) { val ? _disabled.delete(id) : _disabled.add(id); },
+        /** Initialise the disabled set from an array of disabled plugin ids (from server). */
+        loadState(disabledArr) {
+          _disabled.clear();
+          if (Array.isArray(disabledArr)) disabledArr.forEach(id => _disabled.add(id));
+        },
         /**
          * Namespace for ODT utilities exposed to plugins.
          * Populated at the bottom of wiki.js once the functions are defined.
@@ -838,6 +851,7 @@
       document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('plugins-btn').style.display  = isAdmin ? '' : 'none';
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
         document.getElementById('home-btn').style.display = '';
@@ -1160,11 +1174,95 @@
       }
     });
 
+    // ── Plugin panel ─────────────────────────────────────────────────────────────
+    let _pluginsOpen = false;
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderPluginsPanel() {
+      const plugins = WKW.getPlugins();
+      const ids = Object.keys(plugins);
+      const list = document.getElementById('plugins-list');
+      if (ids.length === 0) {
+        list.innerHTML = '<p id="plugins-empty">No plugins installed.</p>';
+        return;
+      }
+      const isAdmin = getRole() === 'admin';
+      list.innerHTML = ids.map(id => {
+        const p = plugins[id];
+        const enabled = WKW.isEnabled(id);
+        return `<div class="plugin-card">
+  <div class="plugin-info">
+    <strong>${escHtml(p.name ?? id)}</strong><span class="plugin-version">v${escHtml(p.version ?? '?')}</span><br>
+    <small>${escHtml(p.description ?? '')}</small>
+  </div>
+  <div class="plugin-toggle">
+    <label class="toggle-switch" title="${enabled ? 'Disable' : 'Enable'} plugin">
+      <input type="checkbox" ${enabled ? 'checked' : ''} ${isAdmin ? '' : 'disabled'}
+             onchange="pluginToggleChange('${escHtml(id)}', this)">
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+</div>`;
+      }).join('');
+    }
+
+    function togglePluginsPanel() {
+      _pluginsOpen = !_pluginsOpen;
+      document.getElementById('plugins-overlay').style.display = _pluginsOpen ? 'block' : 'none';
+      document.getElementById('plugins-panel').style.display   = _pluginsOpen ? 'block' : 'none';
+      if (_pluginsOpen) renderPluginsPanel();
+    }
+
+    async function pluginToggleChange(id, checkbox) {
+      const newEnabled = checkbox.checked;
+      checkbox.disabled = true;
+      WKW.setEnabled(id, newEnabled);
+      const allIds  = Object.keys(WKW.getPlugins());
+      const disabled = allIds.filter(pid => !WKW.isEnabled(pid));
+      try {
+        const res = await apiFetch('?action=save-plugin-state', {
+          method: 'POST',
+          body:   JSON.stringify({ disabled })
+        });
+        if (!res.ok) {
+          WKW.setEnabled(id, !newEnabled);
+          checkbox.checked = !newEnabled;
+          console.error('[WKW] Failed to save plugin state', res.status);
+        }
+      } catch (err) {
+        WKW.setEnabled(id, !newEnabled);
+        checkbox.checked = !newEnabled;
+        console.error('[WKW] Error saving plugin state', err);
+      }
+      checkbox.disabled = false;
+    }
+
     // ── Router ──────────────────────────────────────────────────────────────────
-    function route() {
+    let _pluginStateLoaded = false;
+
+    async function route() {
       if (!getToken()) {
         showLogin();
         return;
+      }
+      if (!_pluginStateLoaded) {
+        _pluginStateLoaded = true;
+        try {
+          const res = await apiFetch('?action=get-plugin-state');
+          if (res.ok) {
+            const data = await res.json();
+            WKW.loadState(data.disabled ?? []);
+          }
+        } catch (e) {
+          console.warn('[WKW] Could not load plugin state', e);
+        }
       }
       showWiki();
       load(getPage());
