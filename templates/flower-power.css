@@ -1,0 +1,1428 @@
+/* ── WeKickWiki — Flower Power Theme ────────────────────────────────────────
+   Psychedelic 1960s hippie aesthetic with vibrant pastel colors, peace symbols
+   and groovy flower patterns. Inspired by Woodstock, love beads and the
+   Summer of Love. Far out, baby!
+
+   TECHNIQUE NOTE: gradient borders use the padding-box / border-box trick
+   so that border-radius and gradient borders coexist.
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* @import MUST be first — if anything precedes it the browser ignores it */
+@import url('https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&family=Righteous&display=swap');
+
+/* ── Reset ── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base body ── */
+body {
+  line-height: 1.7;
+  color: #4a3c2b;
+  font: normal 87.5%/1.5 'Comfortaa', cursive, system-ui, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+
+  /* Static pastel gradient background */
+  background: linear-gradient(
+    120deg,
+    #fef3e8 0%, #fce8f3 16%, #eaf3fe 32%,
+    #f0ebfc 48%, #fffbe5 64%, #eafaf1 80%, #fef3e8 100%
+  );
+}
+
+
+
+/* ── Fixed background texture: soft flower dots ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 10% 15%, rgba(255,105,180,.12) 0%, transparent 35%),
+    radial-gradient(circle at 85% 10%, rgba(255,200,100,.10) 0%, transparent 30%),
+    radial-gradient(circle at 20% 75%, rgba(150,100,255,.10) 0%, transparent 35%),
+    radial-gradient(circle at 75% 80%, rgba(100,200,150,.12) 0%, transparent 35%),
+    radial-gradient(circle at 50% 45%, rgba(200,150,255,.08) 0%, transparent 40%);
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* ── Giant peace symbol watermark behind everything ── */
+body::after {
+  content: '☮';
+  position: fixed;
+  top: -5%;
+  right: -5%;
+  font-size: 55vw;
+  line-height: 1;
+  color: rgba(255,105,180,.04);
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOGIN SCREEN
+   ═══════════════════════════════════════════════════════════════════ */
+
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Floating flowers across the top */
+#login-screen::before {
+  content: '✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿';
+  position: absolute;
+  top: 6%;
+  left: -10%;
+  font-size: 2.4rem;
+  color: rgba(255,105,180,.18);
+  transform: rotate(-12deg);
+  letter-spacing: 3rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Peace drift across the bottom */
+#login-screen::after {
+  content: '☮ PEACE ☮ LOVE ☮ PEACE ☮ LOVE ☮ PEACE ☮';
+  position: absolute;
+  bottom: 6%;
+  left: -20%;
+  font-size: 2rem;
+  color: rgba(100,200,150,.14);
+  transform: rotate(8deg);
+  letter-spacing: 1.5rem;
+  white-space: nowrap;
+  font-family: 'Righteous', cursive;
+  font-weight: 700;
+
+  pointer-events: none;
+}
+
+
+
+/* ── Login box ── */
+/* Gradient border trick: background-clip padding-box / border-box */
+#login-box {
+  background:
+    linear-gradient(135deg, rgba(255,252,246,.97), rgba(255,242,252,.97)) padding-box,
+    linear-gradient(135deg, #ff69b4, #ff1493, #dda0dd, #98fb98, #ffb347, #ff69b4) border-box;
+  border: 4px solid transparent;
+  border-radius: 28px;
+  padding: 3rem 2.8rem 2.5rem;
+  width: 100%;
+  max-width: 380px;
+  box-shadow:
+    0 18px 45px rgba(255,105,180,.22),
+    0  4px 15px rgba(0,0,0,.06);
+  position: relative;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+#login-box h2 {
+  font-family: 'Righteous', cursive;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  /* Gradient text */
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #a855f7, #22c55e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 3px;
+  line-height: 1.3;
+}
+
+#login-box h2::before { content: '✿ '; -webkit-text-fill-color: #ff69b4; }
+#login-box h2::after  { content: ' ✿'; -webkit-text-fill-color: #ff69b4; }
+
+#login-box label {
+  display: block;
+  font-size: .9rem;
+  font-weight: 600;
+  margin-bottom: .9rem;
+  color: #b8569f;
+  letter-spacing: 1px;
+}
+
+#login-box input {
+  display: block;
+  width: 100%;
+  margin-top: .4rem;
+  padding: .75rem 1rem;
+  /* Gradient border on inputs */
+  background:
+    linear-gradient(#fffaf6, #fffaf6) padding-box,
+    linear-gradient(90deg, #ffc0cb, #dda0dd, #98fb98) border-box;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  font-size: 1rem;
+  outline: none;
+  font-family: 'Comfortaa', cursive;
+  color: #4a3c2b;
+  transition: box-shadow .3s, transform .2s;
+}
+
+#login-box input:focus {
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd) border-box;
+  border: 2px solid transparent;
+  box-shadow: 0 0 18px rgba(255,105,180,.25);
+  transform: scale(1.015);
+}
+
+#login-box button {
+  width: 100%;
+  margin-top: 1.8rem;
+  padding: .9rem 2rem;
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd);
+  color: #fff;
+  border: none;
+  border-radius: 18px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  font-family: 'Righteous', cursive;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: all .35s ease;
+  box-shadow: 0 6px 22px rgba(255,105,180,.4);
+}
+
+#login-box button::before { content: '✿'; }
+#login-box button::after  { content: '✿'; }
+
+
+
+#login-box button:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 10px 30px rgba(255,105,180,.5);
+}
+
+#login-box button:active {
+  transform: translateY(-1px) scale(1.01);
+}
+
+#login-error {
+  margin-top: .75rem;
+  font-size: .85rem;
+  color: #d64a96;
+  text-align: center;
+  min-height: 1.2rem;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WIKI SCREEN WRAPPER
+   ═══════════════════════════════════════════════════════════════════ */
+
+#wiki-screen {
+  max-width: 900px;
+  margin: 60px auto;
+  padding: 3rem 2.8rem 3.5rem;
+  clear: both;
+  /* Gradient border trick */
+  background:
+    linear-gradient(135deg, rgba(255,255,244,.97), rgba(255,244,252,.97), rgba(248,248,255,.97)) padding-box,
+    linear-gradient(135deg, #ff69b4, #ff1493, #dda0dd, #98fb98, #ffb347, #ff69b4) border-box;
+  border: 5px solid transparent;
+  border-radius: 28px;
+  box-shadow:
+    0 25px 60px rgba(255,105,180,.14),
+    0  6px 20px rgba(0,0,0,.05);
+  position: relative;
+  word-wrap: break-word;
+  /* NOT overflow:hidden so decorations outside the box are visible */
+}
+
+/* Flower banner above the wiki box */
+#wiki-screen::before {
+  content: '✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿';
+  position: absolute;
+  top: -2.5rem;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 1.6rem;
+  color: rgba(255,105,180,.35);
+  letter-spacing: 2rem;
+  pointer-events: none;
+}
+
+/* Peace symbol corner accent */
+#wiki-screen::after {
+  content: '☮';
+  position: absolute;
+  top: -1.8rem;
+  right: 2.5rem;
+  font-size: 2.8rem;
+  color: rgba(100,200,150,.35);
+  pointer-events: none;
+}
+
+/* ── Header ── */
+header,
+#wiki-header {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2rem;
+  border-bottom: 3px solid rgba(255,105,180,.25);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  position: relative;
+}
+
+/* Rainbow divider line below header */
+header::after,
+#wiki-header::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    rgba(255,105,180,0) 0%,
+    #ff69b4 20%, #dda0dd 40%, #98fb98 60%, #ffb347 80%,
+    rgba(255,105,180,0) 100%);
+  border-radius: 2px;
+}
+
+header a,
+#wiki-header h1 {
+  font-family: 'Righteous', cursive;
+  font-size: 2.6rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-decoration: none;
+  /* Gradient text */
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #a855f7, #22c55e, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.2;
+}
+
+
+
+#wiki-header h1::before,
+header a::before { content: '✿ '; -webkit-text-fill-color: #ff69b4; }
+#wiki-header h1::after,
+header a::after  { content: ' ✿'; -webkit-text-fill-color: #ff69b4; }
+
+/* ── Navigation ── */
+#header-right,
+#wiki-nav {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: .5rem;
+}
+
+nav,
+#wiki-nav {
+  font-size: .85rem;
+  color: #b8569f;
+  margin-bottom: 1.5rem;
+  min-height: 1.2rem;
+}
+
+nav a,
+#wiki-nav a {
+  padding: .65rem 1.4rem;
+  /* Gradient border trick */
+  background:
+    linear-gradient(135deg, rgba(255,240,248,.9), rgba(240,248,255,.9)) padding-box,
+    linear-gradient(90deg, #ff69b4, #dda0dd, #98fb98) border-box;
+  border: 3px solid transparent;
+  border-radius: 40px;
+  color: #d64a96;
+  text-decoration: none;
+  font-weight: 700;
+  font-family: 'Comfortaa', cursive;
+  font-size: 1rem;
+  letter-spacing: .5px;
+  transition: all .3s ease;
+  box-shadow: 0 3px 12px rgba(255,105,180,.2);
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+nav a::before,
+#wiki-nav a::before { content: '✿'; opacity: .7; }
+
+nav a:hover,
+#wiki-nav a:hover {
+  background:
+    linear-gradient(135deg, #ff69b4, #ff1493) padding-box,
+    linear-gradient(90deg, #ff69b4, #dda0dd, #98fb98) border-box;
+  color: #fff;
+  transform: translateY(-3px);
+  box-shadow: 0 7px 20px rgba(255,105,180,.38);
+}
+
+#user-badge {
+  font-size: .78rem;
+  color: #fff;
+  padding: .3rem .8rem;
+  background: linear-gradient(90deg, #ff69b4, #ff1493);
+  border-radius: 20px;
+  font-weight: 700;
+}
+
+/* ── Breadcrumb nav ── */
+nav {
+  font-size: .85rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTENT — HEADINGS
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content h1,
+#wiki-content h1 {
+  font-family: 'Righteous', cursive;
+  font-size: 2.2em;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd, #98fb98);
+  padding: .7em 1.2em;
+  border-left: 8px solid #ff1493;
+  border-radius: 0 14px 14px 0;
+  margin: 1.5rem 0 1rem;
+  letter-spacing: 1px;
+  box-shadow: 0 5px 20px rgba(255,105,180,.3);
+}
+
+#content h2,
+#wiki-content h2 {
+  font-family: 'Righteous', cursive;
+  font-size: 1.8em;
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd, #98fb98, #ffb347);
+  padding: .6em 1.2em;
+  border-left: 7px solid #ff69b4;
+  border-radius: 0 12px 12px 0;
+  margin: 2rem 0 1rem;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 16px rgba(255,105,180,.25);
+}
+
+#content h2::before,
+#wiki-content h2::before { content: '✿ '; font-size: .9em; }
+#content h2::after,
+#wiki-content h2::after  { content: ' ✿'; font-size: .9em; }
+
+#content h3,
+#wiki-content h3 {
+  font-family: 'Comfortaa', cursive;
+  font-size: 1.4em;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #d64a96, #ff69b4, #dda0dd);
+  padding: .5em 1em;
+  border-radius: 10px;
+  border-left: 5px solid #ff1493;
+  margin: 1.8rem 0 .9rem;
+  box-shadow: 0 3px 12px rgba(214,74,150,.22);
+}
+
+#content h4,
+#wiki-content h4 {
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #d64a96;
+  margin: 1.4rem 0 .5rem;
+  padding-left: .8rem;
+  border-left: 4px solid rgba(255,105,180,.4);
+}
+
+#content h5,
+#wiki-content h5 {
+  font-size: 1em;
+  font-weight: 700;
+  color: #b8569f;
+  margin: 1rem 0 .4rem;
+}
+
+#content h6,
+#wiki-content h6 {
+  font-size: .9em;
+  font-weight: 600;
+  color: #a0608f;
+  margin: .8rem 0 .3rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTENT — PARAGRAPHS, LINKS & LISTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content p,
+#wiki-content p {
+  margin: .6rem 0 1rem;
+  line-height: 1.8;
+}
+
+#content a,
+#wiki-content a {
+  color: #e8208a;
+  text-decoration: underline;
+  text-decoration-color: rgba(232,32,138,.35);
+  font-weight: 600;
+  transition: color .2s, background .2s;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+#content a:hover,
+#wiki-content a:hover {
+  color: #b8569f;
+  background: rgba(255,105,180,.1);
+  text-decoration-color: #b8569f;
+}
+
+#content ul,
+#content ol,
+#wiki-content ul,
+#wiki-content ol {
+  margin: .5rem 0 1rem 1.6rem;
+}
+
+#content li,
+#wiki-content li {
+  margin-bottom: .4rem;
+  line-height: 1.7;
+}
+
+#content ul li::marker,
+#wiki-content ul li::marker {
+  content: '✿ ';
+  color: #ff69b4;
+  font-size: 1em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CODE — INLINE & BLOCKS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Inline code: vivid pill on white/pink */
+#content code,
+#wiki-content code {
+  background: linear-gradient(90deg, #ff69b4, #ff1493);
+  color: #fff;
+  padding: .2em .55em;
+  border-radius: 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1.05em;
+  font-weight: 700;
+  display: inline-block;
+  line-height: 1.3;
+  letter-spacing: .3px;
+  box-shadow: 0 2px 8px rgba(255,105,180,.35);
+  vertical-align: baseline;
+}
+
+/* Pre block: light background, thick left border */
+#content pre,
+#wiki-content pre {
+  background: linear-gradient(135deg, rgba(255,250,246,.98), rgba(255,244,252,.98));
+  border-left: 8px solid #ff69b4;
+  border-top: 2px solid rgba(255,105,180,.2);
+  border-right: 2px solid rgba(255,105,180,.15);
+  border-bottom: 2px solid rgba(255,105,180,.2);
+  border-radius: 0 14px 14px 0;
+  padding: 1rem 1.2rem 1.2rem;
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  box-shadow: 0 5px 20px rgba(255,105,180,.15);
+  position: relative;
+}
+
+/* "✿ CODE ✿" label above pre content */
+#content pre::before,
+#wiki-content pre::before {
+  content: '✿  CODE  ✿';
+  display: block;
+  font-family: 'Righteous', cursive;
+  font-size: .85rem;
+  font-weight: 900;
+  color: #ff69b4;
+  letter-spacing: 3px;
+  text-align: center;
+  padding-bottom: .8rem;
+  margin-bottom: .8rem;
+  border-bottom: 2px dashed rgba(255,105,180,.3);
+}
+
+/* Code inside pre: reset to readable dark-on-light */
+#content pre code,
+#wiki-content pre code {
+  background: none;
+  color: #3a3020;
+  padding: 0;
+  border-radius: 0;
+  font-size: .95rem;
+  font-weight: 400;
+  box-shadow: none;
+  display: block;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+/* ── Line numbers (when enabled) ── */
+#content pre.ln-enabled,
+#wiki-content pre.ln-enabled {
+  padding: 1rem 0 1.2rem;
+}
+#content pre.ln-enabled code,
+#wiki-content pre.ln-enabled code {
+  counter-reset: ln;
+}
+#content pre.ln-enabled .ln-line,
+#wiki-content pre.ln-enabled .ln-line {
+  counter-increment: ln;
+  display: block;
+  padding: 0 1.2rem;
+}
+#content pre.ln-enabled .ln-line::before,
+#wiki-content pre.ln-enabled .ln-line::before {
+  content: counter(ln);
+  display: inline-block;
+  width: 2.2em;
+  margin-right: .8em;
+  padding-right: .5em;
+  text-align: right;
+  border-right: 2px solid rgba(255,105,180,.3);
+  color: #c097b8;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BLOCKQUOTES
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content blockquote,
+#wiki-content blockquote {
+  margin: 1.5rem 0;
+  padding: 1rem 1.2rem 1rem 1.5rem;
+  border-left: 6px solid #ff69b4;
+  background: linear-gradient(135deg, rgba(255,105,180,.07), rgba(221,160,221,.06));
+  border-radius: 0 12px 12px 0;
+  font-style: italic;
+  color: #5a4a42;
+  box-shadow: 0 2px 10px rgba(255,105,180,.12);
+}
+
+#content blockquote::before,
+#wiki-content blockquote::before {
+  content: '✿';
+  color: #ff69b4;
+  font-size: 1.1em;
+  font-weight: 900;
+  margin-right: .5rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HORIZONTAL RULE
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content hr,
+#wiki-content hr {
+  border: none;
+  height: 4px;
+  background: linear-gradient(90deg,
+    transparent 0%, #ff69b4 15%, #dda0dd 40%, #98fb98 60%, #ffb347 85%, transparent 100%);
+  margin: 2.5rem 0;
+  border-radius: 2px;
+  opacity: .7;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   IMAGES
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content img,
+#wiki-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 14px;
+  border: 4px solid transparent;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(135deg, #ff69b4, #dda0dd, #98fb98) border-box;
+  box-shadow: 0 6px 18px rgba(255,105,180,.2);
+  margin: 1.5rem 0;
+  display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TABLES
+   Note: border-radius on tables requires border-collapse:separate
+         or a wrapping element — we use border-collapse:separate here.
+   ═══════════════════════════════════════════════════════════════════ */
+
+#content table,
+#wiki-content table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 2rem 0;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 6px 22px rgba(255,105,180,.18);
+  border: 3px solid transparent;
+  background:
+    linear-gradient(rgba(255,255,248,.98), rgba(255,248,252,.98)) padding-box,
+    linear-gradient(135deg, #ff69b4, #dda0dd, #98fb98) border-box;
+}
+
+#content table th,
+#wiki-content table th {
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd);
+  color: #fff;
+  padding: 1rem 1.2rem;
+  text-align: left;
+  font-family: 'Righteous', cursive;
+  font-weight: 700;
+  font-size: .95rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Round the first/last header cells */
+#content table thead tr:first-child th:first-child,
+#wiki-content table thead tr:first-child th:first-child { border-radius: 13px 0 0 0; }
+#content table thead tr:first-child th:last-child,
+#wiki-content table thead tr:first-child th:last-child  { border-radius: 0 13px 0 0; }
+
+/* Round the last row bottom corners */
+#content table tbody tr:last-child td:first-child,
+#wiki-content table tbody tr:last-child td:first-child { border-radius: 0 0 0 13px; }
+#content table tbody tr:last-child td:last-child,
+#wiki-content table tbody tr:last-child td:last-child  { border-radius: 0 0 13px 0; }
+
+#content table td,
+#wiki-content table td {
+  padding: .9rem 1.2rem;
+  border-bottom: 1px solid rgba(255,105,180,.15);
+  transition: background .2s;
+}
+
+#content table tbody tr:hover,
+#wiki-content table tbody tr:hover {
+  background: rgba(255,105,180,.06);
+}
+
+#content table tbody tr:last-child td,
+#wiki-content table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════════ */
+
+#wiki-footer,
+footer {
+  margin-top: 4rem;
+  padding-top: 2.5rem;
+  border-top: 3px solid transparent;
+  background:
+    transparent padding-box,
+    linear-gradient(90deg, transparent, #ff69b4 20%, #dda0dd 50%, #98fb98 80%, transparent) border-box;
+  text-align: center;
+  color: #b8569f;
+  font-size: .95rem;
+  font-weight: 600;
+  font-family: 'Comfortaa', cursive;
+}
+
+#wiki-footer::before,
+footer::before {
+  content: '✿  ☮  LOVE  ☮  PEACE  ☮  HARMONY  ☮  ✿';
+  display: block;
+  margin-bottom: 1.2rem;
+  font-family: 'Righteous', cursive;
+  font-size: 1.4rem;
+  letter-spacing: .8rem;
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd, #98fb98);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+#wiki-footer a,
+footer a {
+  color: #ff69b4;
+  text-decoration: none;
+  font-weight: 700;
+  padding: .3rem .8rem;
+  border-radius: 14px;
+  transition: all .3s;
+}
+
+#wiki-footer a:hover,
+footer a:hover {
+  background: linear-gradient(135deg, #ff69b4, #ff1493);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255,105,180,.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORM CONTROLS (global — textarea, standalone inputs)
+   ═══════════════════════════════════════════════════════════════════ */
+
+textarea,
+input[type="text"],
+input[type="password"],
+input[type="search"],
+input[type="email"] {
+  background:
+    linear-gradient(#fffaf6, #fffaf6) padding-box,
+    linear-gradient(90deg, #ffc0cb, #dda0dd, #98fb98) border-box;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  padding: .6rem .9rem;
+  font-family: 'Comfortaa', cursive;
+  font-size: 1rem;
+  color: #4a3c2b;
+  outline: none;
+  transition: box-shadow .3s, transform .2s;
+  width: 100%;
+}
+
+textarea:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus {
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd) border-box;
+  border: 2px solid transparent;
+  box-shadow: 0 0 16px rgba(255,105,180,.22);
+  transform: scale(1.01);
+}
+
+/* ── Buttons (global) ── */
+button,
+input[type="button"],
+input[type="submit"] {
+  background: linear-gradient(90deg, #ff69b4, #ff1493, #dda0dd);
+  color: #fff;
+  border: none;
+  padding: .75rem 1.8rem;
+  border-radius: 22px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Righteous', cursive;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: all .35s ease;
+  box-shadow: 0 5px 18px rgba(255,105,180,.38);
+}
+
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 9px 25px rgba(255,105,180,.5);
+}
+
+button:active,
+input[type="button"]:active,
+input[type="submit"]:active {
+  transform: translateY(-1px) scale(1.01);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  #wiki-screen {
+    margin: 30px 12px;
+    padding: 2rem 1.4rem 2.5rem;
+    border-radius: 20px;
+  }
+
+  #wiki-screen::before,
+  #wiki-screen::after,
+  #login-screen::before,
+  #login-screen::after { display: none; }
+
+  header,
+  #wiki-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  header a,
+  #wiki-header h1 {
+    font-size: 2rem;
+    margin-bottom: .8rem;
+  }
+
+  #wiki-header h1::before,
+  #wiki-header h1::after,
+  header a::before,
+  header a::after { content: ''; }
+
+  #header-right,
+  #wiki-nav {
+    width: 100%;
+    justify-content: center;
+  }
+
+  #wiki-footer::before,
+  footer::before {
+    font-size: 1rem;
+    letter-spacing: .4rem;
+  }
+
+  #content h2,
+  #wiki-content h2 { font-size: 1.5em; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRINT
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media print {
+  body {
+    background: #fff !important;
+    animation: none !important;
+  }
+
+  body::before, body::after,
+  #login-screen::before, #login-screen::after,
+  #wiki-screen::before, #wiki-screen::after,
+  #wiki-footer::before, footer::before,
+  #content h2::before, #content h2::after,
+  #wiki-content h2::before, #wiki-content h2::after,
+  #content pre::before, #wiki-content pre::before { display: none !important; }
+
+  #wiki-screen {
+    box-shadow: none !important;
+    border: 2px solid #ddd !important;
+    background: #fff !important;
+  }
+
+  #content code, #wiki-content code {
+    background: #eee !important;
+    color: #333 !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
+  #content h2, #wiki-content h2,
+  #content h3, #wiki-content h3 {
+    background: #eee !important;
+    color: #333 !important;
+    animation: none !important;
+  }
+
+  button, input[type="button"], input[type="submit"] { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACCESSIBILITY — Reduce Motion
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   UI COMPONENTS — buttons, panels, overlays, editor, toast
+   These styles are required on top of the theme for the wiki UI
+   to function correctly.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── SVG icon sizing (required for header toolbar icons) ── */
+button svg {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
+}
+
+/* ── Button variants ── */
+.btn {
+  padding: .45rem .6rem;
+  font-size: .85rem;
+  border: 2px solid rgba(255,105,180,.35);
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255,255,255,.88);
+  color: #d64a96;
+  font-family: 'Comfortaa', cursive;
+  letter-spacing: normal;
+  text-transform: none;
+  box-shadow: none;
+  animation: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .3rem;
+}
+
+.btn:hover {
+  background: rgba(255,105,180,.1);
+  transform: none;
+  box-shadow: 0 3px 10px rgba(255,105,180,.2);
+}
+
+.btn:active {
+  transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #ff69b4, #ff1493);
+  color: #fff;
+  border-color: #ff1493;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #ff1493, #d6006e);
+}
+
+.btn-danger {
+  color: #c00;
+  border-color: rgba(200,0,0,.3);
+  background: rgba(255,255,255,.88);
+}
+
+.btn-danger:hover {
+  background: #fff0f4;
+}
+
+#save-status {
+  font-size: .8rem;
+  color: #b8569f;
+  line-height: 2;
+}
+
+/* ── Editor ── */
+#editor {
+  display: none;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+#editor-bar {
+  display: flex;
+  gap: .5rem;
+}
+
+#editor-area {
+  width: 100%;
+  height: 70vh;
+  font-family: ui-monospace, monospace;
+  font-size: .9rem;
+  line-height: 1.5;
+  padding: .75rem;
+  border: 2px solid rgba(255,105,180,.3);
+  border-radius: 12px;
+  resize: vertical;
+  outline: none;
+  background: rgba(255,255,248,.98);
+  color: #4a3c2b;
+  transition: border-color .3s;
+}
+
+#editor-area:focus {
+  border-color: #ff69b4;
+  box-shadow: 0 0 12px rgba(255,105,180,.18);
+}
+
+/* ── Overlays ── */
+#index-overlay,
+#toc-overlay,
+#users-overlay,
+#settings-overlay,
+#plugins-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .4);
+  z-index: 100;
+}
+
+/* ── Slide-in side panels ── */
+#index-panel {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 90vw);
+  background: rgba(255,252,246,.98);
+  box-shadow: -4px 0 24px rgba(255,105,180,.2);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  z-index: 101;
+}
+
+#toc-panel {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 90vw);
+  background: rgba(255,252,246,.98);
+  box-shadow: 4px 0 24px rgba(255,105,180,.2);
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem;
+  z-index: 101;
+}
+
+/* ── Centred modal panels ── */
+#users-panel {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  background: rgba(255,252,246,.98);
+  box-shadow: 0 8px 40px rgba(255,105,180,.3);
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem 1.75rem;
+  z-index: 101;
+  overflow-y: auto;
+}
+
+#settings-panel {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, 92vw);
+  background: rgba(255,252,246,.98);
+  box-shadow: 0 8px 40px rgba(255,105,180,.3);
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem 1.75rem;
+  z-index: 101;
+  overflow-y: auto;
+}
+
+#plugins-panel {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, 94vw);
+  max-height: 80vh;
+  background: rgba(255,252,246,.98);
+  box-shadow: 0 8px 40px rgba(255,105,180,.3);
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 18px;
+  padding: 1.5rem 1.75rem 1.75rem;
+  z-index: 101;
+  overflow-y: auto;
+}
+
+/* ── Panel headings ── */
+#index-panel h3,
+#toc-panel h3,
+#users-panel h3,
+#settings-panel h3,
+#plugins-panel h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #d64a96;
+  font-family: 'Righteous', cursive;
+}
+
+.close-btn {
+  background: none !important;
+  border: none !important;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: #d64a96;
+  line-height: 1;
+  padding: 0 !important;
+  box-shadow: none !important;
+  animation: none !important;
+  transform: none !important;
+  font-family: inherit !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+
+/* ── Index tree ── */
+#index-tree { font-size: .88rem; }
+#index-tree ul { list-style: none; padding-left: 1rem; margin: 0; }
+#index-tree > ul { padding-left: 0; }
+#index-tree li { margin: .2rem 0; }
+#index-tree a { color: #d64a96; text-decoration: none; }
+#index-tree a:hover { text-decoration: underline; }
+#index-tree .folder { font-weight: 600; color: #b8569f; display: block; margin-top: .5rem; }
+
+/* ── TOC list ── */
+#toc-list { font-size: .88rem; }
+#toc-list ul { list-style: none; padding-left: 0; margin: 0; }
+#toc-list li { margin: .2rem 0; }
+#toc-list a { color: #d64a96; text-decoration: none; display: block; }
+#toc-list a:hover { text-decoration: underline; }
+.toc-h1 { font-weight: 700; }
+.toc-h2 { padding-left: 1.5rem; }
+.toc-h3 { padding-left: 2.5rem; font-size: .83rem; color: #b8569f; }
+
+/* ── Users form ── */
+#users-form fieldset {
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 10px;
+  padding: .75rem 1rem .85rem;
+  margin-bottom: 1rem;
+}
+#users-form legend {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #d64a96;
+  padding: 0 .35rem;
+}
+#users-form label {
+  display: block;
+  font-size: .82rem;
+  font-weight: 600;
+  color: #4a3c2b;
+  margin-top: .6rem;
+}
+#users-form label:first-of-type { margin-top: 0; }
+#users-form input[type="text"],
+#users-form input[type="password"] {
+  display: block;
+  width: 100%;
+  margin-top: .2rem;
+  padding: .45rem .65rem;
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 8px;
+  font-size: .92rem;
+  outline: none;
+  font-family: 'Comfortaa', cursive;
+  background: rgba(255,255,248,.98);
+  color: #4a3c2b;
+  /* override global textarea/input styles */
+  transform: none;
+  transition: border-color .3s;
+}
+#users-form input:focus {
+  border-color: #ff69b4;
+  box-shadow: 0 0 8px rgba(255,105,180,.2);
+  transform: none;
+}
+#users-form-actions {
+  display: flex;
+  gap: .6rem;
+  justify-content: flex-end;
+  margin-top: .25rem;
+}
+#users-save-status {
+  font-size: .8rem;
+  color: #b8569f;
+  flex: 1;
+  line-height: 2.1;
+}
+
+/* ── Settings form ── */
+#settings-form label {
+  display: block;
+  font-size: .82rem;
+  font-weight: 600;
+  color: #4a3c2b;
+  margin-top: .85rem;
+}
+#settings-form label:first-of-type { margin-top: 0; }
+#settings-form input[type="text"],
+#settings-form select {
+  display: block;
+  width: 100%;
+  margin-top: .2rem;
+  padding: .45rem .65rem;
+  border: 2px solid rgba(255,105,180,.25);
+  border-radius: 8px;
+  font-size: .92rem;
+  outline: none;
+  font-family: 'Comfortaa', cursive;
+  background: rgba(255,255,248,.98);
+  color: #4a3c2b;
+  transform: none;
+  transition: border-color .3s;
+}
+#settings-form input:focus,
+#settings-form select:focus {
+  border-color: #ff69b4;
+  transform: none;
+}
+#settings-form-actions {
+  display: flex;
+  gap: .6rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+#settings-save-status {
+  font-size: .8rem;
+  color: #b8569f;
+  flex: 1;
+  line-height: 2.1;
+}
+
+/* ── Plugin cards ── */
+.plugin-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .85rem 0;
+  border-bottom: 1px solid rgba(255,105,180,.15);
+}
+.plugin-card:last-child { border-bottom: none; }
+.plugin-info strong { font-size: .92rem; }
+.plugin-info small { color: #b8569f; font-size: .78rem; }
+.plugin-version { font-size: .75rem; color: #d64a96; margin-left: .4rem; font-weight: 400; }
+.plugin-toggle { flex-shrink: 0; padding-top: .15rem; }
+.toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ccc;
+  border-radius: 22px;
+  cursor: pointer;
+  transition: .25s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: .25s;
+}
+.toggle-switch input:checked + .toggle-slider { background: #ff69b4; }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+.toggle-switch input:disabled + .toggle-slider { opacity: .6; cursor: not-allowed; }
+#plugins-empty { color: #b8569f; font-size: .9rem; padding: .5rem 0; }
+
+/* ── Toast notification ── */
+#toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(1rem);
+  background: #22c55e;
+  color: #fff;
+  padding: .6rem 1.4rem;
+  border-radius: 24px;
+  font-size: .9rem;
+  font-weight: 600;
+  font-family: 'Comfortaa', cursive;
+  box-shadow: 0 4px 18px rgba(0,0,0,.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .25s;
+  z-index: 200;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.error { background: #d64a96; }
+
+/* ── Inline TOC (floats right alongside content) ── */
+#toc-inline {
+  float: right;
+  width: 200px;
+  border: 2px solid rgba(255,105,180,.3);
+  background: rgba(255,252,246,.95);
+  padding: .55rem .85rem;
+  font-size: .83rem;
+  line-height: 1.5;
+  border-radius: 12px;
+  margin: 2px 2px 20px 20px;
+}
+#toc-inline ul { list-style: none; padding: 0; margin: 0; }
+#toc-inline li { margin: .15rem 0; }
+#toc-inline a { color: #d64a96; text-decoration: none; }
+#toc-inline a:hover { text-decoration: underline; }
+#toc-inline .toc-h1 { font-weight: 700; }
+#toc-inline .toc-h2 { display: block; padding-left: 1rem; }
+#toc-inline .toc-h3 { display: block; padding-left: 2rem; font-size: .78rem; color: #b8569f; }
+
+/* ── Guest mode ── */
+.guest-mode header {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  min-height: 0;
+  position: fixed;
+  top: .75rem;
+  right: max(1.5rem, calc((100vw - 900px)/2 + 2.8rem));
+  width: auto;
+  z-index: 50;
+}
+.guest-mode #header-title,
+.guest-mode #user-badge { display: none; }
+.guest-mode #nav { display: none; }
+.guest-mode #content { margin-top: 2.5rem; }
+
+/* ── Footer ── */
+#footer, .footer {
+  text-align: center;
+  font-size: 0.78rem;
+  color: #b8569f;
+  margin: 1rem auto 2rem;
+  font-family: 'Comfortaa', cursive;
+}
+#footer a, .footer a { color: #ff69b4; text-decoration: none; }
+#footer a:hover, .footer a:hover { text-decoration: underline; }
+
