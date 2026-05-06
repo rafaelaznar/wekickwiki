@@ -588,6 +588,7 @@ button svg {
   line-height: 1.5;
   border-radius: 10px;
   margin: 2px 2px 20px 20px;
+  padding-left: 25px;
 }
 
 #toc-inline ul {
@@ -623,6 +624,29 @@ button svg {
   padding-left: 2rem;
   font-size: .78rem;
   color: #555
+}
+#toc-inline summary {
+  font-size: .75rem;
+  font-weight: 700;
+  color: #05c;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  margin-bottom: 0
+}
+#toc-inline summary::-webkit-details-marker {
+  display: none
+}
+#toc-inline summary::before {
+  content: "▶ ";
+  font-size: .65rem;
+  vertical-align: middle
+}
+#toc-inline[open] summary {
+  margin-bottom: .5rem
+}
+#toc-inline[open] summary::before {
+  content: "▼ "
 }
 
 /* ── Guest mode ── */

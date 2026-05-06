@@ -1042,14 +1042,14 @@
       if (getRole() !== 'guest') return;
       const headings = document.querySelectorAll('#content h1, #content h2, #content h3');
       if (headings.length < 2) return;
-      let html = '<ul>';
+      let html = '<summary>Table of contents</summary><ul>';
       headings.forEach(h => {
         const cls = 'toc-' + h.tagName.toLowerCase();
         const id = h.id;
         html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});return false;">' + h.textContent + '</a></li>';
       });
       html += '</ul>';
-      const div = document.createElement('div');
+      const div = document.createElement('details');
       div.id = 'toc-inline';
       const content = document.getElementById('content');
       div.innerHTML = html;
