@@ -2,41 +2,62 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // JWT helpers
 // ═══════════════════════════════════════════════════════════════════════════
+// Encodes binary data as Base64URL (RFC 4648 §5): replaces '+' with '-' and '/' with '_',
+// then strips '=' padding. Produces URL-safe strings suitable for JWT segments.
 function b64url(string $d): string
 {
   return rtrim(strtr(base64_encode($d), '+/', '-_'), '=');
 }
 
+// Builds a signed JWT (JSON Web Token) using HMAC-SHA256.
+// A JWT is three dot-separated Base64URL segments: header.payload.signature.
 function jwt_make(array $payload): string
 {
+  // Encode the standard header declaring the algorithm and token type
   $h = b64url(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+  // Encode the payload (claims: sub, role, iat, exp)
   $p = b64url(json_encode($payload));
+  // Sign "header.payload" with HMAC-SHA256 using the server secret; raw binary output is then Base64URL-encoded
   $s = b64url(hash_hmac('sha256', "$h.$p", JWT_SECRET, true));
   return "$h.$p.$s";
 }
 
+// Verifies a JWT token and returns its decoded payload array, or null if invalid/expired.
+// Uses hash_equals() for constant-time signature comparison to resist timing-based attacks.
 function jwt_verify(?string $token): ?array
 {
   if (!$token) return null;
+  // A valid JWT must consist of exactly three dot-separated segments
   $parts = explode('.', $token);
   if (count($parts) !== 3) return null;
   [$h, $p, $s] = $parts;
+  // Recompute the expected signature and compare in constant time to prevent timing leaks
   if (!hash_equals(b64url(hash_hmac('sha256', "$h.$p", JWT_SECRET, true)), $s)) return null;
+  // Convert the Base64URL payload back to standard Base64 before decoding JSON
   $data = json_decode(base64_decode(strtr($p, '-_', '+/')), true);
+  // Reject if the payload is not a valid array or the token's expiry timestamp has passed
   if (!is_array($data) || ($data['exp'] ?? 0) < time()) return null;
   return $data;
 }
 
+// Extracts the Bearer token string from the incoming HTTP Authorization header.
+// Falls back to getallheaders() for CGI/FastCGI environments where PHP may not populate $_SERVER.
+// Returns the raw token, or null when the header is absent or does not carry a Bearer scheme.
 function bearer_token(): ?string
 {
+  // Primary source: PHP populates HTTP_AUTHORIZATION or REDIRECT_HTTP_AUTHORIZATION in most setups
   $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+  // Fallback for servers where mod_rewrite passes the header under a different key
   if (!$auth && function_exists('getallheaders')) {
     $hdrs = getallheaders();
     $auth = $hdrs['Authorization'] ?? $hdrs['authorization'] ?? '';
   }
+  // Extract the token value that follows the "Bearer " prefix (case-insensitive)
   return preg_match('/^Bearer\s+(.+)$/i', $auth, $m) ? trim($m[1]) : null;
 }
 
+// Validates the incoming Bearer JWT and returns its claims array.
+// Terminates the request immediately with HTTP 401 if authentication fails.
 function require_auth(): array
 {
   $claims = jwt_verify(bearer_token());
@@ -46,6 +67,8 @@ function require_auth(): array
   return $claims;
 }
 
+// Sends an HTTP response with the given status code and JSON-encoded body, then exits.
+// Declared with return type 'never' because it always terminates script execution via exit().
 function json_out(int $code, array $data): never
 {
   http_response_code($code);
@@ -72,23 +95,34 @@ $USERS_DEFAULT = [
   'guestLoginEnabled' => true,
 ];
 
+// Loads the user database from users.json.
+// On first run (file absent), seeds the file with built-in defaults using an atomic write.
+// Falls back to defaults if the file is corrupt or contains fewer than 2 entries.
 function load_users(): array {
   global $USERS_DEFAULT;
+  // Seed users.json on first run; LOCK_EX prevents race conditions during concurrent writes
   if (!is_file(USERS_FILE)) {
     file_put_contents(USERS_FILE, json_encode($USERS_DEFAULT, JSON_PRETTY_PRINT), LOCK_EX);
     return $USERS_DEFAULT;
   }
   $data = json_decode(file_get_contents(USERS_FILE), true);
+  // Require at least 2 entries (admin + guest) to consider the file structurally valid
   return (is_array($data) && count($data) >= 2) ? $data : $USERS_DEFAULT;
 }
 
+// Loads and validates wiki settings from settings.json.
+// Each field is validated individually; invalid or missing values fall back to built-in defaults
+// so the wiki always starts up safely even when the settings file is corrupt or incomplete.
 function load_settings(): array {
   $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
+  // Accept wikiName only when it is a non-empty string
   $name            = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
+  // Validate theme: must match a safe filename pattern AND exist on disk to prevent path traversal
   $theme           = (isset($data['theme']) && is_string($data['theme']) && preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $data['theme']) && is_file(__DIR__ . '/templates/' . $data['theme'])) ? $data['theme'] : $defaults['theme'];
+  // Same validation for the highlight.js theme (dots allowed for names like "atom-one-dark.min.css")
   $hljsTheme       = (isset($data['hljsTheme']) && is_string($data['hljsTheme']) && preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $data['hljsTheme']) && is_file(__DIR__ . '/vendor/highlight-themes/' . $data['hljsTheme'])) ? $data['hljsTheme'] : $defaults['hljsTheme'];
   $codeLineNumbers = isset($data['codeLineNumbers']) ? (bool)$data['codeLineNumbers'] : $defaults['codeLineNumbers'];
   return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers];
@@ -116,6 +150,8 @@ function front_plugins(): array {
   if (!is_dir($dir)) return [];
   $files = glob($dir . '/*.js') ?: [];
   sort($files);
+  // Whitelist filenames to alphanumeric, hyphens, and underscores only.
+  // This prevents path traversal or script injection when the name is rendered in a <script src> tag.
   return array_values(array_filter(
     array_map('basename', $files),
     fn($f) => (bool) preg_match('/^[a-zA-Z0-9_\-]+\.js$/', $f)
@@ -135,19 +171,27 @@ $baseHref  = $scriptDir . '/';
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login') {
   $body = json_decode(file_get_contents('php://input'), true) ?? [];
+  // Sanitize username: strip everything except lowercase alphanumerics and underscores
   $user = preg_replace('/[^a-z0-9_]/', '', strtolower($body['user'] ?? ''));
+  // Sanitize hash: the client sends a SHA-256 hex digest of the password, strip non-hex chars
   $hash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
+  // SHA-256 hex output is always exactly 64 characters; reject anything that deviates
   if (strlen($hash) !== 64) json_out(401, ['error' => 'Invalid credentials']);
+  // Double-hash pattern: HMAC the client-side SHA-256 with the server secret before comparing.
+  // The stored value is therefore never the bare SHA-256, protecting it even if users.json leaks.
   $serverHash = hash_hmac('sha256', $hash, JWT_SECRET);
   if (isset($USERS[$user]) && is_array($USERS[$user]) && hash_equals($USERS[$user]['hash'], $serverHash)) {
+    // Block guest logins when the admin has disabled them via the user-management panel
     if (($USERS[$user]['role'] ?? '') === 'guest' && !($USERS['guestLoginEnabled'] ?? true)) {
       json_out(401, ['error' => 'Guest login is currently disabled']);
     }
+    // Issue a JWT embedding the user's role; valid for TOKEN_TTL seconds from now
     json_out(200, [
       'token' => jwt_make(['sub' => $user, 'role' => $USERS[$user]['role'], 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
       'role'  => $USERS[$user]['role'],
     ]);
   }
+  // Generic error message: never reveal whether the username or the password was wrong
   json_out(401, ['error' => 'Invalid credentials']);
 }
 
@@ -156,9 +200,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
 // ═══════════════════════════════════════════════════════════════════════════
 if (isset($_GET['page'])) {
   require_auth();
+  // Strip all characters except path-safe ones to prevent directory traversal attacks
   $p    = preg_replace('/[^a-zA-Z0-9\/\-_]/', '', $_GET['page']);
+  // Trim leading/trailing slashes so the result is always relative to pages/
   $base = __DIR__ . '/pages/' . trim($p, '/');
   $f    = $base . '.md';
+  // Return raw Markdown; rendering is handled client-side by marked.js
   header('Content-Type: text/plain; charset=utf-8');
   if (is_file($f)) {
     readfile($f);
@@ -176,12 +223,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'index')
   require_auth();
   $pagesDir = __DIR__ . '/pages';
   $result   = [];
+  // RecursiveIteratorIterator walks the entire pages/ tree, including nested subdirectories
   $iter = new RecursiveIteratorIterator(
     new RecursiveDirectoryIterator($pagesDir, FilesystemIterator::SKIP_DOTS),
     RecursiveIteratorIterator::SELF_FIRST
   );
   foreach ($iter as $file) {
     if ($file->isFile() && $file->getExtension() === 'md') {
+      // Build a forward-slash relative path (normalises Windows backslashes) and strip the pages/ prefix
       $rel = str_replace('\\', '/', substr($file->getPathname(), strlen($pagesDir) + 1));
       // strip .md extension; root index.md → 'index'
       $page = preg_replace('/\.md$/', '', $rel);
@@ -217,13 +266,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
   $body = json_decode(file_get_contents('php://input'), true) ?? [];
+  // Sanitize the page slug: only path-safe characters; dots and spaces are intentionally excluded
   $p    = preg_replace('/[^a-zA-Z0-9\/\-_]/', '', $body['page'] ?? '');
   $base = __DIR__ . '/pages/' . trim($p, '/');
   $f = $base . '.md';
   $dir = dirname($f);
+  // Auto-create intermediate directories (e.g. pages/docs/guide/) when saving a nested page
   if (!is_dir($dir)) {
     @mkdir($dir, 0755, true);
   }
+  // Wrap the write in output buffering so any PHP permission warnings don't corrupt the JSON response
   ob_start();
   $written = @file_put_contents($f, $body['content'] ?? '');
   ob_end_clean();
@@ -244,9 +296,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-use
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
   $users  = load_users();
+  // Discover admin and guest usernames by iterating entries and inspecting their role.
+  // Password hashes are intentionally excluded from the response to avoid leaking credentials.
   $admin  = '';
   $guest  = '';
   foreach ($users as $uname => $udata) {
+    // Skip non-array entries such as the top-level 'guestLoginEnabled' boolean
     if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') $admin = $uname;
     if (($udata['role'] ?? '') === 'guest') $guest = $uname;
@@ -277,7 +332,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
 
   $existing = load_users();
 
-  // Resolve existing hashes for each role
+  // Resolve existing hashes for each role so we can preserve them when no new password is supplied
   $existingAdminHash = '';
   $existingGuestHash = '';
   foreach ($existing as $udata) {
@@ -286,15 +341,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     if (($udata['role'] ?? '') === 'guest') $existingGuestHash = $udata['hash'];
   }
 
-  // Validate and compute new hashes
+  // Validate and compute new hashes.
+  // A null value in the request body means "keep existing password" (user left the field blank).
   $rawAdminHash = $body['adminHash'] ?? null;
   $rawGuestHash = $body['guestHash'] ?? null;
 
   if ($rawAdminHash !== null) {
+    // Strip non-hex characters and validate length before applying the server-side HMAC
     $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawAdminHash));
     if (strlen($rawAdminHash) !== 64) json_out(400, ['error' => 'Invalid admin password hash']);
     $newAdminHash = hash_hmac('sha256', $rawAdminHash, JWT_SECRET);
   } else {
+    // No new password supplied: retain the currently stored HMAC hash unchanged
     $newAdminHash = $existingAdminHash;
   }
 
@@ -360,8 +418,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'backup'
   echo "# This file can be used to restore the wiki. Do not modify the page markers.\n";
 
   foreach ($files as $f) {
+    // Compute the page slug (e.g. "docs/guide/intro") from the full filesystem path
     $rel  = substr($f, strlen($pagesDir) + 1);
     $page = preg_replace('/\.md$/', '', $rel);
+    // Each page section begins with an ===PAGE=== marker that the restore endpoint uses to split pages
     echo "\n===PAGE=== $page\n";
     $content = file_get_contents($f);
     echo $content;
@@ -445,6 +505,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   if (!is_file(__DIR__ . '/vendor/highlight-themes/' . $hljsTheme)) {
     json_out(400, ['error' => 'Highlight theme file not found']);
   }
+  // Merge into the existing settings file so unmanaged keys are preserved across saves
   $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
   if (!is_array($existing)) $existing = [];
   $existing['wikiName']        = $wikiName;
@@ -509,32 +570,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   $raw = file_get_contents($_FILES['backup']['tmp_name']);
   if ($raw === false) json_out(500, ['error' => 'Could not read uploaded file']);
 
-  // Parse backup: split into pages
+  // Parse backup: split on ===PAGE=== markers using a simple line-by-line accumulation loop.
+  // Lines before the first marker (e.g. comment header lines) are silently discarded.
   $pages   = [];
   $curPage = null;
   $curLines = [];
 
   foreach (explode("\n", $raw) as $line) {
     if (preg_match('/^===PAGE=== (.+)$/', $line, $m)) {
-      // Save previous page block
+      // Flush the previously accumulated page block before starting the next one
       if ($curPage !== null) {
         $pages[$curPage] = implode("\n", $curLines);
       }
-      // Sanitize path: same rules as all other endpoints + no path traversal
+      // Sanitize path: same rules as all other endpoints + explicit path traversal check
       $p = preg_replace('/[^a-zA-Z0-9\/\-_]/', '', trim($m[1]));
       $p = trim($p, '/');
+      // Reject empty or traversal paths even after sanitization (defence-in-depth)
       if ($p === '' || strpos($p, '..') !== false) {
         json_out(400, ['error' => 'Invalid page path in backup: ' . htmlspecialchars(trim($m[1]))]);
       }
       $curPage  = $p;
       $curLines = [];
     } else {
+      // Accumulate content lines for the current page
       if ($curPage !== null) {
         $curLines[] = $line;
       }
     }
   }
-  // Save last page block
+  // Flush the final page block (there is no trailing ===PAGE=== marker after the last page)
   if ($curPage !== null) {
     $pages[$curPage] = implode("\n", $curLines);
   }
@@ -559,7 +623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
     ]);
   }
 
-  // Recreate pages from backup
+  // Recreate pages from backup; write each .md file and auto-create subdirectories as needed
   $written = 0;
   foreach ($pages as $page => $content) {
     $f   = $pagesDir . '/' . $page . '.md';
@@ -579,6 +643,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   json_out(200, ['ok' => true, 'pages' => $written]);
 }
 
+// Load validated settings before rendering the HTML shell; values are PHP-escaped on output.
 $settings = load_settings();
 ?>
 <!DOCTYPE html>
@@ -799,8 +864,10 @@ $settings = load_settings();
 
   <div id="toast"></div>
 
+  <?php // Expose the base path and code-line-numbers flag to JavaScript before loading the main app ?>
   <script>window.WKW_BASE = <?= json_encode($baseHref) ?>;window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;</script>
   <script src="wiki.js"></script>
+<?php // Dynamically inject each enabled front-end plugin as a <script> tag ?>
 <?php foreach (front_plugins() as $pf): ?>
   <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
 <?php endforeach; ?>
