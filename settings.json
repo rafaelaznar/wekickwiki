@@ -1,7 +1,7 @@
 {
     "wikiName": "WeKickWiki",
-    "theme": "impact.css",
+    "theme": "default.css",
     "disabledPlugins": [],
-    "hljsTheme": "monokai.css",
+    "hljsTheme": "humanoid-ligt.css",
     "codeLineNumbers": true
 }
