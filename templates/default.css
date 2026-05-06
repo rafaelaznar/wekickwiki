@@ -938,9 +938,12 @@ button svg {
 .toggle-switch input:disabled + .toggle-slider { opacity: .6; cursor: not-allowed; }
 #plugins-empty { color: #888; font-size: .9rem; padding: .5rem 0; }
 
-.footer {
+#footer {
   text-align: center;
-  font-size: 0.75rem;
-  color: #999;
   margin: 1rem auto 2rem;
+}
+
+#footer a {
+  font-size: 0.75rem;
+  color: #8A0808;
 }
