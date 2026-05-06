@@ -308,10 +308,7 @@ body::after {
       )
       border-box;
 
-  border-width: 25px;
-  border-style: dotted;
-  border-color: rgba(59, 32, 47, 0.4);
-  border-spacing: 10px;
+  border: 25px solid transparent;
   border-radius: 28px;
   box-shadow:
     0 25px 60px rgba(255, 105, 180, 0.14),
@@ -323,9 +320,9 @@ body::after {
 
 /* Flower banner above the wiki box */
 #wiki-screen::before {
-  content: "✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿";
+  content: "✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿  ✿";
   position: absolute;
-  top: -2.5rem;
+  top: -4.5rem;
   left: 0;
   right: 0;
   text-align: center;
@@ -337,12 +334,14 @@ body::after {
 
 /* Peace symbol corner accent */
 #wiki-screen::after {
-  content: "☮";
+  content: "♥";
+  /* inverted */
+  transform: rotate(20deg);
   position: absolute;
   top: -1.8rem;
   right: 2.5rem;
-  font-size: 2.8rem;
-  color: rgba(100, 200, 150, 0.35);
+  font-size: 83.8rem;
+  color: rgba(100, 200, 150, 0.15);
   pointer-events: none;
 }
 
@@ -1631,7 +1630,7 @@ button svg {
   line-height: 1.5;
   border-radius: 12px;
   margin: 2px 2px 20px 20px;
-  padding-left: 30px;;
+  padding-left: 30px;
 }
 #toc-inline ul {
   list-style: none;
