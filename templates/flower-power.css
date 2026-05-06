@@ -359,6 +359,40 @@ header,
   position: relative;
 }
 
+/* Large blurred heart in background */
+header::before {
+  content: "❤";
+  position: fixed;
+  top: 15%;
+  left: 5%;
+  font-size: clamp(120px, 22vw, 350px);
+  color: rgba(255, 105, 180, 0.08);
+  z-index: -2;
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(-30deg);
+  filter: blur(3px);
+  text-shadow: 0 0 60px rgba(255, 105, 180, 0.1);
+}
+
+/* Large blurred flower in background */
+header::after {
+  content: "✿";
+  position: fixed;
+  bottom: 15%;
+  right: 8%;
+  font-size: clamp(140px, 25vw, 400px);
+  color: rgba(100, 200, 150, 0.07);
+  z-index: -2;
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(40deg);
+  filter: blur(3px);
+  text-shadow: 0 0 80px rgba(221, 160, 221, 0.09);
+  font-weight: 900;
+  font-family: "Righteous", cursive;
+}
+
 /* Rainbow divider line below header */
 header::after,
 #wiki-header::after {
