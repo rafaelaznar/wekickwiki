@@ -98,7 +98,8 @@ $USERS_DEFAULT = [
 // Loads the user database from users.json.
 // On first run (file absent), seeds the file with built-in defaults using an atomic write.
 // Falls back to defaults if the file is corrupt or contains fewer than 2 entries.
-function load_users(): array {
+function load_users(): array
+{
   global $USERS_DEFAULT;
   // Seed users.json on first run; LOCK_EX prevents race conditions during concurrent writes
   if (!is_file(USERS_FILE)) {
@@ -113,7 +114,8 @@ function load_users(): array {
 // Loads and validates wiki settings from settings.json.
 // Each field is validated individually; invalid or missing values fall back to built-in defaults
 // so the wiki always starts up safely even when the settings file is corrupt or incomplete.
-function load_settings(): array {
+function load_settings(): array
+{
   $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
@@ -128,7 +130,8 @@ function load_settings(): array {
   return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers];
 }
 
-function list_templates(): array {
+function list_templates(): array
+{
   $dir = __DIR__ . '/templates';
   if (!is_dir($dir)) return ['default.css'];
   $files = glob($dir . '/*.css') ?: [];
@@ -136,7 +139,9 @@ function list_templates(): array {
   return array_map('basename', $files);
 }
 
-function list_hljs_themes(): array {
+// Returns basenames of all *.css files in vendor/highlight-themes/ (safe filenames only)
+function list_hljs_themes(): array
+{
   $dir = __DIR__ . '/vendor/highlight-themes';
   if (!is_dir($dir)) return ['highlight-github.min.css'];
   $files = glob($dir . '/*.css') ?: [];
@@ -145,7 +150,8 @@ function list_hljs_themes(): array {
 }
 
 // Returns basenames of all *.js files in front-plugins/ (safe filenames only)
-function front_plugins(): array {
+function front_plugins(): array
+{
   $dir = __DIR__ . '/front-plugins';
   if (!is_dir($dir)) return [];
   $files = glob($dir . '/*.js') ?: [];
@@ -159,6 +165,25 @@ function front_plugins(): array {
 }
 
 $USERS = load_users();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Helper: delete all contents of a directory but keep the directory itself.
+// Returns true on success, false if any entry could not be removed.
+// Uses @ to suppress PHP warnings; caller checks the return value.
+// ═══════════════════════════════════════════════════════════════════════════
+function clear_dir_contents(string $dir): bool
+{
+  if (!is_dir($dir)) return true;
+  $iter = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
+    RecursiveIteratorIterator::CHILD_FIRST
+  );
+  foreach ($iter as $entry) {
+    $ok = $entry->isDir() ? @rmdir($entry->getPathname()) : @unlink($entry->getPathname());
+    if (!$ok) return false;
+  }
+  return true;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Base path detection
@@ -280,10 +305,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   $written = @file_put_contents($f, $body['content'] ?? '');
   ob_end_clean();
   if ($written === false) {
-    json_out(500, ['error' =>
+    json_out(500, [
+      'error' =>
       'Could not write page to disk. ' .
-      'Check that the web server user has write permission on pages/. ' .
-      'Hint: run "chown -R www-data:www-data pages/" inside the container.'
+        'Check that the web server user has write permission on pages/. ' .
+        'Hint: run "chown -R www-data:www-data pages/" inside the container.'
     ]);
   }
   json_out(200, ['ok' => true]);
@@ -429,24 +455,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'backup'
     if (substr($content, -1) !== "\n") echo "\n";
   }
   exit;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Helper: delete all contents of a directory but keep the directory itself.
-// Returns true on success, false if any entry could not be removed.
-// Uses @ to suppress PHP warnings; caller checks the return value.
-// ═══════════════════════════════════════════════════════════════════════════
-function clear_dir_contents(string $dir): bool {
-  if (!is_dir($dir)) return true;
-  $iter = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS),
-    RecursiveIteratorIterator::CHILD_FIRST
-  );
-  foreach ($iter as $entry) {
-    $ok = $entry->isDir() ? @rmdir($entry->getPathname()) : @unlink($entry->getPathname());
-    if (!$ok) return false;
-  }
-  return true;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -616,10 +624,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   $cleared = clear_dir_contents($pagesDir);
   ob_end_clean();
   if (!$cleared) {
-    json_out(500, ['error' =>
+    json_out(500, [
+      'error' =>
       'Cannot clear pages/ directory contents. ' .
-      'Make sure the web server user has write permission on all files inside pages/. ' .
-      'Hint: run "chown -R www-data:www-data pages/" inside the container.'
+        'Make sure the web server user has write permission on all files inside pages/. ' .
+        'Hint: run "chown -R www-data:www-data pages/" inside the container.'
     ]);
   }
 
@@ -632,9 +641,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
     // Strip the trailing newline added by the parser's line-joining
     $content = rtrim($content, "\n");
     if (@file_put_contents($f, $content) === false) {
-      json_out(500, ['error' =>
+      json_out(500, [
+        'error' =>
         'Could not write page: ' . $page . '. ' .
-        'Check web server write permissions on pages/.'
+          'Check web server write permissions on pages/.'
       ]);
     }
     $written++;
@@ -858,19 +868,24 @@ $settings = load_settings();
     </div>
   </div>
 
-  <div id="footer">    
+  <div id="footer">
     <a href="https://github.com/rafaelaznar/wekickwiki">2026 - <?= htmlspecialchars($settings['wikiName']) ?>. MIT License. Rafael Aznar</a>
   </div>
 
   <div id="toast"></div>
 
-  <?php // Expose the base path and code-line-numbers flag to JavaScript before loading the main app ?>
-  <script>window.WKW_BASE = <?= json_encode($baseHref) ?>;window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;</script>
+  <?php // Expose the base path and code-line-numbers flag to JavaScript before loading the main app 
+  ?>
+  <script>
+    window.WKW_BASE = <?= json_encode($baseHref) ?>;
+    window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;
+  </script>
   <script src="wiki.js"></script>
-<?php // Dynamically inject each enabled front-end plugin as a <script> tag ?>
-<?php foreach (front_plugins() as $pf): ?>
-  <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
-<?php endforeach; ?>
+  <?php // Dynamically inject each enabled front-end plugin as a <script> tag 
+  ?>
+  <?php foreach (front_plugins() as $pf): ?>
+    <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
+  <?php endforeach; ?>
 </body>
 
 </html>
