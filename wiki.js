@@ -1496,5 +1496,23 @@
     WKW.odt.xmlEsc = odtXmlEsc;
     WKW.odt.inline = odtInline;
 
+    // ── Mobile menu ──────────────────────────────────────────────────────────────
+    function toggleMobileMenu() {
+      const menu = document.getElementById('header-buttons');
+      const btn  = document.getElementById('mobile-menu-btn');
+      const open = menu.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', open);
+    }
+
+    document.addEventListener('click', e => {
+      const menu = document.getElementById('header-buttons');
+      const btn  = document.getElementById('mobile-menu-btn');
+      if (!menu || !btn) return;
+      if (menu.classList.contains('is-open') && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('is-open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
     window.addEventListener('popstate', route);
     route();

@@ -718,6 +718,8 @@ $settings = load_settings();
       <a id="header-title" href="" onclick="navigate('index');return false;"><img src="icon.svg" style="display:inline; width:1.5rem; height:1.5rem; margin-right:0.5rem; vertical-align:middle;" alt=""><?= htmlspecialchars($settings['wikiName']) ?></a>
       <div id="header-right">
         <span id="user-badge"></span>
+        <button class="btn" id="mobile-menu-btn" aria-label="Menu" aria-expanded="false" onclick="toggleMobileMenu()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <div id="header-buttons">
         <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <line x1="3" y1="5" x2="21" y2="5" />
             <line x1="6" y1="10" x2="21" y2="10" />
@@ -787,6 +789,7 @@ $settings = load_settings();
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg></button>
+        </div>
       </div>
     </header>
     <nav id="nav"></nav>

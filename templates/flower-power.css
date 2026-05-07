@@ -436,6 +436,8 @@ header a,
   line-height: 1.2;
 }
 
+header a img { display: none !important; }
+
 #wiki-header h1::before,
 header a::before {
   content: "✿ ";
@@ -456,6 +458,10 @@ header a::after {
   align-items: center;
   padding-top: 0.5rem;
 }
+
+#mobile-menu-btn { display: none !important; }
+
+#header-buttons { display: flex !important; position: static !important; flex-direction: row !important; flex-wrap: wrap !important; background: none !important; border: none !important; box-shadow: none !important; padding: 0 !important; gap: 1rem !important; }
 
 nav,
 #wiki-nav {
@@ -515,7 +521,15 @@ nav a:hover,
 
 /* ── Breadcrumb nav ── */
 nav {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+}
+
+nav a {
+  padding: .25rem .7rem;
+  font-size: .75rem;
+  border-width: 2px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(255, 105, 180, .15);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

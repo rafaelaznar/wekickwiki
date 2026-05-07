@@ -134,6 +134,36 @@ header a {
   align-items: center
 }
 
+#mobile-menu-btn { display: none; }
+
+#header-buttons {
+  display: flex;
+  gap: .5rem;
+  align-items: center
+}
+
+@media (max-width: 899px) {
+  #mobile-menu-btn { display: inline-flex; }
+
+  #header-buttons {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #eee;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .12);
+    padding: .5rem;
+    gap: .25rem;
+    z-index: 1001
+  }
+
+  #header-buttons.is-open { display: flex; }
+
+  #header-buttons .btn { width: 100%; }
+}
+
 #user-badge {
   font-size: .78rem;
   color: #666;
