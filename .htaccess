@@ -1,5 +1,13 @@
 RewriteEngine On
 
+# uncomment + 
+# RewriteBase / 
+# + /etc/apache2/sites-enabled/000-default.conf
+# <Directory /var/www/html>
+#        AllowOverride All
+#        Require all granted
+#    </Directory>
+
 # Pass Authorization header to PHP (required for JWT)
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 # !-f prevents existing files from being overwritten to index.php
