@@ -1,10 +1,10 @@
 {
     "wikiName": "WeKickWiki",
-    "theme": "default.css",
+    "theme": "flower-power.css",
     "disabledPlugins": [],
-    "hljsTheme": "atom-one-dark.css",
+    "hljsTheme": "dirtysea-light.css",
     "codeLineNumbers": true,
-    "guestOdtDownload": false,
+    "guestOdtDownload": true,
     "guestToc": true,
     "guestIndex": true
 }
