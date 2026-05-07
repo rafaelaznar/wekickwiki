@@ -351,12 +351,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-use
     'adminUser'         => $admin,
     'guestUser'         => $guest,
     'guestLoginEnabled' => (bool)($users['guestLoginEnabled'] ?? true),
+    'jwtSecret'         => (isset($users['jwtSecret']) && is_string($users['jwtSecret'])) ? $users['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7',
+    'tokenTtl'          => (isset($users['tokenTtl'])  && is_int($users['tokenTtl']))    ? $users['tokenTtl']  : 3600,
   ]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Save users  POST ?action=save-users  (admin only)
-// Body: { adminUser, adminHash (sha256hex|null), guestUser, guestHash (sha256hex|null) }
+// Body: { adminUser, adminHash (sha256hex|null), guestUser, guestHash (sha256hex|null), jwtSecret, tokenTtl }
 // null hash means "keep existing password".
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-users') {
@@ -410,14 +412,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     ? (bool)$body['guestLoginEnabled']
     : (bool)($existing['guestLoginEnabled'] ?? true);
 
+  // Validate and update jwtSecret
+  $jwtSecret = trim($body['jwtSecret'] ?? '');
+  if ($jwtSecret === '') {
+    $jwtSecret = isset($existing['jwtSecret']) ? $existing['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
+  } elseif (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
+    json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
+  }
+
+  // Validate and update tokenTtl
+  $tokenTtl = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
+  if ($tokenTtl < 60 || $tokenTtl > 86400) {
+    if ($tokenTtl === 0 && isset($existing['tokenTtl'])) {
+      $tokenTtl = $existing['tokenTtl'];
+    } else {
+      json_out(400, ['error' => 'Token TTL must be between 60 and 86400 seconds']);
+    }
+  }
+
   $newUsers = [
     $adminUser          => ['hash' => $newAdminHash, 'role' => 'admin'],
     $guestUser          => ['hash' => $newGuestHash, 'role' => 'guest'],
     'guestLoginEnabled' => $guestLoginEnabled,
+    'jwtSecret'         => $jwtSecret,
+    'tokenTtl'          => $tokenTtl,
   ];
-  // Preserve config keys managed outside the users panel
-  if (isset($existing['jwtSecret'])) $newUsers['jwtSecret'] = $existing['jwtSecret'];
-  if (isset($existing['tokenTtl']))  $newUsers['tokenTtl']  = $existing['tokenTtl'];
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
   if ($written === false) json_out(500, ['error' => 'Could not write users file']);
@@ -847,6 +866,15 @@ $settings = load_settings();
           <input type="checkbox" id="guest-login-enabled" style="width:auto;cursor:pointer">
           <label for="guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest login</label>
         </div>
+        <fieldset style="margin-bottom:.85rem;border:1px solid #ddd;border-radius:6px;padding:.75rem 1rem">
+          <legend style="font-weight:600;font-size:.82rem;padding:0 .4rem">Security</legend>
+          <label>JWT Secret
+            <input type="text" id="users-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
+          </label>
+          <label style="margin-top:.6rem">Token TTL <span style="font-weight:400;color:#888">(seconds, 60–86400)</span>
+            <input type="number" id="users-token-ttl" min="60" max="86400" step="60">
+          </label>
+        </fieldset>
         <div id="users-form-actions">
           <span id="users-save-status"></span>
           <button type="button" class="btn" onclick="toggleUsersPanel()">Cancel</button>
@@ -919,7 +947,7 @@ $settings = load_settings();
   </div>
 
   <div id="footer">
-    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - <?= htmlspecialchars($settings['wikiName']) ?>. MIT License. Rafael Aznar</a>
+    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - <?= htmlspecialchars($settings['wikiName']) ?> - version 2. MIT License. Rafael Aznar</a>
   </div>
 
   <div id="toast"></div>

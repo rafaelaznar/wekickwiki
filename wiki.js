@@ -749,6 +749,8 @@
       document.getElementById('users-guest-pass').value = '';
       document.getElementById('users-save-status').textContent = '';
       document.getElementById('guest-login-enabled').checked = data.guestLoginEnabled !== false;
+      document.getElementById('users-jwt-secret').value = '';
+      document.getElementById('users-token-ttl').value  = data.tokenTtl ?? 3600;
     }
 
     /**
@@ -785,12 +787,27 @@
       const adminHash = adminPass ? await sha256(adminPass) : null;
       const guestHash = guestPass ? await sha256(guestPass) : null;
       const guestLoginEnabled = document.getElementById('guest-login-enabled').checked;
+      const jwtSecret = document.getElementById('users-jwt-secret').value.trim();
+      const tokenTtl  = parseInt(document.getElementById('users-token-ttl').value, 10) || 3600;
+
+      if (jwtSecret !== '' && jwtSecret.length < 16) {
+        statusEl.textContent = 'JWT secret must be at least 16 characters (leave blank to keep).';
+        return;
+      }
+      if (jwtSecret !== '' && !adminPass) {
+        statusEl.textContent = 'When changing the JWT secret, you must also set a new admin password.';
+        return;
+      }
+      if (jwtSecret !== '' && !guestPass) {
+        statusEl.textContent = 'When changing the JWT secret, you must also set a new guest password.';
+        return;
+      }
 
       try {
         const res = await apiFetch('?action=save-users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash, guestLoginEnabled })
+          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash, guestLoginEnabled, jwtSecret, tokenTtl })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
