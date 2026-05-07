@@ -539,7 +539,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $guestOdtDownload = isset($body['guestOdtDownload']) ? (bool)$body['guestOdtDownload'] : true;
   $guestToc         = isset($body['guestToc'])         ? (bool)$body['guestToc']         : true;
   $guestIndex       = isset($body['guestIndex'])       ? (bool)$body['guestIndex']       : true;
-  if ($wikiName === '' || mb_strlen($wikiName) > 64) {
+  if ($wikiName === '' || strlen($wikiName) > 64) {
     json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
   }
   if (!preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme)) {
