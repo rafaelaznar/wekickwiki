@@ -82,10 +82,13 @@ function json_out(int $code, array $data): never
 // Passwords are SHA-256'd client-side, then HMAC'd server-side before compare.
 // Users are stored in users.json (blocked from HTTP via .htaccess).
 // ═══════════════════════════════════════════════════════════════════════════
-define('JWT_SECRET',   'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
-define('TOKEN_TTL',    3600); // 1 hour
-define('USERS_FILE',   __DIR__ . '/users.json');
+define('USERS_FILE',    __DIR__ . '/users.json');
 define('SETTINGS_FILE', __DIR__ . '/settings.json');
+// JWT_SECRET and TOKEN_TTL are read from users.json; built-in defaults apply when absent.
+$_wkw_cfg = is_file(USERS_FILE) ? (json_decode(file_get_contents(USERS_FILE), true) ?? []) : [];
+define('JWT_SECRET', (isset($_wkw_cfg['jwtSecret']) && is_string($_wkw_cfg['jwtSecret']) && $_wkw_cfg['jwtSecret'] !== '') ? $_wkw_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
+define('TOKEN_TTL',  (isset($_wkw_cfg['tokenTtl'])  && is_int($_wkw_cfg['tokenTtl'])    && $_wkw_cfg['tokenTtl'] > 0)   ? (int)$_wkw_cfg['tokenTtl']  : 3600);
+unset($_wkw_cfg);
 
 // Default users (used on first run to seed users.json if it doesn't exist)
 // guestLoginEnabled is stored as a top-level key alongside the user entries.
@@ -412,6 +415,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     $guestUser          => ['hash' => $newGuestHash, 'role' => 'guest'],
     'guestLoginEnabled' => $guestLoginEnabled,
   ];
+  // Preserve config keys managed outside the users panel
+  if (isset($existing['jwtSecret'])) $newUsers['jwtSecret'] = $existing['jwtSecret'];
+  if (isset($existing['tokenTtl']))  $newUsers['tokenTtl']  = $existing['tokenTtl'];
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
   if ($written === false) json_out(500, ['error' => 'Could not write users file']);

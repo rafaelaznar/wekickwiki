@@ -7,5 +7,7 @@
         "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
         "role": "guest"
     },
-    "guestLoginEnabled": true
+    "guestLoginEnabled": true,
+    "jwtSecret": "wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7",
+    "tokenTtl": 3600
 }
