@@ -116,7 +116,7 @@ function load_users(): array
 // so the wiki always starts up safely even when the settings file is corrupt or incomplete.
 function load_settings(): array
 {
-  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false];
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
@@ -127,7 +127,8 @@ function load_settings(): array
   // Same validation for the highlight.js theme (dots allowed for names like "atom-one-dark.min.css")
   $hljsTheme       = (isset($data['hljsTheme']) && is_string($data['hljsTheme']) && preg_match('/^[a-zA-Z0-9_\-\.]+\.css$/', $data['hljsTheme']) && is_file(__DIR__ . '/vendor/highlight-themes/' . $data['hljsTheme'])) ? $data['hljsTheme'] : $defaults['hljsTheme'];
   $codeLineNumbers = isset($data['codeLineNumbers']) ? (bool)$data['codeLineNumbers'] : $defaults['codeLineNumbers'];
-  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers];
+  $guestOdtDownload = isset($data['guestOdtDownload']) ? (bool)$data['guestOdtDownload'] : $defaults['guestOdtDownload'];
+  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers, 'guestOdtDownload' => $guestOdtDownload];
 }
 
 function list_templates(): array
@@ -224,7 +225,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
 // API: Read page  GET ?page=...  (any authenticated user)
 // ═══════════════════════════════════════════════════════════════════════════
 if (isset($_GET['page'])) {
-  require_auth();
+  $claims = require_auth();
+
+  // If format=fodt is requested, check if guest is allowed to download
+  if (($_GET['format'] ?? '') === 'fodt') {
+    $settings = load_settings();
+    if (($claims['role'] ?? '') === 'guest' && !($settings['guestOdtDownload'] ?? true)) {
+      json_out(403, ['error' => 'Guest ODT downloads are disabled']);
+    }
+  }
+
   // Strip all characters except path-safe ones to prevent directory traversal attacks
   $p    = preg_replace('/[^a-zA-Z0-9\/\-_]/', '', $_GET['page']);
   // Trim leading/trailing slashes so the result is always relative to pages/
@@ -488,16 +498,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-hlj
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Save settings  POST ?action=save-settings  (admin only)
-// Body: { wikiName: string, theme: string, hljsTheme: string, codeLineNumbers: bool }
+// Body: { wikiName: string, theme: string, hljsTheme: string, codeLineNumbers: bool, guestOdtDownload: bool }
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-settings') {
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-  $body            = json_decode(file_get_contents('php://input'), true) ?? [];
-  $wikiName        = trim($body['wikiName'] ?? '');
-  $theme           = basename($body['theme'] ?? '');
-  $hljsTheme       = basename($body['hljsTheme'] ?? '');
-  $codeLineNumbers = isset($body['codeLineNumbers']) ? (bool)$body['codeLineNumbers'] : false;
+  $body             = json_decode(file_get_contents('php://input'), true) ?? [];
+  $wikiName         = trim($body['wikiName'] ?? '');
+  $theme            = basename($body['theme'] ?? '');
+  $hljsTheme        = basename($body['hljsTheme'] ?? '');
+  $codeLineNumbers  = isset($body['codeLineNumbers']) ? (bool)$body['codeLineNumbers'] : false;
+  $guestOdtDownload = isset($body['guestOdtDownload']) ? (bool)$body['guestOdtDownload'] : true;
   if ($wikiName === '' || mb_strlen($wikiName) > 64) {
     json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
   }
@@ -520,6 +531,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $existing['theme']           = $theme;
   $existing['hljsTheme']       = $hljsTheme;
   $existing['codeLineNumbers'] = $codeLineNumbers;
+  $existing['guestOdtDownload'] = $guestOdtDownload;
   if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
     json_out(500, ['error' => 'Could not write settings file']);
   }
@@ -845,6 +857,10 @@ $settings = load_settings();
           <input type="checkbox" id="settings-code-line-numbers" style="width:auto;cursor:pointer">
           <label for="settings-code-line-numbers" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Show line numbers in code blocks</label>
         </div>
+        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
+          <input type="checkbox" id="settings-guest-odt-download" style="width:auto;cursor:pointer">
+          <label for="settings-guest-odt-download" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest to download ODT</label>
+        </div>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>
           <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>
@@ -880,6 +896,7 @@ $settings = load_settings();
   <script>
     window.WKW_BASE = <?= json_encode($baseHref) ?>;
     window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;
+    window.WKW_GUEST_ODT_DOWNLOAD = <?= $settings['guestOdtDownload'] ? 'true' : 'false' ?>;
   </script>
   <script src="wiki.js"></script>
   <?php // Dynamically inject each enabled front-end plugin as a <script> tag 

@@ -734,16 +734,18 @@
       }
       document.getElementById('settings-save-status').textContent = '';
       document.getElementById('settings-code-line-numbers').checked = !!settings.codeLineNumbers;
+      document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
     }
 
     document.getElementById('settings-form').addEventListener('submit', async e => {
       e.preventDefault();
       const statusEl = document.getElementById('settings-save-status');
       statusEl.textContent = 'Saving\u2026';
-      const wikiName        = document.getElementById('settings-wiki-name').value.trim();
-      const theme           = document.getElementById('settings-theme').value;
-      const hljsTheme       = document.getElementById('settings-hljs-theme').value;
-      const codeLineNumbers = document.getElementById('settings-code-line-numbers').checked;
+      const wikiName         = document.getElementById('settings-wiki-name').value.trim();
+      const theme            = document.getElementById('settings-theme').value;
+      const hljsTheme        = document.getElementById('settings-hljs-theme').value;
+      const codeLineNumbers  = document.getElementById('settings-code-line-numbers').checked;
+      const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
@@ -752,7 +754,7 @@
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -967,7 +969,8 @@
           '<button class="btn btn-primary" title="Create page" aria-label="Create page" onclick="createPage()">' + ICON_PLUS + '</button>';
       } else {
         document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
-        document.getElementById('odt-btn').style.display = '';
+        const canDownloadOdt = isAdmin || (getRole() === 'guest' && window.WKW_GUEST_ODT_DOWNLOAD);
+        document.getElementById('odt-btn').style.display = canDownloadOdt ? '' : 'none';
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
         buildInlineToc();
@@ -1198,7 +1201,8 @@
         highlightContent(document.getElementById('content'));
         WKW.doAction('wkw.page.afterLoad', currentPage, document.getElementById('content'));
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
-        document.getElementById('odt-btn').style.display = '';
+        const canDownloadOdt = (getRole() === 'admin') || (getRole() === 'guest' && window.WKW_GUEST_ODT_DOWNLOAD);
+        document.getElementById('odt-btn').style.display = canDownloadOdt ? '' : 'none';
         showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
       } else {
         const data = await res.json().catch(() => ({}));

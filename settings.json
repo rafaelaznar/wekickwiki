@@ -3,5 +3,6 @@
     "theme": "default.css",
     "disabledPlugins": [],
     "hljsTheme": "atom-one-light.css",
-    "codeLineNumbers": true
+    "codeLineNumbers": true,
+    "guestOdtDownload": true
 }
