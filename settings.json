@@ -2,7 +2,7 @@
     "wikiName": "WeKickWiki",
     "theme": "default.css",
     "disabledPlugins": [],
-    "hljsTheme": "atom-one-light.css",
+    "hljsTheme": "atom-one-dark.css",
     "codeLineNumbers": true,
-    "guestOdtDownload": true
+    "guestOdtDownload": false
 }

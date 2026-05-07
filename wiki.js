@@ -111,20 +111,42 @@
       }).join('');
     }
 
+    /**
+     * Convert Markdown to HTML, running it through the WKW filter pipeline.
+     * Sequence: wkw.md.preprocess → applySymbols → marked.parse → wkw.html.postrender
+     * @param {string} md - Raw Markdown source
+     * @returns {string} Rendered HTML
+     */
     function parseWiki(md) {
+      // Allow plugins to pre-process raw Markdown before any other transformation.
       md = WKW.applyFilters('wkw.md.preprocess', md);
       let html = marked.parse(applySymbols(md));
+      // Allow plugins to post-process the rendered HTML (e.g. add widgets or callout boxes).
       html = WKW.applyFilters('wkw.html.postrender', html);
       return html;
     }
 
+    /**
+     * Wrap each line of a highlighted code block in a <span class="ln-line"> element
+     * so that CSS counters can display gutter line-numbers.
+     * The parent <pre> gets the `ln-enabled` class which activates the CSS counter.
+     * @param {HTMLElement} block - A <code> element produced by Highlight.js
+     */
     function addLineNumbers(block) {
       const lines = block.innerHTML.split('\n');
+      // Highlight.js appends a trailing newline — drop the resulting empty entry.
       if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
       block.innerHTML = lines.map(line => `<span class="ln-line">${line}</span>`).join('');
       block.parentElement.classList.add('ln-enabled');
     }
 
+    /**
+     * Run Highlight.js on every <pre><code> block inside a content container.
+     * If the WKW_CODE_LINE_NUMBERS global flag is truthy (set by index.php from
+     * settings.json), line numbers are also injected via addLineNumbers().
+     * No-ops gracefully when hljs is not loaded.
+     * @param {HTMLElement} contentEl - The container element to search within
+     */
     function highlightContent(contentEl) {
       if (window.hljs) {
         contentEl.querySelectorAll('pre code').forEach(function (block) {
@@ -135,8 +157,16 @@
     }
 
     // ── Toast ───────────────────────────────────────────────────────────────────
+    /** Timer handle for auto-hiding the toast; cleared on each new showToast call. */
     let _toastTimer;
 
+    /**
+     * Display a brief ephemeral notification at the bottom of the screen.
+     * Replaces any currently visible toast — the hide timer is always reset.
+     * @param {string} msg               - Text to display
+     * @param {'success'|'error'} type   - CSS class applied to the toast element
+     * @param {number}            duration - Milliseconds until auto-hide (default 3000)
+     */
     function showToast(msg, type = 'success', duration = 3000) {
       const el = document.getElementById('toast');
       el.textContent = msg;
@@ -155,6 +185,23 @@
       return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
+    /**
+     * Convert an HTML inline fragment (as produced by marked or written in the source)
+     * to the equivalent ODT <text:span> XML.
+     *
+     * Handles:
+     *  - HTML tags: <strong>, <em>, <code>, <s>, <u>, <ins>, <mark>, <br>, <a>
+     *  - Markdown inline syntax: **bold**, __bold__, *italic*, _italic_, ~~strike~~, `code`
+     *  - Markdown links [text](url) and images ![alt](url)
+     *  - HTML entities (named, decimal, hex) decoded then re-escaped for XML
+     *
+     * The parser is character-by-character and intentionally non-recursive for
+     * performance — nested spans are handled by recursive odtInline calls only
+     * for the innermost paired-marker cases.
+     *
+     * @param {string} text - Input fragment (may contain HTML tags and Markdown markers)
+     * @returns {string} ODT XML fragment using <text:span> elements
+     */
     function odtInline(text) {
       // Decode a handful of HTML entities that may come from applySymbols / inline HTML
       function decEnt(s) {
@@ -229,9 +276,32 @@
       return out;
     }
 
-    // Shared ODT table counter — reset by buildOdtContent, incremented per table.
+    /** Module-level table counter — reset to 0 by buildOdtContent(), incremented for each GFM or HTML table so that every table gets a unique name in the ODT XML. */
     let _odtTableCounter = 0;
 
+    /**
+     * Convert a block of Markdown to ODT XML paragraphs, lists, tables, and headings.
+     * This is the core document-body generator — it is called once for the main
+     * document and recursively for every blockquote level.
+     *
+     * Supported Markdown constructs:
+     *  - Headings (H1–H6)                 → <text:h>
+     *  - Paragraphs (with soft-wrap join)   → <text:p P_Body>
+     *  - Fenced code blocks (```)           → consecutive <text:p P_Pre>
+     *  - Horizontal rules (---, ***, ___) → <text:p P_HR>
+     *  - Bullet lists (-, *, +)             → <text:list LS_Bullet>
+     *  - Ordered lists (1. 2. …)           → <text:list LS_Number>
+     *  - GFM tables (pipe syntax)           → <table:table T_Table>
+     *  - HTML <table> blocks                → delegated to wkw.odt.htmlTable plugin filter
+     *  - Blockquotes (>)                    → recursive odtBody(content, inQuote=true)
+     *
+     * When called with inQuote=true the paragraph styles switch to the P_Quote
+     * family so the visual indentation and muted colour are applied.
+     *
+     * @param {string}  md      - Markdown source to convert
+     * @param {boolean} inQuote - true when rendering inside a blockquote
+     * @returns {string} ODT XML fragment ready to be inserted into <office:text>
+     */
     function odtBody(md, inQuote) {
       // Pre-process: collect GFM tables and blockquotes into token objects.
       function parseBlocks(rawLines) {
@@ -390,8 +460,37 @@
       return out;
     }
 
+    /** Stub retained for API completeness — not needed for the Flat ODT (FODT) format used here,
+     *  which embeds all content in a single XML file without a ZIP manifest. */
     function buildOdtManifest() { /* not used in flat-ODT mode */ }
 
+    /**
+     * Assemble a complete Flat ODT (FODT) XML document from Markdown source.
+     *
+     * Flat ODT is a single-file XML variant of the ODF format (no ZIP container).
+     * The document structure is:
+     *   <?xml ...?>
+     *   <office:document> (with all namespace declarations)
+     *     <office:font-face-decls>  — monospace font for code
+     *     <office:automatic-styles> — all paragraph/character/table/list styles
+     *     <office:body>
+     *       <office:text>           — generated by odtBody()
+     *
+     * Automatic styles defined here (name → purpose):
+     *   P_Body, P_H1–H6, P_Pre, P_HR, P_Li   — block paragraph styles
+     *   C_Bold, C_Italic, C_Code, C_Strike, C_Under, C_Mark — inline character styles
+     *   LS_Bullet, LS_Number                   — list styles
+     *   T_Table, T_Col, T_CellH, T_Cell        — table / column / cell styles
+     *   P_TH, P_TD                             — table header/data paragraph styles
+     *   P_Quote, P_QuotePre, P_QuoteLi         — blockquote paragraph styles
+     *
+     * Plugins can add extra styles via the `wkw.odt.styles` filter.
+     * applySymbols() is called here so the final document contains Unicode
+     * typographic characters rather than ASCII sequences.
+     *
+     * @param {string} md - Raw Markdown source of the current page
+     * @returns {string} Complete FODT XML document as a string
+     */
     function buildOdtContent(md) {
       _odtTableCounter = 0;
       const xmlns =
@@ -514,6 +613,12 @@
         +'</office:document>';
     }
 
+    /**
+     * Generate and download the current page as a Flat ODT file (.fodt).
+     * All processing is client-side — no network request is made for the conversion.
+     * The download is triggered by programmatically clicking a temporary <a> element.
+     * The ODT button is disabled for the duration to prevent double-clicks.
+     */
     async function downloadOdt() {
       if (!rawMd) return;
       const btn = document.getElementById('odt-btn');
@@ -570,10 +675,20 @@
       }
     }
 
+    /**
+     * Trigger the hidden file-input that lets the admin choose a backup archive
+     * to restore. The actual restore logic lives in the 'change' event handler below.
+     */
     function restoreBackup() {
       document.getElementById('restore-input').click();
     }
 
+    /**
+     * Handle backup file selection from the restore file input.
+     * Requires explicit confirmation before proceeding because restoring
+     * permanently replaces the entire pages/ directory on the server.
+     * On success reloads the current page so content reflects the restored state.
+     */
     document.getElementById('restore-input').addEventListener('change', async function () {
       const file = this.files[0];
       if (!file) return;
@@ -636,6 +751,14 @@
       document.getElementById('guest-login-enabled').checked = data.guestLoginEnabled !== false;
     }
 
+    /**
+     * Handle the users form submission.
+     * Validates both usernames (2–32 chars, a–z/0–9/_ only, must differ), then
+     * SHA-256 hashes any newly entered passwords before sending them to the server.
+     * Blank password fields mean "keep the existing hash" — null is sent instead.
+     * If the admin renames their own account the session is invalidated and they
+     * are prompted to sign in again with the new username.
+     */
     document.getElementById('users-form').addEventListener('submit', async e => {
       e.preventDefault();
       const statusEl = document.getElementById('users-save-status');
@@ -737,6 +860,14 @@
       document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
     }
 
+    /**
+     * Handle the settings form submission.
+     * Collects wikiName, theme, hljsTheme, codeLineNumbers, and guestOdtDownload
+     * then POSTs them to ?action=save-settings as JSON.
+     * On success the page is reloaded after a short delay so all theme and
+     * configuration changes take effect immediately (themes are server-injected
+     * into the <head> of index.php and cannot be hot-swapped client-side).
+     */
     document.getElementById('settings-form').addEventListener('submit', async e => {
       e.preventDefault();
       const statusEl = document.getElementById('settings-save-status');
@@ -856,6 +987,15 @@
       return [h0,h1,h2,h3,h4,h5,h6,h7].map(n => n.toString(16).padStart(8,'0')).join('');
     }
 
+    /**
+     * Authenticated wrapper around the browser Fetch API.
+     * Automatically injects the Authorization: Bearer header using the stored JWT.
+     * On a 401 Unauthorized response the session is cleared and the login screen
+     * is shown, preventing the user from making further authenticated requests.
+     * @param {string}  url  - Request URL (relative or absolute)
+     * @param {object}  opts - Optional fetch options (method, headers, body, …)
+     * @returns {Promise<Response>} The raw fetch Response
+     */
     async function apiFetch(url, opts = {}) {
       opts.headers = {
         ...(opts.headers || {}),
@@ -869,11 +1009,20 @@
       return res;
     }
 
+    /**
+     * Clear the current session and redirect to the login screen.
+     * Called automatically by apiFetch() on 401 responses and by the logout button.
+     */
     function logout() {
       sessionStorage.clear();
       showLogin();
     }
 
+    /**
+     * Switch the UI to the login screen.
+     * Hides the wiki shell, clears any previous error message, and wipes the
+     * password field so credentials are not left in the DOM.
+     */
     function showLogin() {
       document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('wiki-screen').style.display = 'none';
@@ -881,6 +1030,14 @@
       document.getElementById('login-pass').value = '';
     }
 
+    /**
+     * Switch the UI to the main wiki shell after a successful login.
+     * Adapts the toolbar to the current role:
+     *   admin — all buttons visible
+     *   guest — edit/index/users/backup/restore/settings/plugins hidden;
+     *            TOC panel hidden (guest sees the inline TOC instead);
+     *            'guest-mode' CSS class applied to the wiki-screen wrapper
+     */
     function showWiki() {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('wiki-screen').style.display = '';
