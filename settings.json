@@ -4,5 +4,7 @@
     "disabledPlugins": [],
     "hljsTheme": "atom-one-dark.css",
     "codeLineNumbers": true,
-    "guestOdtDownload": false
+    "guestOdtDownload": false,
+    "guestToc": true,
+    "guestIndex": true
 }

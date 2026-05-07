@@ -858,6 +858,8 @@
       document.getElementById('settings-save-status').textContent = '';
       document.getElementById('settings-code-line-numbers').checked = !!settings.codeLineNumbers;
       document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
+      document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
+      document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
     }
 
     /**
@@ -877,6 +879,8 @@
       const hljsTheme        = document.getElementById('settings-hljs-theme').value;
       const codeLineNumbers  = document.getElementById('settings-code-line-numbers').checked;
       const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
+      const guestToc         = document.getElementById('settings-guest-toc').checked;
+      const guestIndex       = document.getElementById('settings-guest-index').checked;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
@@ -885,7 +889,7 @@
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -1044,9 +1048,9 @@
       document.getElementById('user-badge').textContent = getUser();
       const isAdmin = getRole() === 'admin';
       const isGuest = getRole() === 'guest';
-      document.getElementById('toc-btn').style.display = isGuest ? 'none' : '';
-      document.getElementById('edit-btn').style.display = isAdmin ? '' : 'none';
-      document.getElementById('index-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('toc-btn').style.display   = (isAdmin || (isGuest && window.WKW_GUEST_TOC))   ? '' : 'none';
+      document.getElementById('edit-btn').style.display   = isAdmin ? '' : 'none';
+      document.getElementById('index-btn').style.display  = (isAdmin || (isGuest && window.WKW_GUEST_INDEX)) ? '' : 'none';
       document.getElementById('users-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
@@ -1130,7 +1134,6 @@
         document.getElementById('odt-btn').style.display = canDownloadOdt ? '' : 'none';
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
-        buildInlineToc();
         highlightContent(document.getElementById('content'));
         WKW.doAction('wkw.page.afterLoad', page, document.getElementById('content'));
       }
@@ -1194,26 +1197,6 @@
         }
         h.id = slug;
       });
-    }
-
-    function buildInlineToc() {
-      const existing = document.getElementById('toc-inline');
-      if (existing) existing.remove();
-      if (getRole() !== 'guest') return;
-      const headings = document.querySelectorAll('#content h1, #content h2, #content h3');
-      if (headings.length < 2) return;
-      let html = '<summary>Table of contents</summary><ul>';
-      headings.forEach(h => {
-        const cls = 'toc-' + h.tagName.toLowerCase();
-        const id = h.id;
-        html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});return false;">' + h.textContent + '</a></li>';
-      });
-      html += '</ul>';
-      const div = document.createElement('details');
-      div.id = 'toc-inline';
-      const content = document.getElementById('content');
-      div.innerHTML = html;
-      content.insertBefore(div, content.firstChild);
     }
 
     let tocOpen = false;
@@ -1354,7 +1337,6 @@
         cancelEdit();
         document.getElementById('content').innerHTML = parseWiki(rawMd);
         addHeadingIds();
-        buildInlineToc();
         highlightContent(document.getElementById('content'));
         WKW.doAction('wkw.page.afterLoad', currentPage, document.getElementById('content'));
         if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
