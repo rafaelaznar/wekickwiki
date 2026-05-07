@@ -193,6 +193,8 @@ h6 {
   color: #fff;
   text-align: left;
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
 }
 
 #content h2 {
@@ -200,6 +202,41 @@ h6 {
   margin: 1.8em 0 0.5em;
   border-bottom: 3px solid #e85d04;
   padding-bottom: 0.2em;
+  display: flex;
+  align-items: center;
+}
+
+#content h1 .go-top-btn,
+#content h2 .go-top-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.5em;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: #e85d04;
+  border: 2px solid #e85d04;
+  border-radius: 3px;
+  padding: 0.25em 0.55em;
+  text-decoration: none;
+  letter-spacing: 0;
+  transition: background 0.2s, color 0.2s;
+  align-self: center;
+}
+
+#content h2 .go-top-btn {
+  color: #e85d04;
+  background: transparent;
+}
+
+#content h1 .go-top-btn:hover {
+  background: #c44f03;
+  border-color: #c44f03;
+}
+
+#content h2 .go-top-btn:hover {
+  color: #fff;
+  background: #e85d04;
 }
 
 #content h3 {

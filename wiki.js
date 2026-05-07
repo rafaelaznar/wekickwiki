@@ -1196,6 +1196,16 @@
           seen[slug] = 1;
         }
         h.id = slug;
+        if (h.tagName === 'H1' || h.tagName === 'H2') {
+          h.dataset.label = h.textContent;
+          const btn = document.createElement('a');
+          btn.className = 'go-top-btn';
+          btn.href = '#';
+          btn.setAttribute('aria-label', 'Go to top');
+          btn.textContent = '\u2191';
+          btn.addEventListener('click', e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+          h.appendChild(btn);
+        }
       });
     }
 
@@ -1224,7 +1234,7 @@
       headings.forEach(h => {
         const cls = 'toc-' + h.tagName.toLowerCase();
         const id = h.id;
-        html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});closeToc();return false;">' + h.textContent + '</a></li>';
+        html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});closeToc();return false;">' + (h.dataset.label || h.textContent) + '</a></li>';
       });
       html += '</ul>';
       document.getElementById('toc-list').innerHTML = html;

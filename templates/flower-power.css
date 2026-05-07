@@ -535,6 +535,8 @@ nav {
   margin: 1.5rem 0 1rem;
   letter-spacing: 1px;
   box-shadow: 0 5px 20px rgba(255, 105, 180, 0.3);
+  display: flex;
+  align-items: center;
 }
 
 #content h2,
@@ -550,6 +552,37 @@ nav {
   margin: 2rem 0 1rem;
   letter-spacing: 1px;
   box-shadow: 0 4px 16px rgba(255, 105, 180, 0.25);
+  display: flex;
+  align-items: center;
+}
+
+#content h1 .go-top-btn,
+#wiki-content h1 .go-top-btn,
+#content h2 .go-top-btn,
+#wiki-content h2 .go-top-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.45em;
+  font-weight: 700;
+  line-height: 1;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  padding: 0.3em 0.7em;
+  text-decoration: none;
+  letter-spacing: 0;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+  align-self: center;
+}
+
+#content h1 .go-top-btn:hover,
+#wiki-content h1 .go-top-btn:hover,
+#content h2 .go-top-btn:hover,
+#wiki-content h2 .go-top-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  border-color: #fff;
+  transform: translateY(-2px);
 }
 
 #content h2::before,

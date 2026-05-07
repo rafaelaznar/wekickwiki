@@ -599,6 +599,11 @@ button svg {
   /* No special positioning for guest mode, it uses the global fixed header */
 }
 
+/* ── Go-to-top button (hidden by default, shown by themes that opt in) ── */
+.go-top-btn {
+  display: none;
+}
+
 .guest-mode #user-badge {
   display: none
 }
