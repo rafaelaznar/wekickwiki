@@ -384,7 +384,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     if (($udata['role'] ?? '') === 'guest') $existingGuestHash = $udata['hash'];
   }
 
-  // Validate and compute new hashes.
+  // Resolve the new jwtSecret FIRST so password HMACs can be computed with the correct secret.
+  // If the secret changes, hashes must use the new secret (the one that will be stored and used on login).
+  $jwtSecret = trim($body['jwtSecret'] ?? '');
+  if ($jwtSecret === '') {
+    $jwtSecret = isset($existing['jwtSecret']) ? $existing['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
+  } elseif (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
+    json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
+  }
+
+  // Validate and compute new hashes using $jwtSecret (which may be the newly supplied value).
   // A null value in the request body means "keep existing password" (user left the field blank).
   $rawAdminHash = $body['adminHash'] ?? null;
   $rawGuestHash = $body['guestHash'] ?? null;
@@ -393,7 +402,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     // Strip non-hex characters and validate length before applying the server-side HMAC
     $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawAdminHash));
     if (strlen($rawAdminHash) !== 64) json_out(400, ['error' => 'Invalid admin password hash']);
-    $newAdminHash = hash_hmac('sha256', $rawAdminHash, JWT_SECRET);
+    $newAdminHash = hash_hmac('sha256', $rawAdminHash, $jwtSecret);
   } else {
     // No new password supplied: retain the currently stored HMAC hash unchanged
     $newAdminHash = $existingAdminHash;
@@ -402,7 +411,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
   if ($rawGuestHash !== null) {
     $rawGuestHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawGuestHash));
     if (strlen($rawGuestHash) !== 64) json_out(400, ['error' => 'Invalid guest password hash']);
-    $newGuestHash = hash_hmac('sha256', $rawGuestHash, JWT_SECRET);
+    $newGuestHash = hash_hmac('sha256', $rawGuestHash, $jwtSecret);
   } else {
     $newGuestHash = $existingGuestHash;
   }
@@ -411,14 +420,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
   $guestLoginEnabled = isset($body['guestLoginEnabled'])
     ? (bool)$body['guestLoginEnabled']
     : (bool)($existing['guestLoginEnabled'] ?? true);
-
-  // Validate and update jwtSecret
-  $jwtSecret = trim($body['jwtSecret'] ?? '');
-  if ($jwtSecret === '') {
-    $jwtSecret = isset($existing['jwtSecret']) ? $existing['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
-  } elseif (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
-    json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
-  }
 
   // Validate and update tokenTtl
   $tokenTtl = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
