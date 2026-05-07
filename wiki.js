@@ -893,10 +893,10 @@
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('plugins-btn').style.display  = isAdmin ? '' : 'none';
+      document.getElementById('top-btn').style.display = ''; // Show for everyone
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
         document.getElementById('home-btn').style.display = '';
-        document.getElementById('top-btn').style.display = '';
       }
     }
 
