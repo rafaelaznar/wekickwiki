@@ -947,7 +947,7 @@ $settings = load_settings();
   </div>
 
   <div id="footer">
-    <a href="https://github.com/rafaelaznar/wekickwiki">2026 - <?= htmlspecialchars($settings['wikiName']) ?> - version 2. MIT License. Rafael Aznar</a>
+    <a href="https://github.com/rafaelaznar/wekickwiki"><?= htmlspecialchars($settings['wikiName']) ?> 2026 v2 | MIT Licensed | By Rafael Aznar</a>
   </div>
 
   <div id="toast"></div>
