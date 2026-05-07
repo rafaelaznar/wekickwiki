@@ -631,29 +631,13 @@ button svg {
 }
 
 /* ── Guest mode ── */
+/* Guest header looks identical to admin header */
 .guest-mode header {
-  border-bottom: none;
-  padding-bottom: 0;
-  margin-bottom: 0;
-  min-height: 0;
-  position: fixed;
-  top: 0.75rem;
-  right: max(1.5rem, calc((100vw - 860px) / 2 + 1.5rem));
+  border-bottom: 3px solid #e85d04;
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+  position: relative;
   width: auto;
-  z-index: 50;
-}
-
-.guest-mode #header-title,
-.guest-mode #user-badge {
-  display: none;
-}
-
-.guest-mode #nav {
-  display: none;
-}
-
-.guest-mode #content {
-  margin-top: 2.5rem;
 }
 
 /* ── Users management panel ── */

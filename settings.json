@@ -1,8 +1,8 @@
 {
     "wikiName": "WeKickWiki",
-    "theme": "flower-power.css",
+    "theme": "impact.css",
     "disabledPlugins": [],
-    "hljsTheme": "dirtysea-light.css",
+    "hljsTheme": "monokai-dark.css",
     "codeLineNumbers": true,
     "guestOdtDownload": true,
     "guestToc": true,
