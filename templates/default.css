@@ -853,6 +853,31 @@ button svg {
 .toggle-switch input:disabled + .toggle-slider { opacity: .6; cursor: not-allowed; }
 #plugins-empty { color: #888; font-size: .9rem; padding: .5rem 0; }
 
+/* ── Confirm delete dialog ────────────────────────────────────────────── */
+#confirm-delete-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 200;
+}
+#confirm-delete-dialog {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  background: #fff;
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+  border-radius: 8px;
+  padding: 1.75rem 2rem;
+  z-index: 201;
+}
+#confirm-delete-dialog p { margin: 0 0 .5rem; font-weight: 600; font-size: 1rem; }
+#confirm-delete-dialog .confirm-delete-subtitle { font-weight: 400; font-size: .875rem; color: #666; margin-bottom: 1.5rem; }
+.confirm-delete-actions { display: flex; justify-content: flex-end; gap: .75rem; }
+
 #footer {
   text-align: center;
   margin: 1rem auto 2rem;

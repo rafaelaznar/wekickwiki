@@ -1264,7 +1264,8 @@ button svg {
 #toc-overlay,
 #users-overlay,
 #settings-overlay,
-#plugins-overlay {
+#plugins-overlay,
+#confirm-delete-overlay {
   display: none;
   position: fixed;
   inset: 0;
@@ -1694,3 +1695,21 @@ button svg {
 .footer a:hover {
   text-decoration: underline;
 }
+
+/* ── Confirm delete dialog ────────────────────────────────────────────── */
+#confirm-delete-dialog {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(380px, 92vw);
+  background: rgba(255, 252, 246, 0.98);
+  box-shadow: 0 8px 40px rgba(255, 105, 180, 0.2);
+  border-radius: 12px;
+  padding: 1.75rem 2rem;
+  z-index: 201;
+}
+#confirm-delete-dialog p { margin: 0 0 .5rem; font-weight: 600; font-size: 1rem; }
+#confirm-delete-dialog .confirm-delete-subtitle { font-weight: 400; font-size: .875rem; color: #a0627c; margin-bottom: 1.5rem; }
+.confirm-delete-actions { display: flex; justify-content: flex-end; gap: .75rem; }

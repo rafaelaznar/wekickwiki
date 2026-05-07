@@ -847,6 +847,16 @@ $settings = load_settings();
     </div>
     <!-- Settings panel -->
     <div id="settings-overlay" onclick="toggleSettingsPanel()"></div>
+    <!-- Confirm delete dialog -->
+    <div id="confirm-delete-overlay"></div>
+    <div id="confirm-delete-dialog" role="dialog" aria-modal="true">
+      <p id="confirm-delete-msg"></p>
+      <p class="confirm-delete-subtitle">This action cannot be undone.</p>
+      <div class="confirm-delete-actions">
+        <button class="btn" id="confirm-delete-cancel">Cancel</button>
+        <button class="btn btn-danger" id="confirm-delete-ok">Delete</button>
+      </div>
+    </div>
     <div id="settings-panel">
       <h3>Settings <button class="close-btn" onclick="toggleSettingsPanel()">&times;</button></h3>
       <form id="settings-form" novalidate>

@@ -1273,8 +1273,29 @@
       document.getElementById('index-tree').innerHTML = renderTree(tree, '');
     }
 
+    function showConfirmDelete(message) {
+      return new Promise(resolve => {
+        const overlay = document.getElementById('confirm-delete-overlay');
+        const dialog  = document.getElementById('confirm-delete-dialog');
+        document.getElementById('confirm-delete-msg').textContent = message;
+        overlay.style.display = dialog.style.display = 'block';
+        function close(result) {
+          overlay.style.display = dialog.style.display = 'none';
+          document.getElementById('confirm-delete-ok').removeEventListener('click', onOk);
+          document.getElementById('confirm-delete-cancel').removeEventListener('click', onCancel);
+          overlay.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk()     { close(true);  }
+        function onCancel() { close(false); }
+        document.getElementById('confirm-delete-ok').addEventListener('click', onOk);
+        document.getElementById('confirm-delete-cancel').addEventListener('click', onCancel);
+        overlay.addEventListener('click', onCancel);
+      });
+    }
+
     async function deletePage() {
-      if (!confirm('Delete page "' + currentPage + '"? This action cannot be undone.')) return;
+      if (!await showConfirmDelete('Delete page “' + currentPage + '”?')) return;
       const res = await apiFetch('?action=delete', {
         method: 'POST',
         headers: {
