@@ -1406,6 +1406,18 @@ button svg {
 #index-tree a:hover {
   text-decoration: underline;
 }
+#index-tree .index-dir-label {
+  color: #b8569f;
+  font-weight: 600;
+  cursor: default;
+}
+
+#index-tree .index-no-page {
+  font-size: .7em;
+  color: #d4a0c8;
+  vertical-align: middle;
+  margin-left: .3em;
+}
 #index-tree .folder {
   font-weight: 600;
   color: #b8569f;

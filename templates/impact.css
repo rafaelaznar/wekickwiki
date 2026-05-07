@@ -498,6 +498,19 @@ button svg {
   text-decoration: underline;
 }
 
+#index-tree .index-dir-label {
+  color: #8a9bb0;
+  font-weight: 600;
+  cursor: default;
+}
+
+#index-tree .index-no-page {
+  font-size: .7em;
+  color: #556;
+  vertical-align: middle;
+  margin-left: .3em;
+}
+
 #index-tree .folder {
   font-weight: 900;
   color: #16213e;

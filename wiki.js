@@ -1254,6 +1254,7 @@
         }
       }
 
+      const pageSet = new Set(data.pages);
       function renderTree(node, prefix) {
         const keys = Object.keys(node).sort();
         if (!keys.length) return '';
@@ -1261,8 +1262,15 @@
         for (const key of keys) {
           const path = prefix ? prefix + '/' + key : key;
           const hasChildren = Object.keys(node[key]).length > 0;
+          const isPage = pageSet.has(path);
+          const isAdmin = getRole() === 'admin';
           html += '<li>';
-          html += '<a href="' + BASE + (path === 'index' ? '' : path) + '" onclick="navigate(\'' + path + '\');toggleIndex();return false;">' + key + '</a>';
+          if (isPage || isAdmin) {
+            const badge = (!isPage && isAdmin) ? ' <span class="index-no-page" title="No page file for this directory">\u2205</span>' : '';
+            html += '<a href="' + BASE + (path === 'index' ? '' : path) + '" onclick="navigate(\'' + path + '\');toggleIndex();return false;">' + key + badge + '</a>';
+          } else {
+            html += '<span class="index-dir-label">' + key + '</span>';
+          }
           if (hasChildren) html += renderTree(node[key], path);
           html += '</li>';
         }
