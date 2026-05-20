@@ -33,21 +33,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
   // The stored value is therefore never the bare SHA-256, protecting it even if users.json leaks.
   $serverHash = hash_hmac('sha256', $hash, JWT_SECRET);
   $_users = load_users();
-  if (isset($_users[$user]) && is_array($_users[$user]) && hash_equals($_users[$user]['hash'], $serverHash)) {
+  $_idx = find_user_index($_users, $user);
+  if ($_idx !== -1 && hash_equals($_users[$_idx]['hash'], $serverHash)) {
+    $_u = $_users[$_idx];
     // Block guest logins when the admin has disabled them globally or individually
-    if (($_users[$user]['role'] ?? '') === 'guest') {
+    if (($_u['role'] ?? '') === 'guest') {
       $_login_cfg = load_auth_settings();
       if (!($_login_cfg['guestLoginEnabled'] ?? true)) {
         json_out(401, ['error' => 'Guest login is currently disabled']);
       }
-      if (!($_users[$user]['enabled'] ?? true)) {
+      if (!($_u['enabled'] ?? true)) {
         json_out(401, ['error' => 'This account is disabled']);
       }
     }
     // Issue a JWT embedding the user's role; valid for TOKEN_TTL seconds from now
     json_out(200, [
-      'token' => jwt_make(['sub' => $user, 'role' => $_users[$user]['role'], 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
-      'role'  => $_users[$user]['role'],
+      'token' => jwt_make(['sub' => $user, 'role' => $_u['role'], 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
+      'role'  => $_u['role'],
     ]);
   }
   // Generic error message: never reveal whether the username or the password was wrong
@@ -65,15 +67,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-use
   $adminUser = '';
   $adminName = '';
   $guests    = [];
-  foreach ($users as $uname => $udata) {
+  foreach ($users as $udata) {
     if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') {
-      $adminUser = $uname;
+      $adminUser = $udata['username'] ?? '';
       $adminName = $udata['name'] ?? '';
     }
     if (($udata['role'] ?? '') === 'guest') {
       $guests[] = [
-        'username' => $uname,
+        'username' => $udata['username'] ?? '',
         'name'     => $udata['name'] ?? '',
         'enabled'  => (bool)($udata['enabled'] ?? true),
       ];
@@ -107,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
 
   // Resolve existing admin hash so we can preserve it when no new password is supplied
   $existingAdminHash = '';
-  foreach ($existing as $uname => $udata) {
+  foreach ($existing as $udata) {
     if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') $existingAdminHash = $udata['hash'];
   }
@@ -123,10 +125,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
 
   // Rebuild: new admin entry + all existing guest entries preserved intact
   // guestLoginEnabled, jwtSecret and tokenTtl are NOT stored here — they live in settings.json
-  $newUsers = [$adminUser => ['hash' => $newAdminHash, 'role' => 'admin', 'name' => $adminName]];
-  foreach ($existing as $uname => $udata) {
+  $newUsers = [['username' => $adminUser, 'hash' => $newAdminHash, 'role' => 'admin', 'name' => $adminName]];
+  foreach ($existing as $udata) {
     if (!is_array($udata)) continue;
-    if (($udata['role'] ?? '') === 'guest') $newUsers[$uname] = $udata;
+    if (($udata['role'] ?? '') === 'guest') $newUsers[] = $udata;
   }
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
@@ -150,9 +152,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'add-gu
   if ($name === '') json_out(400, ['error' => 'Name cannot be empty']);
   if (strlen($rawHash) !== 64) json_out(400, ['error' => 'A password is required']);
   $users = load_users();
-  if (isset($users[$username])) json_out(409, ['error' => 'Username already exists']);
-  $users[$username] = ['hash' => hash_hmac('sha256', $rawHash, JWT_SECRET), 'role' => 'guest', 'name' => $name, 'enabled' => true];
-  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+  if (find_user_index($users, $username) !== -1) json_out(409, ['error' => 'Username already exists']);
+  $users[] = ['username' => $username, 'hash' => hash_hmac('sha256', $rawHash, JWT_SECRET), 'role' => 'guest', 'name' => $name, 'enabled' => true];
+  if (file_put_contents(USERS_FILE, json_encode(array_values($users), JSON_PRETTY_PRINT), LOCK_EX) === false)
     json_out(500, ['error' => 'Could not write users file']);
   json_out(201, ['ok' => true]);
 }
@@ -172,16 +174,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'edit-g
   if (strlen($newUsername) < 2 || strlen($newUsername) > 32) json_out(400, ['error' => 'Username must be 2–32 chars (a-z, 0-9, _)']);
   if ($name === '') json_out(400, ['error' => 'Name cannot be empty']);
   $users = load_users();
-  if (!isset($users[$oldUsername]) || !is_array($users[$oldUsername]) || ($users[$oldUsername]['role'] ?? '') !== 'guest')
+  $oldIdx = find_user_index($users, $oldUsername);
+  if ($oldIdx === -1 || ($users[$oldIdx]['role'] ?? '') !== 'guest')
     json_out(404, ['error' => 'Guest user not found']);
-  if ($newUsername !== $oldUsername && isset($users[$newUsername]))
+  if ($newUsername !== $oldUsername && find_user_index($users, $newUsername) !== -1)
     json_out(409, ['error' => 'Username already exists']);
-  $entry = $users[$oldUsername];
-  $entry['name']    = $name;
-  $entry['enabled'] = $enabled;
-  unset($users[$oldUsername]);
-  $users[$newUsername] = $entry;
-  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+  $users[$oldIdx]['username'] = $newUsername;
+  $users[$oldIdx]['name']     = $name;
+  $users[$oldIdx]['enabled']  = $enabled;
+  if (file_put_contents(USERS_FILE, json_encode(array_values($users), JSON_PRETTY_PRINT), LOCK_EX) === false)
     json_out(500, ['error' => 'Could not write users file']);
   json_out(200, ['ok' => true]);
 }
@@ -196,10 +197,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete
   $body     = json_decode(file_get_contents('php://input'), true) ?? [];
   $username = preg_replace('/[^a-z0-9_]/', '', strtolower($body['username'] ?? ''));
   $users    = load_users();
-  if (!isset($users[$username]) || !is_array($users[$username]) || ($users[$username]['role'] ?? '') !== 'guest')
+  $delIdx = find_user_index($users, $username);
+  if ($delIdx === -1 || ($users[$delIdx]['role'] ?? '') !== 'guest')
     json_out(404, ['error' => 'Guest user not found']);
-  unset($users[$username]);
-  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+  array_splice($users, $delIdx, 1);
+  if (file_put_contents(USERS_FILE, json_encode(array_values($users), JSON_PRETTY_PRINT), LOCK_EX) === false)
     json_out(500, ['error' => 'Could not write users file']);
   json_out(200, ['ok' => true]);
 }
@@ -216,9 +218,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'reset-
   $rawHash  = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
   if ($username === '' || strlen($rawHash) !== 64) json_out(400, ['error' => 'Invalid request']);
   $users = load_users();
-  if (!isset($users[$username]) || !is_array($users[$username])) json_out(404, ['error' => 'User not found']);
-  $users[$username]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
-  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+  $rstIdx = find_user_index($users, $username);
+  if ($rstIdx === -1) json_out(404, ['error' => 'User not found']);
+  $users[$rstIdx]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
+  if (file_put_contents(USERS_FILE, json_encode(array_values($users), JSON_PRETTY_PRINT), LOCK_EX) === false)
     json_out(500, ['error' => 'Could not write users file']);
   json_out(200, ['ok' => true]);
 }
@@ -235,9 +238,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'change
   $rawHash  = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
   if ($username === '' || strlen($rawHash) !== 64) json_out(400, ['error' => 'Invalid request']);
   $users = load_users();
-  if (!isset($users[$username]) || !is_array($users[$username])) json_out(404, ['error' => 'User not found']);
-  $users[$username]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
-  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+  $chgIdx = find_user_index($users, $username);
+  if ($chgIdx === -1) json_out(404, ['error' => 'User not found']);
+  $users[$chgIdx]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
+  if (file_put_contents(USERS_FILE, json_encode(array_values($users), JSON_PRETTY_PRINT), LOCK_EX) === false)
     json_out(500, ['error' => 'Could not write users file']);
   json_out(200, ['ok' => true]);
 }

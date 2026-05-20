@@ -129,22 +129,32 @@ function load_auth_settings(): array
 
 // Default users (used on first run to seed users.json if it doesn't exist)
 $USERS_DEFAULT = [
-    'admin' => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin', 'name' => 'Administrator'],
-    'guest' => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest', 'name' => 'Guest', 'enabled' => true],
+    ['username' => 'admin', 'hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin', 'name' => 'Administrator'],
+    ['username' => 'guest', 'hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest', 'name' => 'Guest', 'enabled' => true],
 ];
 
 // Loads the user database from users.json.
 // On first run (file absent), seeds the file with built-in defaults using an atomic write.
 // Falls back to defaults if the file is corrupt or contains fewer than 2 entries.
+// Returns a list (sequential array) of user objects, each containing a 'username' field.
 function load_users(): array
 {
     global $USERS_DEFAULT;
     // Seed users.json on first run; LOCK_EX prevents race conditions during concurrent writes
     if (!is_file(USERS_FILE)) {
-        file_put_contents(USERS_FILE, json_encode($USERS_DEFAULT, JSON_PRETTY_PRINT), LOCK_EX);
+        file_put_contents(USERS_FILE, json_encode($USERS_DEFAULT, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
         return $USERS_DEFAULT;
     }
     $data = json_decode(file_get_contents(USERS_FILE), true);
-    // Require at least 2 entries (admin + guest) to consider the file structurally valid
-    return (is_array($data) && count($data) >= 2) ? $data : $USERS_DEFAULT;
+    // Require a sequential array of at least 2 user objects to consider the file structurally valid
+    return (is_array($data) && isset($data[0]) && count($data) >= 2) ? $data : $USERS_DEFAULT;
+}
+
+// Returns the index of the user with the given username in the users array, or -1 if not found.
+function find_user_index(array $users, string $username): int
+{
+    foreach ($users as $i => $u) {
+        if (is_array($u) && ($u['username'] ?? '') === $username) return $i;
+    }
+    return -1;
 }
