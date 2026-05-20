@@ -1090,11 +1090,12 @@
         document.getElementById('settings-save-status').textContent = '';
         return;
       }
-      // Load current settings and available templates in parallel
-      const [sRes, tRes, hRes] = await Promise.all([
+      // Load current settings, available templates, and users in parallel
+      const [sRes, tRes, hRes, uRes] = await Promise.all([
         apiFetch('?action=get-settings'),
         apiFetch('?action=get-templates'),
         apiFetch('?action=get-hljs-themes'),
+        apiFetch('?action=get-users'),
       ]);
       if (!sRes || !sRes.ok || !tRes || !tRes.ok || !hRes || !hRes.ok) {
         document.getElementById('settings-save-status').textContent = 'Could not load settings.';
@@ -1103,6 +1104,9 @@
       const settings   = await sRes.json();
       const templates  = await tRes.json();
       const hljsThemes = await hRes.json();
+      const usersData  = (uRes && uRes.ok) ? await uRes.json() : {};
+      const hasGuests  = Array.isArray(usersData.guests) && usersData.guests.length > 0;
+      document.getElementById('settings-jwt-secret-row').style.display = hasGuests ? 'none' : '';
       document.getElementById('settings-wiki-name').value = settings.wikiName || '';
       const sel = document.getElementById('settings-theme');
       sel.innerHTML = '';
@@ -1128,7 +1132,7 @@
       document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
       document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
       document.getElementById('settings-guest-login-enabled').checked = settings.guestLoginEnabled !== false;
-      document.getElementById('settings-jwt-secret').value     = '';
+      document.getElementById('settings-jwt-secret').value    = '';
       document.getElementById('settings-admin-pass').value     = '';
       document.getElementById('settings-admin-pass-label').style.display = 'none';
       document.getElementById('settings-token-ttl').value      = settings.tokenTtl ?? 3600;

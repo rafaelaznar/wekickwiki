@@ -652,12 +652,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
     if (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
       json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
     }
+    // Block secret change if guest users exist — their hashes would stop working
+    $usersData = load_users();
+    foreach ($usersData as $uname => $udata) {
+      if (is_array($udata) && ($udata['role'] ?? '') === 'guest') {
+        json_out(400, ['error' => 'Cannot change the JWT secret while guest users exist. Delete all guests first.']);
+      }
+    }
     $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['adminHash'] ?? ''));
     if (strlen($rawAdminHash) !== 64) {
       json_out(400, ['error' => 'When changing the JWT secret, a new admin password is required']);
     }
     // Re-hash the admin password with the new secret and persist it
-    $usersData = load_users();
     foreach ($usersData as $uname => $udata) {
       if (is_array($udata) && ($udata['role'] ?? '') === 'admin') {
         $usersData[$uname]['hash'] = hash_hmac('sha256', $rawAdminHash, $jwtSecret);
@@ -1066,12 +1072,14 @@ $settings = load_settings();
             <input type="checkbox" id="settings-guest-login-enabled" style="width:auto;cursor:pointer">
             <label for="settings-guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest logins</label>
           </div>
-          <label style="margin-top:.85rem">JWT Secret <span class="hint">(leave blank to keep)</span>
-            <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
-          </label>
-          <label id="settings-admin-pass-label" style="display:none;margin-top:.6rem">Admin password <span class="hint">(required when changing JWT secret)</span>
-            <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
-          </label>
+          <div id="settings-jwt-secret-row">
+            <label style="margin-top:.85rem">JWT Secret <span class="hint">(leave blank to keep)</span>
+              <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
+            </label>
+            <label id="settings-admin-pass-label" style="display:none;margin-top:.6rem">Admin password <span class="hint">(required when changing JWT secret)</span>
+              <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
+            </label>
+          </div>
           <label style="margin-top:.6rem">Token TTL <span class="hint">(seconds, 60&#x2013;86400)</span>
             <input type="number" id="settings-token-ttl" min="60" max="86400" step="60">
           </label>
