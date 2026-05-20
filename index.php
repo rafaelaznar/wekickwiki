@@ -84,18 +84,23 @@ function json_out(int $code, array $data): never
 // ═══════════════════════════════════════════════════════════════════════════
 define('USERS_FILE',    __DIR__ . '/users.json');
 define('SETTINGS_FILE', __DIR__ . '/settings.json');
-// JWT_SECRET and TOKEN_TTL are read from users.json; built-in defaults apply when absent.
-$_wkw_cfg = is_file(USERS_FILE) ? (json_decode(file_get_contents(USERS_FILE), true) ?? []) : [];
-define('JWT_SECRET', (isset($_wkw_cfg['jwtSecret']) && is_string($_wkw_cfg['jwtSecret']) && $_wkw_cfg['jwtSecret'] !== '') ? $_wkw_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
-define('TOKEN_TTL',  (isset($_wkw_cfg['tokenTtl'])  && is_int($_wkw_cfg['tokenTtl'])    && $_wkw_cfg['tokenTtl'] > 0)   ? (int)$_wkw_cfg['tokenTtl']  : 3600);
+// JWT_SECRET and TOKEN_TTL are read from settings.json (moved from users.json).
+// Falls back to users.json for graceful migration of existing installations.
+$_wkw_cfg = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
+if (!isset($_wkw_cfg['jwtSecret'])) {
+  $_wkw_u = is_file(USERS_FILE) ? (json_decode(file_get_contents(USERS_FILE), true) ?? []) : [];
+  $_wkw_cfg['jwtSecret'] = $_wkw_u['jwtSecret'] ?? 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
+  $_wkw_cfg['tokenTtl']  = $_wkw_u['tokenTtl']  ?? 3600;
+  unset($_wkw_u);
+}
+define('JWT_SECRET', (is_string($_wkw_cfg['jwtSecret']) && $_wkw_cfg['jwtSecret'] !== '') ? $_wkw_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
+define('TOKEN_TTL',  (is_int($_wkw_cfg['tokenTtl'])  && $_wkw_cfg['tokenTtl'] > 0)       ? (int)$_wkw_cfg['tokenTtl']  : 3600);
 unset($_wkw_cfg);
 
 // Default users (used on first run to seed users.json if it doesn't exist)
-// guestLoginEnabled is stored as a top-level key alongside the user entries.
 $USERS_DEFAULT = [
-  'admin' => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin'],
-  'guest' => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest'],
-  'guestLoginEnabled' => true,
+  'admin' => ['hash' => 'f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61', 'role' => 'admin', 'name' => 'Administrator'],
+  'guest' => ['hash' => '18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4', 'role' => 'guest', 'name' => 'Guest', 'enabled' => true],
 ];
 
 // Loads the user database from users.json.
@@ -119,7 +124,7 @@ function load_users(): array
 // so the wiki always starts up safely even when the settings file is corrupt or incomplete.
 function load_settings(): array
 {
-  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true, 'guestToc' => true, 'guestIndex' => true];
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true, 'guestToc' => true, 'guestIndex' => true, 'guestLoginEnabled' => true, 'jwtSecret' => 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7', 'tokenTtl' => 3600];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
@@ -133,7 +138,10 @@ function load_settings(): array
   $guestOdtDownload = isset($data['guestOdtDownload']) ? (bool)$data['guestOdtDownload'] : $defaults['guestOdtDownload'];
   $guestToc   = isset($data['guestToc'])   ? (bool)$data['guestToc']   : $defaults['guestToc'];
   $guestIndex = isset($data['guestIndex']) ? (bool)$data['guestIndex'] : $defaults['guestIndex'];
-  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers, 'guestOdtDownload' => $guestOdtDownload, 'guestToc' => $guestToc, 'guestIndex' => $guestIndex];
+  $guestLoginEnabled = isset($data['guestLoginEnabled']) ? (bool)$data['guestLoginEnabled'] : $defaults['guestLoginEnabled'];
+  $jwtSecret = (isset($data['jwtSecret']) && is_string($data['jwtSecret']) && strlen($data['jwtSecret']) >= 16) ? $data['jwtSecret'] : $defaults['jwtSecret'];
+  $tokenTtl  = (isset($data['tokenTtl'])  && is_int($data['tokenTtl'])  && $data['tokenTtl'] >= 60)            ? (int)$data['tokenTtl'] : $defaults['tokenTtl'];
+  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers, 'guestOdtDownload' => $guestOdtDownload, 'guestToc' => $guestToc, 'guestIndex' => $guestIndex, 'guestLoginEnabled' => $guestLoginEnabled, 'jwtSecret' => $jwtSecret, 'tokenTtl' => $tokenTtl];
 }
 
 function list_templates(): array
@@ -212,9 +220,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
   // The stored value is therefore never the bare SHA-256, protecting it even if users.json leaks.
   $serverHash = hash_hmac('sha256', $hash, JWT_SECRET);
   if (isset($USERS[$user]) && is_array($USERS[$user]) && hash_equals($USERS[$user]['hash'], $serverHash)) {
-    // Block guest logins when the admin has disabled them via the user-management panel
-    if (($USERS[$user]['role'] ?? '') === 'guest' && !($USERS['guestLoginEnabled'] ?? true)) {
-      json_out(401, ['error' => 'Guest login is currently disabled']);
+    // Block guest logins when the admin has disabled them globally or individually
+    if (($USERS[$user]['role'] ?? '') === 'guest') {
+      $_login_cfg = load_settings();
+      if (!($_login_cfg['guestLoginEnabled'] ?? true)) {
+        json_out(401, ['error' => 'Guest login is currently disabled']);
+      }
+      if (!($USERS[$user]['enabled'] ?? true)) {
+        json_out(401, ['error' => 'This account is disabled']);
+      }
     }
     // Issue a JWT embedding the user's role; valid for TOKEN_TTL seconds from now
     json_out(200, [
@@ -330,36 +344,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save')
   json_out(200, ['ok' => true]);
 }
 // ═══════════════════════════════════════════════════════════════════════════
-// API: Get usernames  GET ?action=get-users  (admin only)
-// Returns only usernames, never hashes.
+// API: Get users  GET ?action=get-users  (admin only)
+// Returns admin info and array of all guest users (no hashes ever returned).
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-users') {
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-  $users  = load_users();
-  // Discover admin and guest usernames by iterating entries and inspecting their role.
-  // Password hashes are intentionally excluded from the response to avoid leaking credentials.
-  $admin  = '';
-  $guest  = '';
+  $users     = load_users();
+  $adminUser = '';
+  $adminName = '';
+  $guests    = [];
   foreach ($users as $uname => $udata) {
-    // Skip non-array entries such as the top-level 'guestLoginEnabled' boolean
     if (!is_array($udata)) continue;
-    if (($udata['role'] ?? '') === 'admin') $admin = $uname;
-    if (($udata['role'] ?? '') === 'guest') $guest = $uname;
+    if (($udata['role'] ?? '') === 'admin') {
+      $adminUser = $uname;
+      $adminName = $udata['name'] ?? '';
+    }
+    if (($udata['role'] ?? '') === 'guest') {
+      $guests[] = [
+        'username' => $uname,
+        'name'     => $udata['name'] ?? '',
+        'enabled'  => (bool)($udata['enabled'] ?? true),
+      ];
+    }
   }
   json_out(200, [
-    'adminUser'         => $admin,
-    'guestUser'         => $guest,
-    'guestLoginEnabled' => (bool)($users['guestLoginEnabled'] ?? true),
-    'jwtSecret'         => (isset($users['jwtSecret']) && is_string($users['jwtSecret'])) ? $users['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7',
-    'tokenTtl'          => (isset($users['tokenTtl'])  && is_int($users['tokenTtl']))    ? $users['tokenTtl']  : 3600,
+    'adminUser' => $adminUser,
+    'adminName' => $adminName,
+    'guests'    => $guests,
   ]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// API: Save users  POST ?action=save-users  (admin only)
-// Body: { adminUser, adminHash (sha256hex|null), guestUser, guestHash (sha256hex|null), jwtSecret, tokenTtl }
-// null hash means "keep existing password".
+// API: Save admin+security  POST ?action=save-users  (admin only)
+// Body: { adminUser, adminName, adminHash (sha256hex|null), guestLoginEnabled, jwtSecret, tokenTtl }
+// null hash means "keep existing password". Guest entries are preserved untouched.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-users') {
   $claims = require_auth();
@@ -367,25 +386,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
 
   $body      = json_decode(file_get_contents('php://input'), true) ?? [];
   $adminUser = preg_replace('/[^a-z0-9_]/', '', strtolower($body['adminUser'] ?? ''));
-  $guestUser = preg_replace('/[^a-z0-9_]/', '', strtolower($body['guestUser'] ?? ''));
+  $adminName = trim(substr($body['adminName'] ?? '', 0, 64));
 
   if (strlen($adminUser) < 2 || strlen($adminUser) > 32) json_out(400, ['error' => 'Admin username must be 2–32 chars (a-z, 0-9, _)']);
-  if (strlen($guestUser) < 2 || strlen($guestUser) > 32) json_out(400, ['error' => 'Guest username must be 2–32 chars (a-z, 0-9, _)']);
-  if ($adminUser === $guestUser) json_out(400, ['error' => 'Admin and guest usernames must be different']);
+  if ($adminName === '') json_out(400, ['error' => 'Admin name cannot be empty']);
 
   $existing = load_users();
 
-  // Resolve existing hashes for each role so we can preserve them when no new password is supplied
+  // Resolve existing admin hash so we can preserve it when no new password is supplied
   $existingAdminHash = '';
-  $existingGuestHash = '';
-  foreach ($existing as $udata) {
+  foreach ($existing as $uname => $udata) {
     if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'admin') $existingAdminHash = $udata['hash'];
-    if (($udata['role'] ?? '') === 'guest') $existingGuestHash = $udata['hash'];
   }
 
-  // Resolve the new jwtSecret FIRST so password HMACs can be computed with the correct secret.
-  // If the secret changes, hashes must use the new secret (the one that will be stored and used on login).
+  // Resolve the new jwtSecret FIRST so password HMACs use the correct secret.
   $jwtSecret = trim($body['jwtSecret'] ?? '');
   if ($jwtSecret === '') {
     $jwtSecret = isset($existing['jwtSecret']) ? $existing['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
@@ -393,35 +408,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
   }
 
-  // Validate and compute new hashes using $jwtSecret (which may be the newly supplied value).
-  // A null value in the request body means "keep existing password" (user left the field blank).
   $rawAdminHash = $body['adminHash'] ?? null;
-  $rawGuestHash = $body['guestHash'] ?? null;
-
   if ($rawAdminHash !== null) {
-    // Strip non-hex characters and validate length before applying the server-side HMAC
     $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawAdminHash));
     if (strlen($rawAdminHash) !== 64) json_out(400, ['error' => 'Invalid admin password hash']);
     $newAdminHash = hash_hmac('sha256', $rawAdminHash, $jwtSecret);
   } else {
-    // No new password supplied: retain the currently stored HMAC hash unchanged
     $newAdminHash = $existingAdminHash;
   }
 
-  if ($rawGuestHash !== null) {
-    $rawGuestHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawGuestHash));
-    if (strlen($rawGuestHash) !== 64) json_out(400, ['error' => 'Invalid guest password hash']);
-    $newGuestHash = hash_hmac('sha256', $rawGuestHash, $jwtSecret);
-  } else {
-    $newGuestHash = $existingGuestHash;
-  }
-
-  // Preserve guestLoginEnabled; allow updating it from body
   $guestLoginEnabled = isset($body['guestLoginEnabled'])
     ? (bool)$body['guestLoginEnabled']
     : (bool)($existing['guestLoginEnabled'] ?? true);
 
-  // Validate and update tokenTtl
   $tokenTtl = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
   if ($tokenTtl < 60 || $tokenTtl > 86400) {
     if ($tokenTtl === 0 && isset($existing['tokenTtl'])) {
@@ -431,18 +430,127 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     }
   }
 
-  $newUsers = [
-    $adminUser          => ['hash' => $newAdminHash, 'role' => 'admin'],
-    $guestUser          => ['hash' => $newGuestHash, 'role' => 'guest'],
-    'guestLoginEnabled' => $guestLoginEnabled,
-    'jwtSecret'         => $jwtSecret,
-    'tokenTtl'          => $tokenTtl,
-  ];
+  // Rebuild: new admin entry + all existing guest entries preserved intact
+  $newUsers = [$adminUser => ['hash' => $newAdminHash, 'role' => 'admin', 'name' => $adminName]];
+  foreach ($existing as $uname => $udata) {
+    if (!is_array($udata)) continue;
+    if (($udata['role'] ?? '') === 'guest') $newUsers[$uname] = $udata;
+  }
+  $newUsers['guestLoginEnabled'] = $guestLoginEnabled;
+  $newUsers['jwtSecret']         = $jwtSecret;
+  $newUsers['tokenTtl']          = $tokenTtl;
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
   if ($written === false) json_out(500, ['error' => 'Could not write users file']);
 
-  json_out(200, ['ok' => true, 'adminUser' => $adminUser, 'guestUser' => $guestUser]);
+  json_out(200, ['ok' => true, 'adminUser' => $adminUser]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Add guest  POST ?action=add-guest  (admin only)
+// Body: { username, name, hash (sha256hex) }
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'add-guest') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $username = preg_replace('/[^a-z0-9_]/', '', strtolower($body['username'] ?? ''));
+  $name     = trim(substr($body['name'] ?? '', 0, 64));
+  $rawHash  = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
+  if (strlen($username) < 2 || strlen($username) > 32) json_out(400, ['error' => 'Username must be 2–32 chars (a-z, 0-9, _)']);
+  if ($name === '') json_out(400, ['error' => 'Name cannot be empty']);
+  if (strlen($rawHash) !== 64) json_out(400, ['error' => 'A password is required']);
+  $users = load_users();
+  if (isset($users[$username])) json_out(409, ['error' => 'Username already exists']);
+  $users[$username] = ['hash' => hash_hmac('sha256', $rawHash, JWT_SECRET), 'role' => 'guest', 'name' => $name, 'enabled' => true];
+  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+    json_out(500, ['error' => 'Could not write users file']);
+  json_out(201, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Edit guest  POST ?action=edit-guest  (admin only)
+// Body: { oldUsername, newUsername, name, enabled }
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'edit-guest') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body        = json_decode(file_get_contents('php://input'), true) ?? [];
+  $oldUsername = preg_replace('/[^a-z0-9_]/', '', strtolower($body['oldUsername'] ?? ''));
+  $newUsername = preg_replace('/[^a-z0-9_]/', '', strtolower($body['newUsername'] ?? ''));
+  $name        = trim(substr($body['name'] ?? '', 0, 64));
+  $enabled     = isset($body['enabled']) ? (bool)$body['enabled'] : true;
+  if (strlen($newUsername) < 2 || strlen($newUsername) > 32) json_out(400, ['error' => 'Username must be 2–32 chars (a-z, 0-9, _)']);
+  if ($name === '') json_out(400, ['error' => 'Name cannot be empty']);
+  $users = load_users();
+  if (!isset($users[$oldUsername]) || !is_array($users[$oldUsername]) || ($users[$oldUsername]['role'] ?? '') !== 'guest')
+    json_out(404, ['error' => 'Guest user not found']);
+  if ($newUsername !== $oldUsername && isset($users[$newUsername]))
+    json_out(409, ['error' => 'Username already exists']);
+  $entry = $users[$oldUsername];
+  $entry['name']    = $name;
+  $entry['enabled'] = $enabled;
+  unset($users[$oldUsername]);
+  $users[$newUsername] = $entry;
+  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+    json_out(500, ['error' => 'Could not write users file']);
+  json_out(200, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Delete guest  POST ?action=delete-guest  (admin only)
+// Body: { username }
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete-guest') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $username = preg_replace('/[^a-z0-9_]/', '', strtolower($body['username'] ?? ''));
+  $users    = load_users();
+  if (!isset($users[$username]) || !is_array($users[$username]) || ($users[$username]['role'] ?? '') !== 'guest')
+    json_out(404, ['error' => 'Guest user not found']);
+  unset($users[$username]);
+  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+    json_out(500, ['error' => 'Could not write users file']);
+  json_out(200, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Reset password  POST ?action=reset-password  (admin only)
+// Body: { username, hash (sha256hex) }
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'reset-password') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $username = preg_replace('/[^a-z0-9_]/', '', strtolower($body['username'] ?? ''));
+  $rawHash  = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
+  if ($username === '' || strlen($rawHash) !== 64) json_out(400, ['error' => 'Invalid request']);
+  $users = load_users();
+  if (!isset($users[$username]) || !is_array($users[$username])) json_out(404, ['error' => 'User not found']);
+  $users[$username]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
+  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+    json_out(500, ['error' => 'Could not write users file']);
+  json_out(200, ['ok' => true]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Change own password  POST ?action=change-password  (any authenticated user)
+// Body: { hash (sha256hex of new password) }
+// Uses the JWT sub claim — a guest can only change their own password.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'change-password') {
+  $claims   = require_auth();
+  $username = $claims['sub'] ?? '';
+  $body     = json_decode(file_get_contents('php://input'), true) ?? [];
+  $rawHash  = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
+  if ($username === '' || strlen($rawHash) !== 64) json_out(400, ['error' => 'Invalid request']);
+  $users = load_users();
+  if (!isset($users[$username]) || !is_array($users[$username])) json_out(404, ['error' => 'User not found']);
+  $users[$username]['hash'] = hash_hmac('sha256', $rawHash, JWT_SECRET);
+  if (file_put_contents(USERS_FILE, json_encode($users, JSON_PRETTY_PRINT), LOCK_EX) === false)
+    json_out(500, ['error' => 'Could not write users file']);
+  json_out(200, ['ok' => true]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -539,6 +647,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $guestOdtDownload = isset($body['guestOdtDownload']) ? (bool)$body['guestOdtDownload'] : true;
   $guestToc         = isset($body['guestToc'])         ? (bool)$body['guestToc']         : true;
   $guestIndex       = isset($body['guestIndex'])       ? (bool)$body['guestIndex']       : true;
+  $guestLoginEnabled = isset($body['guestLoginEnabled']) ? (bool)$body['guestLoginEnabled'] : true;
+  // JWT Secret: blank = keep existing; non-blank requires admin password to re-hash with new secret
+  $jwtSecret = trim($body['jwtSecret'] ?? '');
+  $tokenTtl  = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
   if ($wikiName === '' || strlen($wikiName) > 64) {
     json_out(400, ['error' => 'Wiki name must be between 1 and 64 characters']);
   }
@@ -564,6 +676,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $existing['guestOdtDownload'] = $guestOdtDownload;
   $existing['guestToc']         = $guestToc;
   $existing['guestIndex']       = $guestIndex;
+  $existing['guestLoginEnabled'] = $guestLoginEnabled;
+  if ($jwtSecret !== '') {
+    if (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
+      json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
+    }
+    $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['adminHash'] ?? ''));
+    if (strlen($rawAdminHash) !== 64) {
+      json_out(400, ['error' => 'When changing the JWT secret, a new admin password is required']);
+    }
+    // Re-hash the admin password with the new secret and persist it
+    $usersData = load_users();
+    foreach ($usersData as $uname => $udata) {
+      if (is_array($udata) && ($udata['role'] ?? '') === 'admin') {
+        $usersData[$uname]['hash'] = hash_hmac('sha256', $rawAdminHash, $jwtSecret);
+        break;
+      }
+    }
+    file_put_contents(USERS_FILE, json_encode($usersData, JSON_PRETTY_PRINT), LOCK_EX);
+    $existing['jwtSecret'] = $jwtSecret;
+  } else {
+    $existing['jwtSecret'] = (isset($existing['jwtSecret']) && is_string($existing['jwtSecret']) && strlen($existing['jwtSecret']) >= 16)
+      ? $existing['jwtSecret'] : JWT_SECRET;
+  }
+  if ($tokenTtl >= 60 && $tokenTtl <= 86400) {
+    $existing['tokenTtl'] = $tokenTtl;
+  } elseif (!isset($existing['tokenTtl'])) {
+    $existing['tokenTtl'] = 3600;
+  }
   if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
     json_out(500, ['error' => 'Could not write settings file']);
   }
@@ -815,6 +955,10 @@ $settings = load_settings();
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg></button>
+        <button class="btn" id="change-pass-btn" title="Change my password" aria-label="Change my password" style="display:none" onclick="toggleChangePasswordPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg></button>
         </div>
       </div>
     </header>
@@ -844,44 +988,66 @@ $settings = load_settings();
     <div id="users-overlay" onclick="toggleUsersPanel()"></div>
     <div id="users-panel">
       <h3>Manage users <button class="close-btn" onclick="toggleUsersPanel()">&times;</button></h3>
-      <form id="users-form" novalidate>
+      <div id="users-grid"></div>
+      <div id="guest-add-form" style="display:none">
         <fieldset>
-          <legend>Admin</legend>
+          <legend>Add guest</legend>
           <label>Username
-            <input type="text" id="users-admin-name" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
+            <input type="text" id="guest-add-username" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+" placeholder="username">
           </label>
-          <label>New password <span style="font-weight:400;color:#888">(leave blank to keep)</span>
-            <input type="password" id="users-admin-pass" autocomplete="new-password" placeholder="••••••••">
+          <label>Name
+            <input type="text" id="guest-add-name" autocomplete="off" maxlength="64" placeholder="Display name">
           </label>
+          <label>Password
+            <input type="password" id="guest-add-pass" autocomplete="new-password" placeholder="••••••••">
+          </label>
+          <label>Confirm password
+            <input type="password" id="guest-add-pass2" autocomplete="new-password" placeholder="••••••••">
+          </label>
+          <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
+            <span id="guest-add-status" style="flex:1;font-size:.8rem;color:#c0392b"></span>
+            <button type="button" class="btn" onclick="hideAddGuestForm()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="submitAddGuest()">Add</button>
+          </div>
         </fieldset>
-        <fieldset>
-          <legend>Guest</legend>
-          <label>Username
-            <input type="text" id="users-guest-name" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
-          </label>
-          <label>New password <span style="font-weight:400;color:#888">(leave blank to keep)</span>
-            <input type="password" id="users-guest-pass" autocomplete="new-password" placeholder="••••••••">
-          </label>
-        </fieldset>
-        <div id="guest-login-setting" style="display:flex;align-items:center;gap:.6rem;margin-bottom:.85rem">
-          <input type="checkbox" id="guest-login-enabled" style="width:auto;cursor:pointer">
-          <label for="guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest login</label>
-        </div>
-        <fieldset style="margin-bottom:.85rem;border:1px solid #ddd;border-radius:6px;padding:.75rem 1rem">
-          <legend style="font-weight:600;font-size:.82rem;padding:0 .4rem">Security</legend>
-          <label>JWT Secret
-            <input type="text" id="users-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
-          </label>
-          <label style="margin-top:.6rem">Token TTL <span style="font-weight:400;color:#888">(seconds, 60–86400)</span>
-            <input type="number" id="users-token-ttl" min="60" max="86400" step="60">
-          </label>
-        </fieldset>
-        <div id="users-form-actions">
-          <span id="users-save-status"></span>
-          <button type="button" class="btn" onclick="toggleUsersPanel()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+      <button type="button" class="btn" id="guest-add-btn" onclick="showAddGuestForm()" style="margin-top:.75rem;width:100%">+ Add guest user</button>
+    </div>
+
+    <!-- Change password panel (guest self-service) -->
+    <div id="change-password-overlay" onclick="toggleChangePasswordPanel()"></div>
+    <div id="change-password-panel">
+      <h3>Change my password <button class="close-btn" onclick="toggleChangePasswordPanel()">&times;</button></h3>
+      <form id="change-password-form" novalidate>
+        <label>New password
+          <input type="password" id="change-pass-new" autocomplete="new-password" placeholder="••••••••">
+        </label>
+        <label>Confirm new password
+          <input type="password" id="change-pass-confirm" autocomplete="new-password" placeholder="••••••••">
+        </label>
+        <div id="change-password-form-actions">
+          <span id="change-password-status"></span>
+          <button type="button" class="btn" onclick="toggleChangePasswordPanel()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Change password</button>
         </div>
       </form>
+    </div>
+
+    <!-- Reset password dialog (admin → any user) -->
+    <div id="reset-password-overlay"></div>
+    <div id="reset-password-dialog">
+      <h4 id="reset-password-title">Reset password</h4>
+      <label>New password
+        <input type="password" id="reset-pass-new" autocomplete="new-password" placeholder="••••••••">
+      </label>
+      <label>Confirm password
+        <input type="password" id="reset-pass-confirm" autocomplete="new-password" placeholder="••••••••">
+      </label>
+      <div id="reset-password-actions">
+        <span id="reset-password-status"></span>
+        <button type="button" class="btn" id="reset-password-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="reset-password-ok">Reset</button>
+      </div>
     </div>
     <!-- Settings panel -->
     <div id="settings-overlay" onclick="toggleSettingsPanel()"></div>
@@ -923,6 +1089,22 @@ $settings = load_settings();
           <input type="checkbox" id="settings-guest-index" style="width:auto;cursor:pointer">
           <label for="settings-guest-index" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest to view Index</label>
         </div>
+        <fieldset style="border:1px solid #e0e0e0;border-radius:6px;padding:.75rem 1rem .85rem;margin-top:1rem">
+          <legend style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#555;padding:0 .35rem">Security</legend>
+          <div style="display:flex;align-items:center;gap:.6rem;margin-top:.25rem">
+            <input type="checkbox" id="settings-guest-login-enabled" style="width:auto;cursor:pointer">
+            <label for="settings-guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest logins</label>
+          </div>
+          <label style="margin-top:.85rem">JWT Secret <span class="hint">(leave blank to keep)</span>
+            <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
+          </label>
+          <label id="settings-admin-pass-label" style="display:none;margin-top:.6rem">Admin password <span class="hint">(required when changing JWT secret)</span>
+            <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
+          </label>
+          <label style="margin-top:.6rem">Token TTL <span class="hint">(seconds, 60&#x2013;86400)</span>
+            <input type="number" id="settings-token-ttl" min="60" max="86400" step="60">
+          </label>
+        </fieldset>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>
           <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>
@@ -962,7 +1144,7 @@ $settings = load_settings();
     window.WKW_GUEST_TOC   = <?= $settings['guestToc']   ? 'true' : 'false' ?>;
     window.WKW_GUEST_INDEX = <?= $settings['guestIndex'] ? 'true' : 'false' ?>;
   </script>
-  <script src="wiki.js"></script>
+  <script src="wiki.js?v=<?= filemtime(__DIR__ . '/wiki.js') ?>"></script>
   <?php // Dynamically inject each enabled front-end plugin as a <script> tag 
   ?>
   <?php foreach (front_plugins() as $pf): ?>

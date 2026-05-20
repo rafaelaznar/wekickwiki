@@ -730,102 +730,352 @@
       const panel   = document.getElementById('users-panel');
       usersOpen = !usersOpen;
       overlay.style.display = panel.style.display = usersOpen ? 'block' : 'none';
-      if (!usersOpen) {
-        document.getElementById('users-save-status').textContent = '';
-        document.getElementById('users-admin-pass').value = '';
-        document.getElementById('users-guest-pass').value = '';
-        return;
-      }
-      // Pre-load current usernames from server
+      if (!usersOpen) return;
+      await loadUsersPanel();
+    }
+
+    async function loadUsersPanel() {
+      const grid = document.getElementById('users-grid');
+      grid.innerHTML = '<p style="font-size:.82rem;color:#888;padding:.5rem 0">Loading…</p>';
       const res = await apiFetch('?action=get-users');
       if (!res || !res.ok) {
-        document.getElementById('users-save-status').textContent = 'Could not load users.';
+        grid.innerHTML = '<p style="font-size:.82rem;color:#c0392b;padding:.5rem 0">Could not load users.</p>';
         return;
       }
       const data = await res.json();
-      document.getElementById('users-admin-name').value = data.adminUser || '';
-      document.getElementById('users-guest-name').value = data.guestUser || '';
-      document.getElementById('users-admin-pass').value = '';
-      document.getElementById('users-guest-pass').value = '';
-      document.getElementById('users-save-status').textContent = '';
-      document.getElementById('guest-login-enabled').checked = data.guestLoginEnabled !== false;
-      document.getElementById('users-jwt-secret').value = '';
-      document.getElementById('users-token-ttl').value  = data.tokenTtl ?? 3600;
+      grid.innerHTML = '';
+      renderAdminCard(data.adminUser || '', data.adminName || '');
+      hideAddGuestForm();
+      renderGuestCards(data.guests || []);
     }
 
-    /**
-     * Handle the users form submission.
-     * Validates both usernames (2–32 chars, a–z/0–9/_ only, must differ), then
-     * SHA-256 hashes any newly entered passwords before sending them to the server.
-     * Blank password fields mean "keep the existing hash" — null is sent instead.
-     * If the admin renames their own account the session is invalidated and they
-     * are prompted to sign in again with the new username.
-     */
-    document.getElementById('users-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const statusEl = document.getElementById('users-save-status');
+    function renderAdminCard(adminUser, adminName) {
+      const grid = document.getElementById('users-grid');
+      const div  = document.createElement('div');
+      div.className = 'user-card admin-card';
+      div.id = 'user-card-__admin';
+      div.innerHTML = `
+        <div class="user-card-view">
+          <div class="user-card-info">
+            <strong class="user-card-name">${escHtml(adminName || adminUser)}</strong>
+            <span class="user-card-username">@${escHtml(adminUser)}</span>
+            <span class="user-card-badge">Admin</span>
+          </div>
+          <div class="user-card-controls">
+            <button class="btn btn-sm" title="Change password" onclick="showResetPasswordModal('${escHtml(adminUser)}')">&#128273;</button>
+            <button class="btn btn-sm" title="Edit" onclick="startEditAdmin()">&#9998;</button>
+          </div>
+        </div>
+        <div class="user-card-edit" id="admin-card-edit" style="display:none">
+          <label>Username
+            <input type="text" id="users-admin-name" value="${escHtml(adminUser)}" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
+          </label>
+          <label>Name
+            <input type="text" id="users-admin-displayname" value="${escHtml(adminName)}" autocomplete="off" maxlength="64">
+          </label>
+          <span class="guest-edit-status" id="users-admin-status"></span>
+          <div style="display:flex;gap:.4rem;margin-top:.4rem;justify-content:flex-end">
+            <button class="btn btn-sm" onclick="cancelEditAdmin()">Cancel</button>
+            <button class="btn btn-primary btn-sm" onclick="submitEditAdmin()">Save</button>
+          </div>
+        </div>`;
+      grid.appendChild(div);
+    }
+
+    function renderGuestCards(guests) {
+      const grid = document.getElementById('users-grid');
+      guests.forEach(g => {
+        const div = document.createElement('div');
+        div.className = 'user-card';
+        div.id = 'user-card-' + g.username;
+        div.innerHTML = `
+          <div class="user-card-view">
+            <label class="toggle-switch" title="${g.enabled ? 'Enabled – click to disable' : 'Disabled – click to enable'}" style="margin:0">
+              <input type="checkbox" ${g.enabled ? 'checked' : ''} onchange="toggleGuestEnabled('${g.username}', this)">
+              <span class="toggle-slider"></span>
+            </label>
+            <div class="user-card-info">
+              <strong class="user-card-name">${escHtml(g.name)}</strong>
+              <span class="user-card-username">@${escHtml(g.username)}</span>
+            </div>
+            <div class="user-card-controls">
+              <button class="btn btn-sm" title="Reset password" onclick="showResetPasswordModal('${g.username}')">&#128273;</button>
+              <button class="btn btn-sm" title="Edit" onclick="startEditGuest('${g.username}')">&#9998;</button>
+              <button class="btn btn-danger btn-sm" title="Delete" onclick="deleteGuest('${g.username}')">&#215;</button>
+            </div>
+          </div>
+          <div class="user-card-edit" id="guest-edit-${g.username}" style="display:none">
+            <label>Username
+              <input type="text" id="guest-edit-username-${g.username}" value="${escHtml(g.username)}" maxlength="32" autocomplete="off">
+            </label>
+            <label>Name
+              <input type="text" id="guest-edit-name-${g.username}" value="${escHtml(g.name)}" maxlength="64" autocomplete="off">
+            </label>
+            <span class="guest-edit-status" id="guest-edit-status-${g.username}"></span>
+            <div style="display:flex;gap:.4rem;margin-top:.4rem;justify-content:flex-end">
+              <button class="btn btn-sm" onclick="cancelEditGuest('${g.username}')">Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick="submitEditGuest('${g.username}')">Save</button>
+            </div>
+          </div>`;
+        grid.appendChild(div);
+      });
+    }
+
+    function showAddGuestForm() {
+      document.getElementById('guest-add-form').style.display = '';
+      document.getElementById('guest-add-btn').style.display  = 'none';
+      document.getElementById('guest-add-username').value = '';
+      document.getElementById('guest-add-name').value     = '';
+      document.getElementById('guest-add-pass').value     = '';
+      document.getElementById('guest-add-pass2').value    = '';
+      document.getElementById('guest-add-status').textContent = '';
+      document.getElementById('guest-add-username').focus();
+    }
+
+    function hideAddGuestForm() {
+      document.getElementById('guest-add-form').style.display = 'none';
+      document.getElementById('guest-add-btn').style.display  = '';
+    }
+
+    async function submitAddGuest() {
+      const statusEl  = document.getElementById('guest-add-status');
+      const username  = document.getElementById('guest-add-username').value.trim().toLowerCase();
+      const name      = document.getElementById('guest-add-name').value.trim();
+      const pass      = document.getElementById('guest-add-pass').value;
+      const pass2     = document.getElementById('guest-add-pass2').value;
+      statusEl.textContent = '';
+      if (!/^[a-z0-9_]{2,32}$/.test(username)) { statusEl.textContent = 'Username: 2–32 chars (a-z, 0-9, _)'; return; }
+      if (!name)  { statusEl.textContent = 'Name cannot be empty.'; return; }
+      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
+      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
+      const hash = await sha256(pass);
+      statusEl.textContent = 'Adding…';
+      try {
+        const res  = await apiFetch('?action=add-guest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, name, hash })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showToast('Guest user added.');
+          await loadUsersPanel();
+        } else {
+          statusEl.textContent = data.error || 'Error adding guest.';
+        }
+      } catch { statusEl.textContent = 'Connection error.'; }
+    }
+
+    function startEditGuest(username) {
+      document.getElementById('guest-edit-' + username).style.display = '';
+      document.getElementById('guest-edit-username-' + username).focus();
+    }
+
+    function cancelEditGuest(username) {
+      document.getElementById('guest-edit-' + username).style.display = 'none';
+      document.getElementById('guest-edit-status-' + username).textContent = '';
+    }
+
+    async function submitEditGuest(oldUsername) {
+      const statusEl  = document.getElementById('guest-edit-status-' + oldUsername);
+      const newUsername = document.getElementById('guest-edit-username-' + oldUsername).value.trim().toLowerCase();
+      const name        = document.getElementById('guest-edit-name-' + oldUsername).value.trim();
+      statusEl.textContent = '';
+      if (!/^[a-z0-9_]{2,32}$/.test(newUsername)) { statusEl.textContent = 'Username: 2–32 chars (a-z, 0-9, _)'; return; }
+      if (!name) { statusEl.textContent = 'Name cannot be empty.'; return; }
+      // Read the current enabled state from the toggle in the view row
+      const enabledEl = document.querySelector(`#user-card-${oldUsername} input[type="checkbox"]`);
+      const enabled = enabledEl ? enabledEl.checked : true;
       statusEl.textContent = 'Saving…';
+      try {
+        const res  = await apiFetch('?action=edit-guest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldUsername, newUsername, name, enabled })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showToast('Guest updated.');
+          await loadUsersPanel();
+        } else {
+          statusEl.textContent = data.error || 'Error updating guest.';
+        }
+      } catch { statusEl.textContent = 'Connection error.'; }
+    }
 
+    async function toggleGuestEnabled(username, checkbox) {
+      // Persist the enabled change immediately via edit-guest (name unchanged)
+      const nameEl = document.getElementById('guest-edit-name-' + username);
+      // If edit form has a modified name, use it; otherwise read from the display
+      const nameDisplay = document.querySelector('#user-card-' + username + ' .user-card-name');
+      const name = (nameEl && nameEl.style.display !== 'none' && nameEl.value.trim()) ||
+                   (nameDisplay ? nameDisplay.textContent : username);
+      const enabled = checkbox.checked;
+      try {
+        const res = await apiFetch('?action=edit-guest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldUsername: username, newUsername: username, name, enabled })
+        });
+        if (!res.ok) {
+          checkbox.checked = !enabled; // revert
+          const data = await res.json().catch(() => ({}));
+          showToast(data.error || 'Could not update status.', 'error');
+        }
+      } catch {
+        checkbox.checked = !enabled;
+        showToast('Connection error.', 'error');
+      }
+    }
+
+    async function deleteGuest(username) {
+      if (!confirm(`Delete guest "${username}"? This cannot be undone.`)) return;
+      try {
+        const res  = await apiFetch('?action=delete-guest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          showToast('Guest deleted.');
+          await loadUsersPanel();
+        } else {
+          showToast(data.error || 'Error deleting guest.', 'error');
+        }
+      } catch { showToast('Connection error.', 'error'); }
+    }
+
+    // ── Reset password dialog (admin → any user) ────────────────────────────────
+    let _resetPasswordTarget = '';
+
+    function showResetPasswordModal(username) {
+      _resetPasswordTarget = username;
+      document.getElementById('reset-password-title').textContent = `Reset password for @${username}`;
+      document.getElementById('reset-pass-new').value     = '';
+      document.getElementById('reset-pass-confirm').value = '';
+      document.getElementById('reset-password-status').textContent = '';
+      document.getElementById('reset-password-overlay').style.display = 'block';
+      document.getElementById('reset-password-dialog').style.display  = 'block';
+      document.getElementById('reset-pass-new').focus();
+    }
+
+    function hideResetPasswordModal() {
+      _resetPasswordTarget = '';
+      document.getElementById('reset-password-overlay').style.display = 'none';
+      document.getElementById('reset-password-dialog').style.display  = 'none';
+    }
+
+    document.getElementById('reset-password-cancel').addEventListener('click', hideResetPasswordModal);
+    document.getElementById('reset-password-overlay').addEventListener('click', hideResetPasswordModal);
+    document.getElementById('reset-password-ok').addEventListener('click', async () => {
+      const statusEl = document.getElementById('reset-password-status');
+      const pass     = document.getElementById('reset-pass-new').value;
+      const pass2    = document.getElementById('reset-pass-confirm').value;
+      statusEl.textContent = '';
+      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
+      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
+      const hash = await sha256(pass);
+      statusEl.textContent = 'Resetting…';
+      try {
+        const res  = await apiFetch('?action=reset-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: _resetPasswordTarget, hash })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          hideResetPasswordModal();
+          showToast('Password reset successfully.');
+        } else {
+          statusEl.textContent = data.error || 'Error resetting password.';
+        }
+      } catch { statusEl.textContent = 'Connection error.'; }
+    });
+
+    // ── Admin card inline edit ───────────────────────────────────────────────────
+    function startEditAdmin() {
+      document.getElementById('admin-card-edit').style.display = '';
+      document.getElementById('users-admin-name').focus();
+    }
+
+    function cancelEditAdmin() {
+      document.getElementById('admin-card-edit').style.display = 'none';
+      document.getElementById('users-admin-status').textContent = '';
+    }
+
+    async function submitEditAdmin() {
+      const statusEl = document.getElementById('users-admin-status');
       const adminUser = document.getElementById('users-admin-name').value.trim().toLowerCase();
-      const guestUser = document.getElementById('users-guest-name').value.trim().toLowerCase();
-      const adminPass = document.getElementById('users-admin-pass').value;
-      const guestPass = document.getElementById('users-guest-pass').value;
-
+      const adminName = document.getElementById('users-admin-displayname').value.trim();
+      statusEl.textContent = '';
       if (!/^[a-z0-9_]{2,32}$/.test(adminUser)) {
-        statusEl.textContent = 'Admin username: 2–32 chars, only a-z, 0-9, _';
+        statusEl.textContent = 'Username: 2–32 chars, only a-z, 0-9, _';
         return;
       }
-      if (!/^[a-z0-9_]{2,32}$/.test(guestUser)) {
-        statusEl.textContent = 'Guest username: 2–32 chars, only a-z, 0-9, _';
+      if (!adminName) {
+        statusEl.textContent = 'Name cannot be empty.';
         return;
       }
-      if (adminUser === guestUser) {
-        statusEl.textContent = 'Admin and guest usernames must be different.';
-        return;
-      }
-
-      const adminHash = adminPass ? await sha256(adminPass) : null;
-      const guestHash = guestPass ? await sha256(guestPass) : null;
-      const guestLoginEnabled = document.getElementById('guest-login-enabled').checked;
-      const jwtSecret = document.getElementById('users-jwt-secret').value.trim();
-      const tokenTtl  = parseInt(document.getElementById('users-token-ttl').value, 10) || 3600;
-
-      if (jwtSecret !== '' && jwtSecret.length < 16) {
-        statusEl.textContent = 'JWT secret must be at least 16 characters (leave blank to keep).';
-        return;
-      }
-      if (jwtSecret !== '' && !adminPass) {
-        statusEl.textContent = 'When changing the JWT secret, you must also set a new admin password.';
-        return;
-      }
-      if (jwtSecret !== '' && !guestPass) {
-        statusEl.textContent = 'When changing the JWT secret, you must also set a new guest password.';
-        return;
-      }
-
+      statusEl.textContent = 'Saving…';
       try {
         const res = await apiFetch('?action=save-users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminUser, adminHash, guestUser, guestHash, guestLoginEnabled, jwtSecret, tokenTtl })
+          body: JSON.stringify({ adminUser, adminName, adminHash: null })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           const currentUser = getUser();
-          toggleUsersPanel();
-          // If admin renamed themselves, force re-login
           if (currentUser !== adminUser) {
+            toggleUsersPanel();
             showToast('Admin username changed — please sign in again.', 'success', 4000);
             setTimeout(logout, 500);
           } else {
-            showToast('Users updated successfully.');
+            showToast('Admin updated.');
+            await loadUsersPanel();
           }
         } else {
-          statusEl.textContent = data.error || 'Error saving users.';
+          statusEl.textContent = data.error || 'Error saving admin.';
         }
       } catch {
         statusEl.textContent = 'Connection error.';
       }
+    }
+
+    // ── Change-password panel (guest self-service) ──────────────────────────────
+    let changePassOpen = false;
+
+    function toggleChangePasswordPanel() {
+      changePassOpen = !changePassOpen;
+      document.getElementById('change-password-overlay').style.display = changePassOpen ? 'block' : 'none';
+      document.getElementById('change-password-panel').style.display   = changePassOpen ? 'block' : 'none';
+      if (changePassOpen) {
+        document.getElementById('change-pass-new').value     = '';
+        document.getElementById('change-pass-confirm').value = '';
+        document.getElementById('change-password-status').textContent = '';
+        document.getElementById('change-pass-new').focus();
+      }
+    }
+
+    document.getElementById('change-password-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('change-password-status');
+      const pass     = document.getElementById('change-pass-new').value;
+      const pass2    = document.getElementById('change-pass-confirm').value;
+      statusEl.textContent = '';
+      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
+      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
+      const hash = await sha256(pass);
+      statusEl.textContent = 'Saving…';
+      try {
+        const res  = await apiFetch('?action=change-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hash })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toggleChangePasswordPanel();
+          showToast('Password changed successfully.');
+        } else {
+          statusEl.textContent = data.error || 'Error changing password.';
+        }
+      } catch { statusEl.textContent = 'Connection error.'; }
     });
 
     // ── Settings panel ──────────────────────────────────────────────────────────
@@ -877,6 +1127,11 @@
       document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
       document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
       document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
+      document.getElementById('settings-guest-login-enabled').checked = settings.guestLoginEnabled !== false;
+      document.getElementById('settings-jwt-secret').value     = '';
+      document.getElementById('settings-admin-pass').value     = '';
+      document.getElementById('settings-admin-pass-label').style.display = 'none';
+      document.getElementById('settings-token-ttl').value      = settings.tokenTtl ?? 3600;
     }
 
     /**
@@ -898,27 +1153,50 @@
       const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
       const guestToc         = document.getElementById('settings-guest-toc').checked;
       const guestIndex       = document.getElementById('settings-guest-index').checked;
+      const guestLoginEnabled = document.getElementById('settings-guest-login-enabled').checked;
+      const jwtSecret = document.getElementById('settings-jwt-secret').value.trim();
+      const adminPass = document.getElementById('settings-admin-pass').value;
+      const tokenTtl  = parseInt(document.getElementById('settings-token-ttl').value, 10) || 3600;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
       }
+      if (jwtSecret !== '' && jwtSecret.length < 16) {
+        statusEl.textContent = 'JWT secret must be at least 16 characters.';
+        return;
+      }
+      if (jwtSecret !== '' && !adminPass) {
+        statusEl.textContent = 'When changing the JWT secret, a new admin password is required.';
+        return;
+      }
+      const adminHash = adminPass ? await sha256(adminPass) : null;
       try {
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex, guestLoginEnabled, jwtSecret, tokenTtl, adminHash }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           toggleSettingsPanel();
-          showToast('Settings saved. Reloading\u2026', 'success', 2000);
-          setTimeout(() => location.reload(), 1500);
+          if (jwtSecret) {
+            showToast('JWT secret changed \u2014 please sign in again.', 'success', 3000);
+            setTimeout(logout, 2000);
+          } else {
+            showToast('Settings saved. Reloading\u2026', 'success', 2000);
+            setTimeout(() => location.reload(), 1500);
+          }
         } else {
           statusEl.textContent = data.error || 'Error saving settings.';
         }
       } catch {
         statusEl.textContent = 'Connection error.';
       }
+    });
+
+    // Show/hide admin password field when JWT secret input changes
+    document.getElementById('settings-jwt-secret').addEventListener('input', function () {
+      document.getElementById('settings-admin-pass-label').style.display = this.value.trim() ? '' : 'none';
     });
 
     // ── Base & routing helpers ──────────────────────────────────────────────────
@@ -1073,6 +1351,7 @@
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('plugins-btn').style.display  = isAdmin ? '' : 'none';
+      document.getElementById('change-pass-btn').style.display = isGuest ? '' : 'none';
       document.getElementById('top-btn').style.display = ''; // Show for everyone
       if (isGuest) {
         document.getElementById('wiki-screen').classList.add('guest-mode');
