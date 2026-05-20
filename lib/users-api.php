@@ -46,10 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login'
         json_out(401, ['error' => 'This account is disabled']);
       }
     }
-    // Issue a JWT embedding the user's role; valid for TOKEN_TTL seconds from now
+    // Issue a JWT embedding the user's role and display name; valid for TOKEN_TTL seconds from now
+    $_name = $_u['name'] ?? $user;
     json_out(200, [
-      'token' => jwt_make(['sub' => $user, 'role' => $_u['role'], 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
+      'token' => jwt_make(['sub' => $user, 'role' => $_u['role'], 'name' => $_name, 'iat' => time(), 'exp' => time() + TOKEN_TTL]),
       'role'  => $_u['role'],
+      'name'  => $_name,
     ]);
   }
   // Generic error message: never reveal whether the username or the password was wrong
