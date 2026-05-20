@@ -84,17 +84,10 @@ function json_out(int $code, array $data): never
 // ═══════════════════════════════════════════════════════════════════════════
 define('USERS_FILE',    __DIR__ . '/users.json');
 define('SETTINGS_FILE', __DIR__ . '/settings.json');
-// JWT_SECRET and TOKEN_TTL are read from settings.json (moved from users.json).
-// Falls back to users.json for graceful migration of existing installations.
+// JWT_SECRET and TOKEN_TTL are read exclusively from settings.json.
 $_wkw_cfg = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
-if (!isset($_wkw_cfg['jwtSecret'])) {
-  $_wkw_u = is_file(USERS_FILE) ? (json_decode(file_get_contents(USERS_FILE), true) ?? []) : [];
-  $_wkw_cfg['jwtSecret'] = $_wkw_u['jwtSecret'] ?? 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
-  $_wkw_cfg['tokenTtl']  = $_wkw_u['tokenTtl']  ?? 3600;
-  unset($_wkw_u);
-}
-define('JWT_SECRET', (is_string($_wkw_cfg['jwtSecret']) && $_wkw_cfg['jwtSecret'] !== '') ? $_wkw_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
-define('TOKEN_TTL',  (is_int($_wkw_cfg['tokenTtl'])  && $_wkw_cfg['tokenTtl'] > 0)       ? (int)$_wkw_cfg['tokenTtl']  : 3600);
+define('JWT_SECRET', (is_string($_wkw_cfg['jwtSecret'] ?? null) && $_wkw_cfg['jwtSecret'] !== '') ? $_wkw_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
+define('TOKEN_TTL',  (isset($_wkw_cfg['tokenTtl']) && is_int($_wkw_cfg['tokenTtl']) && $_wkw_cfg['tokenTtl'] > 0) ? (int)$_wkw_cfg['tokenTtl'] : 3600);
 unset($_wkw_cfg);
 
 // Default users (used on first run to seed users.json if it doesn't exist)
@@ -377,8 +370,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-use
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Save admin+security  POST ?action=save-users  (admin only)
-// Body: { adminUser, adminName, adminHash (sha256hex|null), guestLoginEnabled, jwtSecret, tokenTtl }
+// Body: { adminUser, adminName, adminHash (sha256hex|null) }
 // null hash means "keep existing password". Guest entries are preserved untouched.
+// guestLoginEnabled, jwtSecret and tokenTtl are managed exclusively by save-settings.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-users') {
   $claims = require_auth();
@@ -400,45 +394,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-u
     if (($udata['role'] ?? '') === 'admin') $existingAdminHash = $udata['hash'];
   }
 
-  // Resolve the new jwtSecret FIRST so password HMACs use the correct secret.
-  $jwtSecret = trim($body['jwtSecret'] ?? '');
-  if ($jwtSecret === '') {
-    $jwtSecret = isset($existing['jwtSecret']) ? $existing['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7';
-  } elseif (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
-    json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
-  }
-
   $rawAdminHash = $body['adminHash'] ?? null;
   if ($rawAdminHash !== null) {
     $rawAdminHash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $rawAdminHash));
     if (strlen($rawAdminHash) !== 64) json_out(400, ['error' => 'Invalid admin password hash']);
-    $newAdminHash = hash_hmac('sha256', $rawAdminHash, $jwtSecret);
+    $newAdminHash = hash_hmac('sha256', $rawAdminHash, JWT_SECRET);
   } else {
     $newAdminHash = $existingAdminHash;
   }
 
-  $guestLoginEnabled = isset($body['guestLoginEnabled'])
-    ? (bool)$body['guestLoginEnabled']
-    : (bool)($existing['guestLoginEnabled'] ?? true);
-
-  $tokenTtl = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
-  if ($tokenTtl < 60 || $tokenTtl > 86400) {
-    if ($tokenTtl === 0 && isset($existing['tokenTtl'])) {
-      $tokenTtl = $existing['tokenTtl'];
-    } else {
-      json_out(400, ['error' => 'Token TTL must be between 60 and 86400 seconds']);
-    }
-  }
-
   // Rebuild: new admin entry + all existing guest entries preserved intact
+  // guestLoginEnabled, jwtSecret and tokenTtl are NOT stored here — they live in settings.json
   $newUsers = [$adminUser => ['hash' => $newAdminHash, 'role' => 'admin', 'name' => $adminName]];
   foreach ($existing as $uname => $udata) {
     if (!is_array($udata)) continue;
     if (($udata['role'] ?? '') === 'guest') $newUsers[$uname] = $udata;
   }
-  $newUsers['guestLoginEnabled'] = $guestLoginEnabled;
-  $newUsers['jwtSecret']         = $jwtSecret;
-  $newUsers['tokenTtl']          = $tokenTtl;
 
   $written = file_put_contents(USERS_FILE, json_encode($newUsers, JSON_PRETTY_PRINT), LOCK_EX);
   if ($written === false) json_out(500, ['error' => 'Could not write users file']);
