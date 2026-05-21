@@ -228,7 +228,71 @@ function qs_sanitize_quest(array $b): array
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-queries') {
     $claims = require_auth();
     if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-    json_out(200, qs_load_queries());
+
+    $queries  = qs_load_queries();
+    $attempts = qs_load_attempts();
+
+    // Build query lookup
+    $q_map = [];
+    foreach ($queries as $q) $q_map[(int)$q['id']] = $q;
+
+    // Compute per-question stats from completed attempts
+    $appeared          = [];  // query_id => count
+    $stat_correct      = [];  // query_id => count
+    $stat_wrong        = [];  // query_id => count
+    $total_appearances = 0;
+
+    foreach ($attempts as $a) {
+        if (($a['status'] ?? '') !== 'completed') continue;
+        $qids    = (array)($a['question_ids'] ?? []);
+        $ans_map = [];
+        foreach ((array)($a['queries'] ?? []) as $ans) {
+            $ans_map[(int)($ans['id'] ?? 0)] = $ans['answer'] ?? null;
+        }
+        $total_appearances += count($qids);
+        foreach ($qids as $qid) {
+            $qid = (int)$qid;
+            $appeared[$qid] = ($appeared[$qid] ?? 0) + 1;
+            $dq       = $q_map[$qid] ?? null;
+            $user_ans = $ans_map[$qid] ?? null;
+            if (!$dq || $user_ans === null || $user_ans === '' || $user_ans === []) continue;
+            $type = $dq['type'] ?? 'multiple_choice';
+            if ($type === 'multiple_choice' || $type === 'binary') {
+                $ok = ((string)$user_ans === (string)($dq['answer'] ?? ''));
+            } elseif ($type === 'gap_filling') {
+                $valid = array_map('strtolower', (array)($dq['options'] ?? []));
+                $ok = in_array(strtolower(trim((string)$user_ans)), $valid, true);
+            } elseif ($type === 'matching') {
+                $ok = true;
+                $user_pairs = (array)$user_ans;
+                foreach ((array)($dq['options'] ?? []) as $k => $v) {
+                    if (($user_pairs[$k] ?? '') !== $v) { $ok = false; break; }
+                }
+            } else {
+                $ok = false;
+            }
+            if ($ok) $stat_correct[$qid] = ($stat_correct[$qid] ?? 0) + 1;
+            else     $stat_wrong[$qid]   = ($stat_wrong[$qid] ?? 0) + 1;
+        }
+    }
+
+    $result = array_map(function ($q) use ($appeared, $stat_correct, $stat_wrong, $total_appearances) {
+        $qid      = (int)$q['id'];
+        $app      = $appeared[$qid]     ?? 0;
+        $cor      = $stat_correct[$qid] ?? 0;
+        $wrg      = $stat_wrong[$qid]   ?? 0;
+        $answered = $cor + $wrg;
+        $q['stats'] = [
+            'appeared'       => $app,
+            'correct'        => $cor,
+            'wrong'          => $wrg,
+            'success_pct'    => $answered > 0 ? round($cor / $answered * 100, 1) : null,
+            'appearance_pct' => $total_appearances > 0 ? round($app / $total_appearances * 100, 1) : null,
+        ];
+        return $q;
+    }, $queries);
+
+    json_out(200, $result);
 }
 
 // POST ?action=save-query  — add (no id) or update (with id)
@@ -292,14 +356,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-que
     $quests   = qs_load_quests();
     $attempts = qs_load_attempts();
 
-    // Count attempts per quest
+    // Count attempts and accumulate scores per quest
     $counts = [];
+    $scores = [];
     foreach ($attempts as $a) {
         $qid = (int)($a['quest_id'] ?? 0);
-        if (($a['status'] ?? '') === 'completed') $counts[$qid] = ($counts[$qid] ?? 0) + 1;
+        if (($a['status'] ?? '') !== 'completed') continue;
+        $counts[$qid] = ($counts[$qid] ?? 0) + 1;
+        if (($a['score'] ?? null) !== null) $scores[$qid][] = (float)$a['score'];
     }
-    $result = array_map(function ($q) use ($counts) {
-        $q['attempt_count'] = $counts[(int)($q['id'] ?? 0)] ?? 0;
+    $result = array_map(function ($q) use ($counts, $scores) {
+        $qid = (int)($q['id'] ?? 0);
+        $q['attempt_count'] = $counts[$qid] ?? 0;
+        $arr = $scores[$qid] ?? [];
+        $q['avg_score'] = count($arr) ? round(array_sum($arr) / count($arr), 2) : null;
         return $q;
     }, $quests);
     json_out(200, $result);
@@ -349,6 +419,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete
     $quests = qs_load_quests();
     $quests = array_values(array_filter($quests, fn($q) => (int)($q['id'] ?? 0) !== $id));
     qs_save_quests($quests);
+    json_out(200, ['ok' => true]);
+}
+
+// POST ?action=delete-attempt  — body: {id}  (admin)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete-attempt') {
+    $claims = require_auth();
+    if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+    $body = json_decode(file_get_contents('php://input'), true);
+    $id   = (int)($body['id'] ?? 0);
+    if (!$id) json_out(400, ['error' => 'id required']);
+
+    $attempts = qs_load_attempts();
+    $found = false;
+    foreach ($attempts as $a) {
+        if ((int)($a['id'] ?? 0) === $id) { $found = true; break; }
+    }
+    if (!$found) json_out(404, ['error' => 'Attempt not found']);
+
+    $attempts = array_values(array_filter($attempts, fn($a) => (int)($a['id'] ?? 0) !== $id));
+    qs_save_attempts($attempts);
     json_out(200, ['ok' => true]);
 }
 
@@ -673,6 +764,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
 
     json_out(200, [
         'attempt_id'   => $attempt['id'],
+        'username'     => $attempt['username'] ?? ($attempt['usename'] ?? ''),
         'quest_name'   => $quest['name'],
         'score'        => $attempt['score'],
         'submitted_at' => $attempt['submitted_at'],
@@ -777,12 +869,31 @@ $baseHref  = $scriptDir . '/';
 
       <!-- Questions tab -->
       <div id="tab-questions" class="qs-tab-panel active">
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap">
           <button class="btn btn-primary" onclick="qsOpenQueryModal()">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add question
           </button>
           <span id="queries-status" class="qs-status" style="display:none"></span>
+        </div>
+        <!-- Filter bar -->
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">
+          <input id="qf-search" type="search" placeholder="Search question text…"
+            style="flex:1;min-width:180px;max-width:320px;padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+            oninput="qsApplyQueryFilters()">
+          <select id="qf-type" style="padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+            onchange="qsApplyQueryFilters()">
+            <option value="">All types</option>
+            <option value="multiple_choice">Multiple choice</option>
+            <option value="binary">Binary</option>
+            <option value="gap_filling">Gap filling</option>
+            <option value="matching">Matching</option>
+          </select>
+          <input id="qf-label" type="search" list="qf-label-list" placeholder="Filter by label…"
+            style="min-width:150px;padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+            oninput="qsApplyQueryFilters()">
+          <datalist id="qf-label-list"></datalist>
+          <span id="qf-count" style="font-size:.82rem;color:#888;white-space:nowrap"></span>
         </div>
         <div id="queries-table-wrap" class="qs-table-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
@@ -1093,41 +1204,89 @@ $baseHref  = $scriptDir . '/';
     try {
       const res = await apiFetch('quests.php?action=get-queries');
       if (!res.ok) throw new Error('Failed to load questions');
-      const queries = await res.json();
-      wrap.innerHTML = '';
-      if (!queries.length) {
-        wrap.innerHTML = '<p class="qs-empty">No questions yet. Click "Add question" to create one.</p>';
-        return;
+      _allQueriesCache = await res.json();
+      // Populate label datalist with all unique labels
+      const allLabels = [...new Set(_allQueriesCache.flatMap(q => q.labels || []))].sort();
+      const dl = document.getElementById('qf-label-list');
+      if (dl) {
+        dl.innerHTML = '';
+        allLabels.forEach(l => { const o = document.createElement('option'); o.value = l; dl.appendChild(o); });
       }
-      const table = document.createElement('table');
-      table.className = 'qs-table';
-      table.innerHTML = `<thead><tr>
-        <th style="width:3rem">ID</th>
-        <th>Question</th>
-        <th>Type</th>
-        <th>Labels</th>
-        <th style="width:110px">Actions</th>
-      </tr></thead>`;
-      const tbody = document.createElement('tbody');
-      for (const q of queries) {
-        const tr = document.createElement('tr');
-        const labelsHtml = (q.labels || []).map(l => `<span class="badge badge-label">${esc(l)}</span>`).join(' ');
-        tr.innerHTML = `
-          <td style="text-align:center;color:#888">${q.id}</td>
-          <td style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.query)}">${esc(q.query)}</td>
-          <td><span class="badge badge-type">${esc(q.type)}</span></td>
-          <td>${labelsHtml || '<span style="color:#bbb">—</span>'}</td>
-          <td>
-            <button class="btn btn-sm" onclick="qsEditQuery(${q.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuery(${q.id})">Del</button>
-          </td>`;
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-      wrap.appendChild(table);
+      qsApplyQueryFilters();
     } catch (err) {
-      wrap.innerHTML = `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
+      document.getElementById('queries-table-wrap').innerHTML =
+        `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
     }
+  }
+
+  function qsApplyQueryFilters() {
+    const search = (document.getElementById('qf-search')?.value ?? '').toLowerCase().trim();
+    const type   =  document.getElementById('qf-type')?.value  ?? '';
+    const label  = (document.getElementById('qf-label')?.value  ?? '').toLowerCase().trim();
+
+    const filtered = _allQueriesCache.filter(q => {
+      if (type   && q.type !== type) return false;
+      if (search && !q.query.toLowerCase().includes(search)) return false;
+      if (label  && !(q.labels || []).some(l => l.toLowerCase().includes(label))) return false;
+      return true;
+    });
+
+    const countEl = document.getElementById('qf-count');
+    if (countEl) {
+      const active = search || type || label;
+      countEl.textContent = active ? `${filtered.length} / ${_allQueriesCache.length}` : '';
+    }
+
+    qsRenderQueriesTable(filtered);
+  }
+
+  function qsRenderQueriesTable(queries) {
+    const wrap = document.getElementById('queries-table-wrap');
+    wrap.innerHTML = '';
+    if (!_allQueriesCache.length) {
+      wrap.innerHTML = '<p class="qs-empty">No questions yet. Click “Add question” to create one.</p>';
+      return;
+    }
+    if (!queries.length) {
+      wrap.innerHTML = '<p class="qs-empty">No questions match the current filters.</p>';
+      return;
+    }
+    const table = document.createElement('table');
+    table.className = 'qs-table';
+    table.innerHTML = `<thead><tr>
+      <th style="width:3rem">ID</th>
+      <th>Question</th>
+      <th>Type</th>
+      <th>Labels</th>
+      <th style="width:68px" title="% answered correctly out of answered (excl. skipped)">Hit %</th>
+      <th style="width:68px" title="% of total question appearances across all attempts">Freq %</th>
+      <th style="width:110px">Actions</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    for (const q of queries) {
+      const tr = document.createElement('tr');
+      const labelsHtml = (q.labels || []).map(l => `<span class="badge badge-label">${esc(l)}</span>`).join(' ');
+      const st  = q.stats || {};
+      const hitPct  = st.success_pct    != null ? st.success_pct    + '%' : '—';
+      const freqPct = st.appearance_pct != null ? st.appearance_pct + '%' : '—';
+      const hitCls  = st.success_pct != null
+        ? (st.success_pct >= 70 ? 'score-high' : st.success_pct >= 40 ? 'score-mid' : 'score-low')
+        : '';
+      tr.innerHTML = `
+        <td style="text-align:center;color:#888">${q.id}</td>
+        <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.query)}">${esc(q.query)}</td>
+        <td><span class="badge badge-type">${esc(q.type)}</span></td>
+        <td>${labelsHtml || '<span style="color:#bbb">—</span>'}</td>
+        <td style="text-align:center" title="${st.correct ?? 0} correct / ${st.wrong ?? 0} wrong of ${st.appeared ?? 0} shown"><span class="${hitCls}">${hitPct}</span></td>
+        <td style="text-align:center" title="${st.appeared ?? 0} appearances">${freqPct}</td>
+        <td>
+          <button class="btn btn-sm" onclick="qsEditQuery(${q.id})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuery(${q.id})">Del</button>
+        </td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
   }
 
   // ── Query modal ────────────────────────────────────────────────────────────
@@ -1326,7 +1485,7 @@ $baseHref  = $scriptDir . '/';
       const table = document.createElement('table');
       table.className = 'qs-table';
       table.innerHTML = `<thead><tr>
-        <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Attempts</th><th style="width:120px">Actions</th>
+        <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Attempts</th><th style="width:80px">Avg score</th><th style="width:120px">Actions</th>
       </tr></thead>`;
       const tbody = document.createElement('tbody');
       for (const q of quests) {
@@ -1338,6 +1497,7 @@ $baseHref  = $scriptDir . '/';
           <td>${q.wrong < 0 ? q.wrong : '—'}</td>
           <td>${q.revisable ? '✔' : '—'}</td>
           <td style="text-align:center">${q.attempt_count ?? 0}</td>
+          <td style="text-align:center"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
           <td>
             <button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>
@@ -1446,6 +1606,41 @@ $baseHref  = $scriptDir . '/';
     document.getElementById('delete-modal-overlay').classList.add('open');
   }
 
+  function qsConfirmDeleteAttempt(id) {
+    _deleteCallback = async () => {
+      const res  = await apiFetch('quests.php?action=delete-attempt', {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id})
+      });
+      const data = await res.json().catch(() => ({}));
+      qsCloseDeleteModal();
+      if (res.ok) { qsToast('Attempt deleted'); qsLoadResults(); }
+      else qsToast(data.error || 'Delete failed', 'error');
+    };
+    document.getElementById('delete-modal-title').textContent = 'Delete attempt';
+    document.getElementById('delete-modal-msg').textContent   = `Delete attempt #${id}? This cannot be undone.`;
+    document.getElementById('delete-modal-confirm').onclick   = _deleteCallback;
+    document.getElementById('delete-modal-overlay').classList.add('open');
+  }
+
+  async function qsAdminReviewAttempt(attemptId) {
+    const res  = await apiFetch(`quests.php?action=review-attempt&id=${attemptId}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { qsToast(data.error || 'Failed to load review', 'error'); return; }
+
+    _reviewData    = data;
+    _reviewStep    = 0;
+    _reviewIsAdmin = true;
+    _reviewBackFn  = () => {
+      document.getElementById('admin-panel').style.display = '';
+      document.getElementById('user-panel').style.display  = 'none';
+      qsShowTab('results');
+    };
+    document.getElementById('admin-panel').style.display = 'none';
+    document.getElementById('user-panel').style.display  = '';
+    qsUserShowView('review');
+    qsRenderReviewStep();
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — RESULTS tab ─────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1453,32 +1648,57 @@ $baseHref  = $scriptDir . '/';
     const wrap = document.getElementById('results-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
     try {
-      const res    = await apiFetch('quests.php?action=get-all-attempts');
+      const res   = await apiFetch('quests.php?action=get-all-attempts');
       if (!res.ok) throw new Error('Failed to load results');
-      const items  = await res.json();
+      const items = await res.json();
       wrap.innerHTML = '';
       if (!items.length) {
         wrap.innerHTML = '<p class="qs-empty">No completed attempts yet.</p>';
         return;
       }
-      const table = document.createElement('table');
-      table.className = 'qs-table';
-      table.innerHTML = `<thead><tr>
-        <th>User</th><th>Quest</th><th>Date</th><th style="width:90px">Score / 10</th>
-      </tr></thead>`;
-      const tbody = document.createElement('tbody');
+
+      // Group by quest_id preserving insertion order (items already sorted date desc)
+      const groupMap = new Map();
       for (const a of items) {
-        const sc  = a.score;
-        const tr  = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>${esc(a.username)}</strong></td>
-          <td>${esc(a.quest_name)}</td>
-          <td style="color:#888;font-size:.82rem">${fmtDate(a.submitted_at)}</td>
-          <td style="text-align:center"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>`;
-        tbody.appendChild(tr);
+        if (!groupMap.has(a.quest_id)) groupMap.set(a.quest_id, { quest_name: a.quest_name, attempts: [] });
+        groupMap.get(a.quest_id).attempts.push(a);
       }
-      table.appendChild(tbody);
-      wrap.appendChild(table);
+      // Sort groups by date of their most-recent attempt (first item per group)
+      const groups = [...groupMap.values()].sort((a, b) => {
+        const da = a.attempts[0]?.submitted_at ?? '';
+        const db = b.attempts[0]?.submitted_at ?? '';
+        return db.localeCompare(da);
+      });
+
+      for (const group of groups) {
+        const hdr = document.createElement('div');
+        hdr.style.cssText = 'margin:1.25rem 0 .4rem;display:flex;align-items:baseline;gap:.75rem';
+        hdr.innerHTML = `<strong style="font-size:1rem">${esc(group.quest_name)}</strong>`
+          + `<span style="font-size:.8rem;color:#888">${group.attempts.length} attempt${group.attempts.length !== 1 ? 's' : ''}</span>`;
+        wrap.appendChild(hdr);
+
+        const table = document.createElement('table');
+        table.className = 'qs-table';
+        table.innerHTML = `<thead><tr>
+          <th>User</th><th>Date</th><th style="width:90px">Score / 10</th><th style="width:130px">Actions</th>
+        </tr></thead>`;
+        const tbody = document.createElement('tbody');
+        for (const a of group.attempts) {
+          const sc = a.score;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td><strong>${esc(a.username)}</strong></td>
+            <td style="color:#888;font-size:.82rem">${fmtDate(a.submitted_at)}</td>
+            <td style="text-align:center"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>
+            <td>
+              <button class="btn btn-sm" onclick="qsAdminReviewAttempt(${a.id})">Review</button>
+              <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteAttempt(${a.id})">Del</button>
+            </td>`;
+          tbody.appendChild(tr);
+        }
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+      }
     } catch (err) {
       wrap.innerHTML = `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
     }
@@ -1758,16 +1978,20 @@ $baseHref  = $scriptDir . '/';
   // ═══════════════════════════════════════════════════════════════════════════
   // ── USER — Review ──────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
-  let _reviewData  = null;
-  let _reviewStep  = 0;
+  let _reviewData    = null;
+  let _reviewStep    = 0;
+  let _reviewIsAdmin = false;
+  let _reviewBackFn  = () => qsLoadUserHome();
 
   async function qsReviewAttempt(attemptId) {
     const res  = await apiFetch(`quests.php?action=review-attempt&id=${attemptId}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok) { qsToast(data.error || 'Failed to load review', 'error'); return; }
 
-    _reviewData = data;
-    _reviewStep = 0;
+    _reviewData    = data;
+    _reviewStep    = 0;
+    _reviewIsAdmin = false;
+    _reviewBackFn  = () => qsLoadUserHome();
     qsUserShowView('review');
     qsRenderReviewStep();
   }
@@ -1795,8 +2019,8 @@ $baseHref  = $scriptDir . '/';
 
     wrap.innerHTML = `
       <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
-        <button class="btn btn-sm btn-ghost" onclick="qsLoadUserHome()">← Back</button>
-        <strong style="flex:1;font-size:1rem">${esc(_reviewData.quest_name)} — Review</strong>
+        <button class="btn btn-sm btn-ghost" onclick="_reviewBackFn()">← Back</button>
+        <strong style="flex:1;font-size:1rem">${esc(_reviewData.quest_name)} — Review${_reviewIsAdmin && _reviewData.username ? ' (' + esc(_reviewData.username) + ')' : ''}</strong>
         <span class="${scoreClass(_reviewData.score)}" style="font-size:1.1rem;font-weight:700">${fmtScore(_reviewData.score)}/10</span>
       </div>
       <div class="qs-wizard">
@@ -1817,7 +2041,7 @@ $baseHref  = $scriptDir . '/';
           <span style="font-size:.8rem;color:#888">${step+1} / ${total}</span>
           ${step < total - 1
             ? `<button class="btn btn-primary" onclick="qsReviewNext()">Next →</button>`
-            : `<button class="btn btn-primary" onclick="qsLoadUserHome()">Finish review</button>`
+            : `<button class="btn btn-primary" onclick="_reviewBackFn()">Finish review</button>`
           }
         </div>
       </div>`;
