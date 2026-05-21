@@ -1,0 +1,54 @@
+[
+  {
+    "id": 1,
+    "name": "First semester final quest",
+    "date": "2024-06-15",
+    "status": "open",
+    "revisable": true,
+    "wrong": -0.25,
+    "queries": [
+      {
+        "labels": ["mathematics"],
+        "queries": 5
+      },
+      {
+        "labels": ["science"],
+        "queries": 2
+      },
+      {
+        "labels": ["astronomy", "planets"],
+        "queries": 1
+      },
+      {
+        "labels": ["literature"],
+        "queries": 3
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Second semester final quest",
+    "date": "2024-12-15",
+    "status": "closed",
+    "wrong": -0.33,
+    "revisable": true,
+    "queries": [
+      {
+        "labels": ["astronomy"],
+        "queries": 2
+      },
+      {
+        "labels": ["art"],
+        "queries": 3
+      },
+      {
+        "labels": ["chemistry"],
+        "queries": 1
+      },
+      {
+        "labels": ["literature"],
+        "queries": 3
+      }
+    ]
+  }
+]

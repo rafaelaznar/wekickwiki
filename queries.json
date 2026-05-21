@@ -1,0 +1,263 @@
+[
+  {
+    "id": 1,
+    "type": "multiple_choice",
+    "query": "What is the capital of France?",
+    "options": ["Paris", "London", "Berlin", "Madrid"],
+    "answer": "0",
+    "labels": ["geography", "capital cities"]
+  },
+  {
+    "id": 2,
+    "type": "multiple_choice",
+    "query": "Who is the president of the United States?",
+    "options": ["Joe Biden", "Donald Trump", "Barack Obama", "George Bush"],
+    "answer": "0",
+    "labels": ["politics", "current events"]
+  },
+  {
+    "id": 3,
+    "type": "multiple_choice",
+    "query": "What is the largest mammal?",
+    "options": ["Elephant", "Giraffe", "Blue Whale", "Hippopotamus"],
+    "answer": "2",
+    "labels": ["biology", "animals"]
+  },
+  {
+    "id": 4,
+    "type": "multiple_choice",
+    "query": "What is the chemical symbol for water?",
+    "options": ["H2O", "CO2", "O2", "NaCl"],
+    "answer": "0",
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 5,
+    "type": "multiple_choice",
+    "query": "Who wrote 'To Kill a Mockingbird'?",
+    "options": [
+      "Harper Lee",
+      "Mark Twain",
+      "Ernest Hemingway",
+      "F. Scott Fitzgerald"
+    ],
+    "answer": "0",
+    "labels": ["literature", "authors"]
+  },
+  {
+    "id": 6,
+    "type": "multiple_choice",
+    "query": "What is the largest planet in our solar system?",
+    "options": ["Earth", "Mars", "Jupiter", "Saturn"],
+    "answer": "2",
+    "labels": ["astronomy", "planets"]
+  },
+  {
+    "id": 7,
+
+    "type": "multiple_choice",
+    "query": "What is the square root of 64?",
+    "options": ["6", "7", "8", "9"],
+    "answer": "2",
+    "labels": ["mathematics", "square roots"]
+  },
+  {
+    "id": 8,
+    "type": "multiple_choice",
+    "query": "Who painted the Mona Lisa?",
+    "options": [
+      "Leonardo da Vinci",
+      "Vincent van Gogh",
+      "Pablo Picasso",
+      "Claude Monet"
+    ],
+    "answer": "0",
+    "labels": ["art", "artists"]
+  },
+  {
+    "id": 9,
+    "type": "multiple_choice",
+    "query": "What is the smallest prime number?",
+    "options": ["0", "1", "2", "3"],
+    "answer": "2",
+    "labels": ["mathematics", "prime numbers"]
+  },
+  {
+    "id": 10,
+    "type": "multiple_choice",
+    "query": "What is the chemical symbol for gold?",
+    "options": ["Au", "Ag", "Fe", "Pb"],
+    "answer": "0",
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 11,
+    "type": "gap_filling",
+    "query": "What is the chemical symbol for gold?",
+    "options": ["Au", "au"],
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 12,
+    "type": "gap_filling",
+    "query": "What is the largest planet in our solar system?",
+    "options": ["Jupiter", "jupiter"],
+    "labels": ["astronomy", "planets"]
+  },
+  {
+    "id": 13,
+    "type": "gap_filling",
+    "query": "Who painted the Mona Lisa?",
+    "options": [
+      "Leonardo da Vinci",
+      "leonardo da vinci",
+      "Leonardo Da Vinci",
+      "leonardo Da Vinci"
+    ],
+    "labels": ["art", "artists"]
+  },
+  {
+    "id": 14,
+    "type": "gap_filling",
+    "query": "What is the square root of 64?",
+    "options": ["8", "eight"],
+    "labels": ["mathematics", "square roots"]
+  },
+  {
+    "id": 15,
+    "type": "gap_filling",
+    "query": "Who is the president of the United States?",
+    "options": ["Joe Biden", "joe biden"],
+    "labels": ["politics", "current events"]
+  },
+  {
+    "id": 16,
+    "type": "binary",
+    "query": "Is Paris the capital of France?",
+    "answer": "1",
+    "labels": ["geography", "capital cities"]
+  },
+  {
+    "id": 17,
+    "type": "binary",
+    "query": "Is Joe Biden the president of the United States?",
+    "answer": "1",
+    "labels": ["politics", "current events"]
+  },
+  {
+    "id": 18,
+    "type": "binary",
+    "query": "Is the largest mammal the Ant?",
+    "answer": "0",
+    "labels": ["biology", "animals"]
+  },
+  {
+    "id": 19,
+    "type": "binary",
+    "query": "Is the chemical symbol for water H2O?",
+    "answer": "1",
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 20,
+    "type": "binary",
+    "query": "Did Harper Lee write 'To Kill a Mockingbird'?",
+    "answer": "1",
+    "labels": ["literature", "authors"]
+  },
+  {
+    "id": 21,
+    "type": "binary",
+    "query": "Is Jupiter the largest planet in our solar system?",
+    "answer": "1",
+    "labels": ["astronomy", "planets"]
+  },
+  {
+    "id": 22,
+    "type": "binary",
+    "query": "Is the square root of 64 equal to 8?",
+    "answer": "1",
+    "labels": ["mathematics", "square roots"]
+  },
+  {
+    "id": 23,
+    "type": "binary",
+    "query": "Did Leonardo da Vinci paint the Mona Lisa?",
+    "answer": "1",
+    "labels": ["art", "artists"]
+  },
+  {
+    "id": 24,
+    "type": "binary",
+    "query": "Is 2 the smallest prime number?",
+    "answer": "1",
+    "labels": ["mathematics", "prime numbers"]
+  },
+  {
+    "id": 25,
+    "type": "binary",
+    "query": "Is Au the chemical symbol for gold?",
+    "answer": "1",
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 26,
+    "type": "matching",
+    "query": "Match the following chemical symbols with their corresponding elements:",
+    "options": {
+      "H2O": "Water",
+      "CO2": "Carbon Dioxide",
+      "O2": "Oxygen",
+      "NaCl": "Sodium Chloride"
+    },
+    "labels": ["chemistry", "elements"]
+  },
+  {
+    "id": 27,
+    "type": "matching",
+    "query": "Match the following planets with their corresponding sizes:",
+    "options": {
+      "Earth": "Small",
+      "Mars": "Small",
+      "Jupiter": "Large",
+      "Saturn": "Large"
+    },
+    "labels": ["astronomy", "planets"]
+  },
+  {
+    "id": 28,
+    "type": "matching",
+    "query": "Match the following authors with their corresponding works:",
+    "options": {
+      "Harper Lee": "'To Kill a Mockingbird'",
+      "Mark Twain": "'The Adventures of Tom Sawyer'",
+      "Ernest Hemingway": "'The Old Man and the Sea'",
+      "F. Scott Fitzgerald": "'The Great Gatsby'"
+    },
+    "labels": ["literature", "authors"]
+  },
+  {
+    "id": 29,
+    "type": "matching",
+    "query": "Match the following artists with their corresponding artworks:",
+    "options": {
+      "Leonardo da Vinci": "Mona Lisa",
+      "Vincent van Gogh": "Starry Night",
+      "Pablo Picasso": "Guernica",
+      "Claude Monet": "Water Lilies"
+    },
+    "labels": ["art", "artists"]
+  },
+  {
+    "id": 30,
+    "type": "matching",
+    "query": "Match the following prime numbers with their corresponding values:",
+    "options": {
+      "2": "Smallest prime number",
+      "3": "Second prime number",
+      "5": "Third prime number",
+      "7": "Fourth prime number"
+    },
+    "labels": ["mathematics", "prime numbers"]
+  }
+]
