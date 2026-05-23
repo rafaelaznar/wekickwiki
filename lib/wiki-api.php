@@ -21,6 +21,7 @@
 // Requires lib/auth.php (automatically required below if not already loaded).
 // ═══════════════════════════════════════════════════════════════════════════
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/data.php';
 
 // Loads and validates wiki settings from settings.json.
 // Each field is validated individually; invalid or missing values fall back to built-in defaults
@@ -28,9 +29,8 @@ require_once __DIR__ . '/auth.php';
 function load_settings(): array
 {
   $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true, 'guestToc' => true, 'guestIndex' => true, 'guestLoginEnabled' => true, 'jwtSecret' => 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7', 'tokenTtl' => 3600];
-  if (!is_file(SETTINGS_FILE)) return $defaults;
-  $data = json_decode(file_get_contents(SETTINGS_FILE), true);
-  if (!is_array($data)) return $defaults;
+  $data = data_read(SETTINGS_FILE);
+  if (empty($data)) return $defaults;
   // Accept wikiName only when it is a non-empty string
   $name            = (isset($data['wikiName']) && is_string($data['wikiName']) && $data['wikiName'] !== '') ? $data['wikiName'] : $defaults['wikiName'];
   // Validate theme: must match a safe filename pattern AND exist on disk to prevent path traversal
@@ -318,8 +318,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
     json_out(400, ['error' => 'Highlight theme file not found']);
   }
   // Merge into the existing settings file so unmanaged keys are preserved across saves
-  $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
-  if (!is_array($existing)) $existing = [];
+  $existing = data_read(SETTINGS_FILE);
   $existing['wikiName']        = $wikiName;
   $existing['theme']           = $theme;
   $existing['hljsTheme']       = $hljsTheme;
@@ -350,7 +349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
         break;
       }
     }
-    file_put_contents(USERS_FILE, json_encode($usersData, JSON_PRETTY_PRINT), LOCK_EX);
+    data_write(USERS_FILE, $usersData);
     $existing['jwtSecret'] = $jwtSecret;
   } else {
     $existing['jwtSecret'] = (isset($existing['jwtSecret']) && is_string($existing['jwtSecret']) && strlen($existing['jwtSecret']) >= 16)
@@ -361,9 +360,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   } elseif (!isset($existing['tokenTtl'])) {
     $existing['tokenTtl'] = 3600;
   }
-  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
-    json_out(500, ['error' => 'Could not write settings file']);
-  }
+  data_write(SETTINGS_FILE, $existing);
   json_out(200, ['ok' => true]);
 }
 
@@ -373,8 +370,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-plugin-state') {
   require_auth();
-  $data = is_file(SETTINGS_FILE) ? json_decode(file_get_contents(SETTINGS_FILE), true) : [];
-  $disabled = (is_array($data) && is_array($data['disabledPlugins'] ?? null))
+  $data = data_read(SETTINGS_FILE);
+  $disabled = (is_array($data['disabledPlugins'] ?? null))
     ? array_values(array_filter($data['disabledPlugins'], fn($v) => is_string($v) && preg_match('/^[a-zA-Z0-9_\-]+$/', $v)))
     : [];
   json_out(200, ['disabled' => $disabled]);
@@ -392,12 +389,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-p
     $body['disabled'] ?? [],
     fn($v) => is_string($v) && preg_match('/^[a-zA-Z0-9_\-]+$/', $v)
   ));
-  $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
-  if (!is_array($existing)) $existing = [];
+  $existing = data_read(SETTINGS_FILE);
   $existing['disabledPlugins'] = $disabled;
-  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
-    json_out(500, ['error' => 'Could not write settings file']);
-  }
+  data_write(SETTINGS_FILE, $existing);
   json_out(200, ['ok' => true]);
 }
 

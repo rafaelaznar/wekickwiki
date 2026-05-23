@@ -14,6 +14,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 require_once __DIR__ . '/lib/auth.php';
+require_once __DIR__ . '/lib/data.php';
 require_once __DIR__ . '/lib/users-api.php';
 
 // ── Data-file paths ──────────────────────────────────────────────────────────
@@ -24,35 +25,13 @@ define('QS_ATTEMPTS_FILE', __DIR__ . '/attempts.json');
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
-function qs_write_json(string $path, mixed $data): void
-{
-    file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-}
+function qs_load_queries(): array { return data_read(QS_QUERIES_FILE); }
+function qs_load_quests():  array { return data_read(QS_QUESTS_FILE);  }
+function qs_load_attempts():array { return data_read(QS_ATTEMPTS_FILE); }
 
-function qs_load_json(string $path): array
-{
-    if (!is_file($path)) return [];
-    $d = json_decode(file_get_contents($path), true);
-    return is_array($d) ? $d : [];
-}
-
-function qs_load_queries(): array { return qs_load_json(QS_QUERIES_FILE); }
-function qs_load_quests():  array { return qs_load_json(QS_QUESTS_FILE);  }
-function qs_load_attempts():array { return qs_load_json(QS_ATTEMPTS_FILE); }
-
-function qs_save_queries(array $d): void  { qs_write_json(QS_QUERIES_FILE,  $d); }
-function qs_save_quests(array $d):  void  { qs_write_json(QS_QUESTS_FILE,   $d); }
-function qs_save_attempts(array $d): void { qs_write_json(QS_ATTEMPTS_FILE, $d); }
-
-/** Returns max(id)+1 across an array of objects with an 'id' field, or 1 if empty. */
-function qs_next_id(array $arr): int
-{
-    $max = 0;
-    foreach ($arr as $item) {
-        if (isset($item['id']) && (int)$item['id'] > $max) $max = (int)$item['id'];
-    }
-    return $max + 1;
-}
+function qs_save_queries(array $d): void  { data_write(QS_QUERIES_FILE,  $d); }
+function qs_save_quests(array $d):  void  { data_write(QS_QUESTS_FILE,   $d); }
+function qs_save_attempts(array $d): void { data_write(QS_ATTEMPTS_FILE, $d); }
 
 /**
  * Randomly select questions from $all_queries matching the quest's label groups.
@@ -317,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
         $queries[$idx] = $clean;
     } else {
         // Insert
-        $clean['id'] = qs_next_id($queries);
+        $clean['id'] = data_next_id($queries);
         $queries[] = $clean;
     }
     qs_save_queries($queries);
@@ -395,7 +374,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
         $clean['id'] = $id;
         $quests[$idx] = $clean;
     } else {
-        $clean['id'] = qs_next_id($quests);
+        $clean['id'] = data_next_id($quests);
         $quests[] = $clean;
     }
     qs_save_quests($quests);
@@ -491,9 +470,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
         !is_file(__DIR__ . '/templates-quests/' . $theme)) {
         json_out(400, ['error' => 'Invalid theme']);
     }
-    $raw = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
+    $raw = data_read(SETTINGS_FILE);
     $raw['questsTheme'] = $theme;
-    file_put_contents(SETTINGS_FILE, json_encode($raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    data_write(SETTINGS_FILE, $raw);
     json_out(200, ['ok' => true]);
 }
 
@@ -574,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
     if (empty($question_ids)) json_out(500, ['error' => 'No matching questions found for this quest']);
 
     // Create pending attempt
-    $attempt_id = qs_next_id($attempts);
+    $attempt_id = data_next_id($attempts);
     $attempts[] = [
         'id'           => $attempt_id,
         'username'     => $username,
@@ -777,16 +756,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
 // ═══════════════════════════════════════════════════════════════════════════
 $qs_theme    = 'default.css';
 $qs_app_name = 'Quests';
-if (is_file(SETTINGS_FILE)) {
-    $_raw = json_decode(file_get_contents(SETTINGS_FILE), true) ?? [];
-    if (!empty($_raw['wikiName'])) $qs_app_name = $_raw['wikiName'] . ' — Quests';
-    if (!empty($_raw['questsTheme']) &&
-        preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['questsTheme']) &&
-        is_file(__DIR__ . '/templates-quests/' . $_raw['questsTheme'])) {
-        $qs_theme = $_raw['questsTheme'];
-    }
-    unset($_raw);
+$_raw = data_read(SETTINGS_FILE);
+if (!empty($_raw['wikiName'])) $qs_app_name = $_raw['wikiName'] . ' — Quests';
+if (!empty($_raw['questsTheme']) &&
+    preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['questsTheme']) &&
+    is_file(__DIR__ . '/templates-quests/' . $_raw['questsTheme'])) {
+    $qs_theme = $_raw['questsTheme'];
 }
+unset($_raw);
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $baseHref  = $scriptDir . '/';
 ?>

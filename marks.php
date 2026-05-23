@@ -12,6 +12,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 require_once __DIR__ . '/lib/auth.php';
+require_once __DIR__ . '/lib/data.php';
 require_once __DIR__ . '/lib/users-api.php';  // handles ?action=login, get-users, etc.
 
 // ── Data-file paths ──────────────────────────────────────────────────────────
@@ -19,51 +20,31 @@ define('PQ_ITEMS_FILE', __DIR__ . '/items.json');
 define('PQ_MARKS_FILE', __DIR__ . '/marks.json');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Helper: atomic JSON write
-// ═══════════════════════════════════════════════════════════════════════════
-function pq_write_json(string $path, mixed $data): void
-{
-    file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // items.json helpers
 // ═══════════════════════════════════════════════════════════════════════════
 function pq_load_items(): array
 {
-    if (!is_file(PQ_ITEMS_FILE)) {
-        $default = ['name' => 'My Course', 'weight' => 100, 'subitems' => []];
-        pq_write_json(PQ_ITEMS_FILE, $default);
-        return $default;
-    }
-    $data = json_decode(file_get_contents(PQ_ITEMS_FILE), true);
-    return (is_array($data) && isset($data['name'])) ? $data : ['name' => 'My Course', 'weight' => 100, 'subitems' => []];
+    $data = data_read(PQ_ITEMS_FILE);
+    if (isset($data['name'])) return $data;
+    $default = ['name' => 'My Course', 'weight' => 100, 'subitems' => []];
+    data_write(PQ_ITEMS_FILE, $default);
+    return $default;
 }
 
-function pq_save_items(array $data): void
-{
-    pq_write_json(PQ_ITEMS_FILE, $data);
-}
+function pq_save_items(array $data): void { data_write(PQ_ITEMS_FILE, $data); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // marks.json helpers
 // ═══════════════════════════════════════════════════════════════════════════
 function pq_load_marks(): array
 {
-    if (!is_file(PQ_MARKS_FILE)) {
-        pq_write_json(PQ_MARKS_FILE, []);
-        return [];
-    }
-    $raw = json_decode(file_get_contents(PQ_MARKS_FILE), true);
+    $raw = data_read(PQ_MARKS_FILE);
     // Support legacy single-object format (upgrade to array on first access)
-    if (is_array($raw) && isset($raw['name'])) return [$raw];
-    return is_array($raw) ? $raw : [];
+    if (isset($raw['name'])) return [$raw];
+    return $raw;
 }
 
-function pq_save_marks(array $data): void
-{
-    pq_write_json(PQ_MARKS_FILE, $data);
-}
+function pq_save_marks(array $data): void { data_write(PQ_MARKS_FILE, $data); }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Weight validation: every sibling group must sum to 100
@@ -328,11 +309,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-m
         !is_file(__DIR__ . '/templates-marks/' . $theme)) {
         json_out(400, ['error' => 'Invalid theme']);
     }
-    $raw = is_file(SETTINGS_FILE)
-        ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? [])
-        : [];
+    $raw = data_read(SETTINGS_FILE);
     $raw['pqTheme'] = $theme;
-    file_put_contents(SETTINGS_FILE, json_encode($raw, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    data_write(SETTINGS_FILE, $raw);
     json_out(200, ['ok' => true]);
 }
 
@@ -343,16 +322,14 @@ $pq_settings = load_auth_settings();
 $pq_app_name = 'Qualifications';
 // Try to get the wikiName from settings if available (re-read raw settings.json)
 $pq_theme = 'default.css';
-if (is_file(SETTINGS_FILE)) {
-    $_raw = json_decode(file_get_contents(SETTINGS_FILE), true) ?? [];
-    if (!empty($_raw['wikiName'])) $pq_app_name = $_raw['wikiName'] . ' — Qualifications';
-    if (!empty($_raw['pqTheme']) &&
-        preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['pqTheme']) &&
-        is_file(__DIR__ . '/templates-marks/' . $_raw['pqTheme'])) {
-        $pq_theme = $_raw['pqTheme'];
-    }
-    unset($_raw);
+$_raw = data_read(SETTINGS_FILE);
+if (!empty($_raw['wikiName'])) $pq_app_name = $_raw['wikiName'] . ' — Qualifications';
+if (!empty($_raw['pqTheme']) &&
+    preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['pqTheme']) &&
+    is_file(__DIR__ . '/templates-marks/' . $_raw['pqTheme'])) {
+    $pq_theme = $_raw['pqTheme'];
 }
+unset($_raw);
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $baseHref  = $scriptDir . '/';
 ?>
