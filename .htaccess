@@ -19,35 +19,7 @@ RewriteRule ^ index.php [L]
 #  Require all granted
 # </FilesMatch>
 
-# Block direct HTTP access to sensitive config files
-<Files "users.json">
+# Block direct HTTP access to all JSON data files
+<FilesMatch "\.json$">
   Require all denied
-</Files>
-
-<Files "settings.json">
-  Require all denied
-</Files>
-
-# -------------- Marks
-
-<Files "marks.json">
-  Require all denied
-</Files>
-
-<Files "items.json">
-  Require all denied
-</Files>
-
-# --------------- Quests
-
-<Files "quests.json">
-  Require all denied
-</Files>
-
-<Files "queries.json">
-  Require all denied
-</Files>
-
-<Files "attempts.json">
-  Require all denied
-</Files>
+</FilesMatch>

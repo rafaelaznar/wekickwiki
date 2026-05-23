@@ -24,7 +24,7 @@ require_once __DIR__ . '/auth.php';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'login') {
   $body = json_decode(file_get_contents('php://input'), true) ?? [];
   // Sanitize username: strip everything except lowercase alphanumerics and underscores
-  $user = preg_replace('/[^a-z0-9_]/', '', strtolower($body['user'] ?? ''));
+  $user = preg_replace('/[^a-z0-9_]/', '', strtolower($body['username'] ?? ''));
   // Sanitize hash: the client sends a SHA-256 hex digest of the password, strip non-hex chars
   $hash = strtolower(preg_replace('/[^a-fA-F0-9]/', '', $body['hash'] ?? ''));
   // SHA-256 hex output is always exactly 64 characters; reject anything that deviates

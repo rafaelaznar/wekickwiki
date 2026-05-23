@@ -18,16 +18,17 @@
 //   · GET  ?action=get-plugin-state  — disabled plugin ids
 //   · POST ?action=save-plugin-state — update disabled plugin ids
 //
-// Requires lib/auth.php (automatically required below if not already loaded).
+// Requires lib/auth.php and lib/data.php (loaded below if not already).
 // ═══════════════════════════════════════════════════════════════════════════
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/data.php';
 
 // Loads and validates wiki settings from settings.json.
 // Each field is validated individually; invalid or missing values fall back to built-in defaults
 // so the wiki always starts up safely even when the settings file is corrupt or incomplete.
 function load_settings(): array
 {
-  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true, 'guestToc' => true, 'guestIndex' => true, 'guestLoginEnabled' => true, 'jwtSecret' => 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7', 'tokenTtl' => 3600];
+  $defaults = ['wikiName' => 'WeKickWiki', 'theme' => 'default.css', 'hljsTheme' => 'highlight-github.min.css', 'codeLineNumbers' => false, 'guestOdtDownload' => true, 'guestToc' => true, 'guestIndex' => true, 'guestLoginEnabled' => true, 'jwtSecret' => 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7', 'tokenTtl' => 3600, 'marksEnabled' => true, 'questsEnabled' => true];
   if (!is_file(SETTINGS_FILE)) return $defaults;
   $data = json_decode(file_get_contents(SETTINGS_FILE), true);
   if (!is_array($data)) return $defaults;
@@ -44,7 +45,9 @@ function load_settings(): array
   $guestLoginEnabled = isset($data['guestLoginEnabled']) ? (bool)$data['guestLoginEnabled'] : $defaults['guestLoginEnabled'];
   $jwtSecret = (isset($data['jwtSecret']) && is_string($data['jwtSecret']) && strlen($data['jwtSecret']) >= 16) ? $data['jwtSecret'] : $defaults['jwtSecret'];
   $tokenTtl  = (isset($data['tokenTtl'])  && is_int($data['tokenTtl'])  && $data['tokenTtl'] >= 60)            ? (int)$data['tokenTtl'] : $defaults['tokenTtl'];
-  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers, 'guestOdtDownload' => $guestOdtDownload, 'guestToc' => $guestToc, 'guestIndex' => $guestIndex, 'guestLoginEnabled' => $guestLoginEnabled, 'jwtSecret' => $jwtSecret, 'tokenTtl' => $tokenTtl];
+  $marksEnabled  = isset($data['marksEnabled'])  ? (bool)$data['marksEnabled']  : $defaults['marksEnabled'];
+  $questsEnabled = isset($data['questsEnabled']) ? (bool)$data['questsEnabled'] : $defaults['questsEnabled'];
+  return ['wikiName' => $name, 'theme' => $theme, 'hljsTheme' => $hljsTheme, 'codeLineNumbers' => $codeLineNumbers, 'guestOdtDownload' => $guestOdtDownload, 'guestToc' => $guestToc, 'guestIndex' => $guestIndex, 'guestLoginEnabled' => $guestLoginEnabled, 'jwtSecret' => $jwtSecret, 'tokenTtl' => $tokenTtl, 'marksEnabled' => $marksEnabled, 'questsEnabled' => $questsEnabled];
 }
 
 function list_templates(): array
@@ -299,6 +302,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $guestToc         = isset($body['guestToc'])         ? (bool)$body['guestToc']         : true;
   $guestIndex       = isset($body['guestIndex'])       ? (bool)$body['guestIndex']       : true;
   $guestLoginEnabled = isset($body['guestLoginEnabled']) ? (bool)$body['guestLoginEnabled'] : true;
+  $marksEnabled  = isset($body['marksEnabled'])  ? (bool)$body['marksEnabled']  : true;
+  $questsEnabled = isset($body['questsEnabled']) ? (bool)$body['questsEnabled'] : true;
   // JWT Secret: blank = keep existing; non-blank requires admin password to re-hash with new secret
   $jwtSecret = trim($body['jwtSecret'] ?? '');
   $tokenTtl  = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
@@ -328,6 +333,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $existing['guestToc']         = $guestToc;
   $existing['guestIndex']       = $guestIndex;
   $existing['guestLoginEnabled'] = $guestLoginEnabled;
+  $existing['marksEnabled']  = $marksEnabled;
+  $existing['questsEnabled'] = $questsEnabled;
   if ($jwtSecret !== '') {
     if (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
       json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
@@ -361,9 +368,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   } elseif (!isset($existing['tokenTtl'])) {
     $existing['tokenTtl'] = 3600;
   }
-  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
-    json_out(500, ['error' => 'Could not write settings file']);
-  }
+  data_write(SETTINGS_FILE, $existing);
   json_out(200, ['ok' => true]);
 }
 
@@ -395,9 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-p
   $existing = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
   if (!is_array($existing)) $existing = [];
   $existing['disabledPlugins'] = $disabled;
-  if (file_put_contents(SETTINGS_FILE, json_encode($existing, JSON_PRETTY_PRINT), LOCK_EX) === false) {
-    json_out(500, ['error' => 'Could not write settings file']);
-  }
+  data_write(SETTINGS_FILE, $existing);
   json_out(200, ['ok' => true]);
 }
 
@@ -492,4 +495,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'restor
   }
 
   json_out(200, ['ok' => true, 'pages' => $written]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// API: Get front plugins  GET ?action=get-front-plugins  (admin only)
+// Returns the list of plugin filenames plus which are disabled.
+// ═══════════════════════════════════════════════════════════════════════════
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-front-plugins') {
+  $claims = require_auth();
+  if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+  $files    = front_plugins();
+  $cfg      = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
+  $disabled = is_array($cfg['disabledPlugins'] ?? null) ? array_values($cfg['disabledPlugins']) : [];
+  json_out(200, ['plugins' => $files, 'disabled' => $disabled]);
 }
