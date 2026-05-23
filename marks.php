@@ -340,536 +340,6 @@ $baseHref  = $scriptDir . '/';
   <title><?= htmlspecialchars($pq_app_name) ?></title>
   <base href="<?= htmlspecialchars($baseHref) ?>">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <style>
-    /* ── PasQ app-specific styles ─────────────────────────────────── */
-
-    /* Header reuse */
-    #pq-header {
-      border-bottom: 2px solid #222;
-      padding: .5rem 1.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      background: #fff;
-      z-index: 1000;
-      box-shadow: 0 2px 5px rgba(0,0,0,.1);
-      min-height: 50px;
-    }
-    #pq-header a {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: #111;
-      text-decoration: none;
-    }
-    #pq-header-right {
-      display: flex;
-      gap: .5rem;
-      align-items: center;
-    }
-
-    /* Main content area */
-    #pq-screen {
-      max-width: 960px;
-      margin: 70px auto 50px;
-      padding: 1rem 1.5rem 2rem;
-      background: #fff;
-      border: 1px solid #eee;
-      box-shadow: 0 0 .5em #999;
-      border-radius: 2px;
-      display: none;
-    }
-
-    /* Tabs (admin) */
-    .pq-tabs {
-      display: flex;
-      gap: 0;
-      border-bottom: 2px solid #8A0808;
-      margin-bottom: 1.5rem;
-    }
-    .pq-tab {
-      padding: .55rem 1.4rem;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: .9rem;
-      color: #555;
-      border: 1px solid transparent;
-      border-bottom: none;
-      border-radius: 4px 4px 0 0;
-      background: #f4f4f5;
-      margin-right: 3px;
-      transition: background .15s, color .15s;
-    }
-    .pq-tab.active {
-      background: #8A0808;
-      color: #fff;
-      border-color: #8A0808;
-    }
-    .pq-tab:hover:not(.active) {
-      background: #f0e0e0;
-      color: #8A0808;
-    }
-    .pq-tab-panel { display: none; }
-    .pq-tab-panel.active { display: block; }
-
-    /* Buttons */
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: .35rem;
-      padding: .45rem .9rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      background: #fafafa;
-      cursor: pointer;
-      font-size: .85rem;
-      font-weight: 600;
-      color: #333;
-      text-decoration: none;
-      transition: background .15s, border-color .15s;
-    }
-    .btn:hover { background: #eee; border-color: #bbb; }
-    .btn-primary { background: #8A0808; color: #fff; border-color: #8A0808; }
-    .btn-primary:hover { background: #6a0606; border-color: #6a0606; }
-    .btn-sm { padding: .25rem .55rem; font-size: .78rem; }
-    .btn-danger { background: #c0392b; color: #fff; border-color: #c0392b; }
-    .btn-danger:hover { background: #a93226; border-color: #a93226; }
-    .btn-ghost { background: transparent; border-color: transparent; color: #8A0808; }
-    .btn-ghost:hover { background: #f0e0e0; border-color: #f0e0e0; }
-    .btn svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    #pq-logout-btn { color: #c00; border-color: #c00; }
-    #pq-logout-btn:hover { background: #fff5f5; }
-
-    /* ── Structure editor ─────────────────────────────────────────── */
-    #structure-root-name {
-      width: 100%;
-      max-width: 420px;
-      padding: .5rem .75rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
-    #structure-root-name:focus { outline: none; border-color: #8A0808; }
-
-    .pq-tree { list-style: none; padding: 0; margin: 0; }
-    .pq-tree .pq-tree { padding-left: 1.6rem; margin-top: .35rem; }
-
-    .pq-item {
-      margin: .3rem 0;
-    }
-    .pq-item-row {
-      display: flex;
-      align-items: center;
-      gap: .4rem;
-      background: #fafafa;
-      border: 1px solid #e8e8e8;
-      border-radius: 4px;
-      padding: .35rem .5rem;
-    }
-    .pq-item-row:focus-within {
-      border-color: #8A0808;
-      background: #fff;
-    }
-    .pq-item-name {
-      flex: 1;
-      min-width: 0;
-      padding: .3rem .5rem;
-      border: 1px solid transparent;
-      border-radius: 3px;
-      font-size: .9rem;
-      background: transparent;
-    }
-    .pq-item-name:focus {
-      outline: none;
-      border-color: #ccc;
-      background: #fff;
-    }
-    .pq-item-weight-wrap {
-      display: flex;
-      align-items: center;
-      gap: .3rem;
-      white-space: nowrap;
-    }
-    .pq-item-weight {
-      width: 58px;
-      padding: .3rem .4rem;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-      font-size: .9rem;
-      text-align: right;
-    }
-    .pq-item-weight:focus { outline: none; border-color: #8A0808; }
-    .pq-weight-label { font-size: .78rem; color: #888; }
-
-    /* Per-sibling weight indicator */
-    .pq-weight-sum {
-      font-size: .75rem;
-      font-weight: 700;
-      padding: .15rem .45rem;
-      border-radius: 3px;
-      margin: .2rem 0 .4rem 0;
-      display: inline-block;
-    }
-    .pq-weight-sum.ok { background: #e8f5e9; color: #2e7d32; }
-    .pq-weight-sum.bad { background: #fdecea; color: #c62828; }
-
-    /* Leaf badge */
-    .pq-leaf-badge {
-      font-size: .7rem;
-      background: #e3f0ff;
-      color: #1a5faa;
-      border-radius: 3px;
-      padding: .1rem .4rem;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    /* Structure action bar */
-    #structure-action-bar {
-      display: flex;
-      align-items: flex-start;
-      gap: .75rem;
-      margin-top: 1.5rem;
-      flex-wrap: wrap;
-    }
-    #structure-errors {
-      background: #fdecea;
-      border: 1px solid #f5c6c6;
-      border-radius: 4px;
-      padding: .65rem 1rem;
-      margin-top: .75rem;
-      display: none;
-    }
-    #structure-errors ul { margin: .3rem 0 0 1.2rem; }
-    #structure-errors li { font-size: .88rem; color: #c62828; margin: .15rem 0; }
-
-    /* ── Marks editor table ───────────────────────────────────────── */
-    #marks-table-wrap {
-      overflow-x: auto;
-      overflow-y: auto;
-      max-height: 72vh;
-      margin-top: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-    }
-    #marks-table {
-      /* separate + spacing:0 is required for sticky positioning to work */
-      border-collapse: separate;
-      border-spacing: 0;
-      font-size: .85rem;
-      min-width: 100%;
-    }
-
-    /* ── Header row (sticky top) ── */
-    #marks-table thead th {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: #8A0808;
-      color: #fff;
-      padding: .5rem .7rem;
-      text-align: center;
-      font-weight: 600;
-      white-space: nowrap;
-      border-right: 1px solid #6a0606;
-      border-bottom: 2px solid #5a0606;
-    }
-    /* Corner cell: sticky both top and left */
-    #marks-table thead th:first-child {
-      position: sticky;
-      left: 0;
-      z-index: 4;
-      text-align: left;
-      min-width: 220px;
-      max-width: 320px;
-    }
-    /* Student header */
-    #marks-table thead th.col-student {
-      min-width: 88px;
-    }
-    .col-student-name {
-      display: block;
-      font-weight: 700;
-    }
-    .col-student-user {
-      display: block;
-      font-size: .72rem;
-      opacity: .78;
-      font-weight: 400;
-    }
-
-    /* ── Body cells ── */
-    #marks-table tbody td {
-      padding: .3rem .5rem;
-      border-right: 1px solid #e8e8e8;
-      border-bottom: 1px solid #e8e8e8;
-      vertical-align: middle;
-      background: #fff;
-    }
-    /* Sticky first column in body */
-    #marks-table tbody td:first-child {
-      position: sticky;
-      left: 0;
-      z-index: 1;
-      border-right: 2px solid #ccc;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 320px;
-    }
-
-    /* ── Group header rows ── */
-    .marks-group-row td:first-child {
-      font-weight: 700;
-      font-size: .88rem;
-      color: #fff !important;
-      background: #8A0808 !important;
-      border-bottom: 1px solid #6a0606 !important;
-    }
-    .marks-depth-1 td:first-child { background: #8A0808 !important; }
-    .marks-depth-2 td:first-child { background: #a03030 !important; color: #fff !important; }
-    .marks-depth-3 td:first-child { background: #c05050 !important; color: #fff !important; }
-    .marks-group-row td { background: #f8f0f0; }
-    .marks-depth-1 td { background: #f4eded; }
-    .marks-depth-2 td { background: #faf4f4; }
-
-    /* ── Leaf rows ── */
-    #marks-table tbody tr.marks-leaf-row:hover td { background: #fff8f8; }
-    #marks-table tbody tr.marks-leaf-row:hover td:first-child { background: #f5e8e8 !important; }
-    .marks-item-cell {
-      font-size: .85rem;
-      color: #333;
-    }
-    .item-weight {
-      font-size: .75rem;
-      opacity: .6;
-      font-weight: 400;
-      margin-left: .25em;
-    }
-
-    /* ── Grade inputs ── */
-    .mark-input {
-      width: 66px;
-      padding: .28rem .3rem;
-      border: 1px solid #ddd;
-      border-radius: 3px;
-      font-size: .88rem;
-      text-align: center;
-      background: #fff;
-    }
-    .mark-input:focus { outline: none; border-color: #8A0808; box-shadow: 0 0 0 2px rgba(138,8,8,.12); }
-
-    /* ── Subtotal cells (group rows) ── */
-    .marks-subtotal-cell {
-      text-align: center;
-      min-width: 72px;
-    }
-    .subtotal-val {
-      display: inline-block;
-      font-weight: 700;
-      font-size: .85rem;
-      min-width: 2.8em;
-      padding: .12rem .35rem;
-      border-radius: 3px;
-      background: rgba(255,255,255,.25);
-      letter-spacing: .01em;
-    }
-    .subtotal-val.mark-red    { color: #c62828; background: rgba(255,255,255,.30); }
-    .subtotal-val.mark-orange { color: #e65100; background: rgba(255,255,255,.30); }
-    .subtotal-val.mark-green  { color: #1b5e20; background: rgba(255,255,255,.30); }
-    .subtotal-val.mark-none   { color: rgba(255,255,255,.55); font-weight: 400; }
-
-    /* Marks action bar */
-    #marks-action-bar {
-      display: flex;
-      align-items: center;
-      gap: .75rem;
-      margin-top: 1.25rem;
-    }
-
-    /* ── Student grade view ───────────────────────────────────────── */
-    #pq-grade-view { padding-top: .5rem; }
-
-    .grade-final-box {
-      background: linear-gradient(135deg, #8A0808 0%, #b01010 100%);
-      color: #fff;
-      border-radius: 8px;
-      padding: 1.5rem 2rem;
-      margin-bottom: 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 4px 16px rgba(138,8,8,.25);
-    }
-    .grade-final-box .gf-label {
-      font-size: 1rem;
-      font-weight: 600;
-      opacity: .85;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-    }
-    .grade-final-box .gf-value {
-      font-size: 3rem;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: -.02em;
-    }
-    .grade-final-box .gf-name {
-      font-size: 1.4rem;
-      font-weight: 600;
-      opacity: .9;
-    }
-    .grade-final-box .gf-username {
-      font-size: .95rem;
-      font-weight: 400;
-      opacity: .65;
-      margin-top: .15rem;
-    }
-
-    /* Sections */
-    .grade-section {
-      margin-bottom: 1.5rem;
-    }
-    .grade-section-header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      border-bottom: 3px double #8A0808;
-      padding-bottom: .35rem;
-      margin-bottom: .75rem;
-    }
-    .grade-section-title {
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: #8A0808;
-    }
-    .grade-section-avg {
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-
-    /* Subsection */
-    .grade-subsection {
-      background: #fafafa;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      margin-bottom: .6rem;
-      overflow: hidden;
-    }
-    .grade-subsection-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: .5rem .75rem;
-      background: #f4eeee;
-      border-bottom: 1px solid #eee;
-    }
-    .grade-subsection-title {
-      font-weight: 600;
-      font-size: .95rem;
-      color: #444;
-    }
-    .grade-subsection-avg {
-      font-weight: 700;
-      font-size: .95rem;
-    }
-    .grade-subsection-body { padding: .4rem .75rem; }
-
-    /* Leaf rows */
-    .grade-leaf {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: .3rem .25rem;
-      border-bottom: 1px solid #f0f0f0;
-    }
-    .grade-leaf:last-child { border-bottom: none; }
-    .grade-leaf-name { font-size: .88rem; color: #555; }
-    .grade-leaf-mark { font-weight: 700; font-size: .95rem; }
-    .grade-leaf-weight { font-size: .78rem; color: #999; margin-left: .5rem; }
-
-    /* Mark color coding */
-    .mark-red   { color: #c0392b; }
-    .mark-orange { color: #d35400; }
-    .mark-green  { color: #27ae60; }
-    .mark-none   { color: #aaa; font-style: italic; }
-
-    /* Shared status / toast */
-    .pq-status {
-      font-size: .85rem;
-      padding: .3rem .6rem;
-      border-radius: 3px;
-    }
-    .pq-status.ok { background: #e8f5e9; color: #2e7d32; }
-    .pq-status.err { background: #fdecea; color: #c62828; }
-
-    #pq-toast {
-      position: fixed;
-      bottom: 1.5rem;
-      left: 50%;
-      transform: translateX(-50%) translateY(60px);
-      background: #222;
-      color: #fff;
-      padding: .6rem 1.4rem;
-      border-radius: 6px;
-      font-size: .9rem;
-      z-index: 9999;
-      opacity: 0;
-      transition: transform .25s, opacity .25s;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    #pq-toast.show {
-      transform: translateX(-50%) translateY(0);
-      opacity: 1;
-    }
-    #pq-toast.success { background: #2e7d32; }
-    #pq-toast.error   { background: #c62828; }
-
-    /* Loading spinner */
-    .pq-loading {
-      display: flex;
-      align-items: center;
-      gap: .6rem;
-      color: #888;
-      font-size: .9rem;
-      padding: 1.5rem 0;
-    }
-    .pq-spinner {
-      width: 20px; height: 20px;
-      border: 2px solid #ddd;
-      border-top-color: #8A0808;
-      border-radius: 50%;
-      animation: pq-spin .7s linear infinite;
-    }
-    @keyframes pq-spin { to { transform: rotate(360deg); } }
-
-    /* User badge */
-    #pq-user-badge {
-      font-size: .78rem;
-      color: #666;
-      padding: .2rem .6rem;
-      background: #f0f0f0;
-      border-radius: 3px;
-    }
-
-    /* Empty state */
-    .pq-empty {
-      text-align: center;
-      color: #aaa;
-      padding: 2rem;
-      font-size: .95rem;
-    }
-
-    /* Responsive */
-    @media (max-width: 680px) {
-      #pq-screen { margin-top: 60px; padding: .75rem 1rem 1.5rem; }
-      .grade-final-box { flex-direction: column; gap: .75rem; text-align: center; }
-      .grade-final-box .gf-value { font-size: 2.2rem; }
-    }
-  </style>
   <link id="pq-theme-link" rel="stylesheet" href="templates-marks/<?= htmlspecialchars($pq_theme, ENT_QUOTES) ?>">
 </head>
 <body>
@@ -878,7 +348,7 @@ $baseHref  = $scriptDir . '/';
   <!-- ── App screen ────────────────────────────────────────────────── -->
   <div id="pq-header" style="display:none">
     <a href="marks.php">
-      <img src="icon.svg" style="display:inline;width:1.4rem;height:1.4rem;vertical-align:middle;margin-right:.4rem" alt="">
+      <img src="icon.svg" class="pq-header-icon" alt="">
       <?= htmlspecialchars($pq_app_name) ?>
     </a>
     <div id="pq-header-right">
@@ -898,27 +368,27 @@ $baseHref  = $scriptDir . '/';
     <div id="admin-panel" style="display:none">
       <div class="pq-tabs">
         <div class="pq-tab active" onclick="pqShowTab('structure')">
-          <svg style="width:.9em;height:.9em;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="17" x2="21" y2="17"/><line x1="17" y1="14" x2="17" y2="21"/></svg>
+          <svg class="pq-tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="14" y1="17" x2="21" y2="17"/><line x1="17" y1="14" x2="17" y2="21"/></svg>
           Structure
         </div>
         <div class="pq-tab" onclick="pqShowTab('marks')">
-          <svg style="width:.9em;height:.9em;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <svg class="pq-tab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
           Marks
         </div>
       </div>
 
       <!-- ── Structure tab ───────────────────────────────────────── -->
       <div id="tab-structure" class="pq-tab-panel active">
-        <p style="margin-bottom:.75rem;color:#555;font-size:.9rem">
+        <p class="pq-section-intro">
           Build the qualification hierarchy. Each group of sub-items must have weights that sum exactly to <strong>100</strong>.
         </p>
-        <label style="display:block;margin-bottom:.3rem;font-weight:600;font-size:.85rem">Course / root name</label>
+        <label class="pq-structure-label">Course / root name</label>
         <input id="structure-root-name" type="text" maxlength="128" placeholder="e.g. Cooking Course">
         <div id="structure-tree-wrap">
           <!-- rendered by JS -->
         </div>
         <div id="structure-errors">
-          <strong style="color:#c62828">Weight errors — please correct before saving:</strong>
+          <strong>Weight errors — please correct before saving:</strong>
           <ul id="structure-errors-list"></ul>
         </div>
         <div id="structure-action-bar">
@@ -936,7 +406,7 @@ $baseHref  = $scriptDir . '/';
 
       <!-- ── Marks tab ───────────────────────────────────────────── -->
       <div id="tab-marks" class="pq-tab-panel">
-        <p style="margin-bottom:.75rem;color:#555;font-size:.9rem">
+        <p class="pq-section-intro">
           Enter the grade (0–10) for each student in each leaf item. Leave blank if not yet graded.
         </p>
         <div id="marks-table-wrap">
@@ -1079,7 +549,7 @@ $baseHref  = $scriptDir . '/';
       pqRenderStructure();
     } catch (err) {
       document.getElementById('structure-tree-wrap').innerHTML =
-        '<p style="color:#c62828;padding:1rem 0">' + err.message + '</p>';
+        '<p class="pq-load-error">' + err.message + '</p>';
     }
   }
 
@@ -1370,7 +840,7 @@ $baseHref  = $scriptDir . '/';
         if (e.target.classList.contains('mark-input')) pqUpdateSubtotals();
       }, { capture: false });
     } catch (err) {
-      wrap.innerHTML = '<p style="color:#c62828;padding:1rem 0">' + pqEsc(err.message) + '</p>';
+      wrap.innerHTML = '<p class="pq-load-error">' + pqEsc(err.message) + '</p>';
     }
   }
 
@@ -1510,7 +980,7 @@ $baseHref  = $scriptDir . '/';
       nameCell.style.paddingLeft = indent + 'rem';
       const wLabel = (node.weight !== undefined && node.weight !== null)
         ? '<span class="item-weight"> ' + node.weight + '%</span>' : '';
-      nameCell.innerHTML = '<svg style="width:.8em;height:.8em;fill:none;stroke:currentColor;stroke-width:2.5;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>' + pqEsc(node.name) + wLabel;
+      nameCell.innerHTML = '<svg class="pq-tree-expand-icon" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>' + pqEsc(node.name) + wLabel;
 
       // Subtotal cells (one per student) — filled after table is built
       pqUsers.forEach(user => {
@@ -1545,7 +1015,7 @@ $baseHref  = $scriptDir . '/';
       // One mark input per student
       pqUsers.forEach(user => {
         const cell = row.insertCell();
-        cell.style.textAlign = 'center';
+        cell.className = 'marks-mark-cell';
 
         const userMarksObj = pqAllMarks.find(m => m.name === user.username) || null;
         const existingMark = userMarksObj ? pqGetLeafMark(userMarksObj, currentPath) : null;
@@ -1645,7 +1115,7 @@ $baseHref  = $scriptDir . '/';
       view.innerHTML = '';
       view.appendChild(pqRenderGradeCard(computed));
     } catch (err) {
-      view.innerHTML = '<p style="color:#c62828;padding:1.5rem 0">' + pqEsc(err.message) + '</p>';
+      view.innerHTML = '<p class="pq-load-error">' + pqEsc(err.message) + '</p>';
     }
   }
 

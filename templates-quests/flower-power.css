@@ -211,6 +211,52 @@ body::after {
 #qs-theme-panel select { display: block; width: 100%; padding: .5rem .7rem; border: 2px solid #f9a8d4; border-radius: 8px; font-size: .9rem; margin-bottom: 1.2rem; outline: none; font-family: inherit; }
 #qs-theme-panel-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 
+/* ── Extracted from inline styles ─────────────────────────────────────── */
+.qs-header-icon { display: inline; width: 1.4rem; height: 1.4rem; vertical-align: middle; margin-right: .4rem; }
+.qs-tab-icon { width: .9em; height: .9em; fill: none; stroke: currentColor; stroke-width: 2; vertical-align: middle; margin-right: .3em; }
+.qs-tab-toolbar { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.qs-tab-toolbar-sm { margin-bottom: .75rem; }
+.qs-filter-bar { display: flex; align-items: center; gap: .5rem; margin-bottom: .75rem; flex-wrap: wrap; }
+.qs-filter-search { flex: 1; min-width: 180px; max-width: 320px; padding: .35rem .6rem; border: 2px solid #f9a8d4; border-radius: 8px; font-size: .88rem; }
+.qs-filter-select { padding: .35rem .6rem; border: 2px solid #f9a8d4; border-radius: 8px; font-size: .88rem; }
+.qs-filter-label-input { min-width: 150px; padding: .35rem .6rem; border: 2px solid #f9a8d4; border-radius: 8px; font-size: .88rem; }
+.qs-filter-count { font-size: .82rem; color: #7c3aed; white-space: nowrap; }
+.qs-label-hint { font-weight: 400; color: #7c3aed; }
+.qs-field-shrink { flex: 0 0 auto; }
+.qs-add-group-btn { margin-top: .4rem; }
+.qs-modal-sm { max-width: 380px; }
+.qs-delete-msg { margin-bottom: 1.25rem; font-size: .9rem; color: #7c3aed; }
+#user-quest-list h2 { margin-bottom: 1rem; }
+#user-quest-list h2 + h2 { margin: 1.5rem 0 .75rem; }
+.qs-results-group-hdr { margin: 1.25rem 0 .4rem; display: flex; align-items: baseline; gap: .75rem; }
+.qs-results-quest-name { font-size: 1rem; }
+.qs-results-attempt-count { font-size: .8rem; color: #7c3aed; }
+.qs-center-td { text-align: center; }
+.qs-id-cell { text-align: center; color: #7c3aed; }
+.qs-date-td { color: #7c3aed; font-size: .82rem; }
+.qs-query-text-cell { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qs-empty-val { color: #c4b5fd; }
+.qs-load-error { padding: 1rem; color: #be185d; }
+.qs-load-error-sm { color: #be185d; padding: .5rem 0; }
+.qs-label-group-label-input { flex: 1; }
+.qs-qty-label { font-size: .78rem; color: #7c3aed; white-space: nowrap; }
+.qs-view-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.qs-view-title { flex: 1; font-size: 1rem; }
+.qs-progress-label { font-size: .8rem; color: #7c3aed; }
+.qs-score-suffix { font-size: 1.2rem; opacity: .7; }
+.qs-result-text { color: #7c3aed; margin-bottom: 1.5rem; font-size: .95rem; }
+.qs-review-score { font-size: 1.1rem; font-weight: 700; }
+.qs-correct-indicator { font-size: .8rem; font-weight: 700; }
+.qs-attempt-actions { padding-left: .75rem; }
+.qs-matching-hint-row { grid-column: 1 / -1; margin-bottom: .4rem; }
+.qs-th-id { width: 3rem; }
+.qs-th-stat { width: 68px; }
+.qs-th-actions-sm { width: 110px; }
+.qs-th-avgscore { width: 80px; }
+.qs-th-actions-md { width: 120px; }
+.qs-th-score { width: 90px; }
+.qs-th-actions-lg { width: 130px; }
+
 @media (max-width: 680px) {
   #qs-screen { margin-top: 60px; padding: .75rem 1rem 1.5rem; }
   .qs-quest-cards { grid-template-columns: 1fr; }

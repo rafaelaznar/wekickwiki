@@ -648,6 +648,19 @@ body {
   margin-top: 1.25rem;
 }
 
+#pq-logout-btn { color: #c00; border-color: #c00; }
+#pq-logout-btn:hover { background: #fff5f5; }
+
+/* ── Extracted from inline styles ─────────────────────────────────────── */
+.pq-header-icon { display: inline; width: 1.4rem; height: 1.4rem; vertical-align: middle; margin-right: .4rem; }
+.pq-tab-icon { width: .9em; height: .9em; fill: none; stroke: currentColor; stroke-width: 2; vertical-align: middle; margin-right: .3em; }
+.pq-section-intro { margin-bottom: .75rem; color: #888; font-size: .9rem; }
+.pq-structure-label { display: block; margin-bottom: .3rem; font-weight: 700; font-size: .85rem; }
+#structure-errors strong { color: #f87171; }
+.pq-load-error { color: #f87171; padding: 1rem 0; }
+.pq-tree-expand-icon { width: .8em; height: .8em; fill: none; stroke: currentColor; stroke-width: 2.5; vertical-align: middle; margin-right: .3em; }
+.marks-mark-cell { text-align: center; }
+
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 680px) {
   #pq-screen { margin-top: 60px; padding: .75rem 1rem 1.5rem; }

@@ -781,7 +781,7 @@ $baseHref  = $scriptDir . '/';
   <!-- ── App header ───────────────────────────────────────────────────── -->
   <div id="qs-header" style="display:none">
     <a href="quests.php">
-      <img src="icon.svg" style="display:inline;width:1.4rem;height:1.4rem;vertical-align:middle;margin-right:.4rem" alt="">
+      <img src="icon.svg" class="qs-header-icon" alt="">
       <?= htmlspecialchars($qs_app_name) ?>
     </a>
     <div id="qs-header-right">
@@ -802,22 +802,22 @@ $baseHref  = $scriptDir . '/';
     <div id="admin-panel" style="display:none">
       <div class="qs-tabs">
         <div class="qs-tab active" data-tab="questions" onclick="qsShowTab('questions')">
-          <svg style="width:.9em;height:.9em;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           Questions
         </div>
         <div class="qs-tab" data-tab="quests" onclick="qsShowTab('quests')">
-          <svg style="width:.9em;height:.9em;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           Quests
         </div>
         <div class="qs-tab" data-tab="results" onclick="qsShowTab('results')">
-          <svg style="width:.9em;height:.9em;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:.3em" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           Results
         </div>
       </div>
 
       <!-- Questions tab -->
       <div id="tab-questions" class="qs-tab-panel active">
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;flex-wrap:wrap">
+        <div class="qs-tab-toolbar qs-tab-toolbar-sm">
           <button class="btn btn-primary" onclick="qsOpenQueryModal()">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add question
@@ -825,11 +825,11 @@ $baseHref  = $scriptDir . '/';
           <span id="queries-status" class="qs-status" style="display:none"></span>
         </div>
         <!-- Filter bar -->
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap">
+        <div class="qs-filter-bar">
           <input id="qf-search" type="search" placeholder="Search question text…"
-            style="flex:1;min-width:180px;max-width:320px;padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+            class="qs-filter-search"
             oninput="qsApplyQueryFilters()">
-          <select id="qf-type" style="padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+          <select id="qf-type" class="qs-filter-select"
             onchange="qsApplyQueryFilters()">
             <option value="">All types</option>
             <option value="multiple_choice">Multiple choice</option>
@@ -838,10 +838,10 @@ $baseHref  = $scriptDir . '/';
             <option value="matching">Matching</option>
           </select>
           <input id="qf-label" type="search" list="qf-label-list" placeholder="Filter by label…"
-            style="min-width:150px;padding:.35rem .6rem;border:1px solid #ccc;border-radius:4px;font-size:.88rem"
+            class="qs-filter-label-input"
             oninput="qsApplyQueryFilters()">
           <datalist id="qf-label-list"></datalist>
-          <span id="qf-count" style="font-size:.82rem;color:#888;white-space:nowrap"></span>
+          <span id="qf-count" class="qs-filter-count"></span>
         </div>
         <div id="queries-table-wrap" class="qs-table-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
@@ -850,7 +850,7 @@ $baseHref  = $scriptDir . '/';
 
       <!-- Quests tab -->
       <div id="tab-quests" class="qs-tab-panel">
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap">
+        <div class="qs-tab-toolbar">
           <button class="btn btn-primary" onclick="qsOpenQuestModal()">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add quest
@@ -864,7 +864,7 @@ $baseHref  = $scriptDir . '/';
 
       <!-- Results tab -->
       <div id="tab-results" class="qs-tab-panel">
-        <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+        <div class="qs-tab-toolbar">
           <button class="btn" onclick="qsLoadResults()">
             <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
             Reload
@@ -880,11 +880,11 @@ $baseHref  = $scriptDir . '/';
     <div id="user-panel" style="display:none">
       <!-- Available quests -->
       <div id="user-quest-list">
-        <h2 style="margin-bottom:1rem">Available quests</h2>
+        <h2>Available quests</h2>
         <div id="open-quests-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
         </div>
-        <h2 style="margin:1.5rem 0 .75rem">My completed quests</h2>
+        <h2>My completed quests</h2>
         <div id="my-attempts-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
         </div>
@@ -924,7 +924,7 @@ $baseHref  = $scriptDir . '/';
         <textarea id="qm-query" placeholder="Enter the question…"></textarea>
       </div>
       <div class="qs-field">
-        <label>Labels <span style="font-weight:400;color:#888">(comma-separated)</span></label>
+        <label>Labels <span class="qs-label-hint">(comma-separated)</span></label>
         <input type="text" id="qm-labels" placeholder="e.g. mathematics, algebra">
       </div>
       <!-- Type-specific fields rendered here -->
@@ -960,10 +960,10 @@ $baseHref  = $scriptDir . '/';
       </div>
       <div class="qs-field-row">
         <div class="qs-field">
-          <label>Wrong answer penalty <span style="font-weight:400;color:#888">(0 = none, -0.25 = ¼ deduction)</span></label>
+          <label>Wrong answer penalty <span class="qs-label-hint">(0 = none, -0.25 = ¼ deduction)</span></label>
           <input type="number" id="qst-wrong" step="0.01" min="-1" max="0" value="0" placeholder="-0.25">
         </div>
-        <div class="qs-field" style="flex:0 0 auto">
+        <div class="qs-field qs-field-shrink">
           <label>Revisable</label>
           <select id="qst-revisable">
             <option value="1">Yes</option>
@@ -972,9 +972,9 @@ $baseHref  = $scriptDir . '/';
         </div>
       </div>
       <div class="qs-field">
-        <label>Question groups <span style="font-weight:400;color:#888">(labels AND-matched, random pick)</span></label>
+        <label>Question groups <span class="qs-label-hint">(labels AND-matched, random pick)</span></label>
         <div id="qst-label-groups" class="qs-label-groups"></div>
-        <button class="btn btn-sm" style="margin-top:.4rem" onclick="qsAddLabelGroup()">
+        <button class="btn btn-sm qs-add-group-btn" onclick="qsAddLabelGroup()">
           <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Add group
         </button>
@@ -988,9 +988,9 @@ $baseHref  = $scriptDir . '/';
 
   <!-- Delete confirm modal -->
   <div class="qs-overlay" id="delete-modal-overlay">
-    <div class="qs-modal" onclick="event.stopPropagation()" style="max-width:380px">
+    <div class="qs-modal qs-modal-sm" onclick="event.stopPropagation()">
       <h3 id="delete-modal-title">Confirm delete</h3>
-      <p id="delete-modal-msg" style="margin-bottom:1.25rem;font-size:.9rem;color:#555"></p>
+      <p id="delete-modal-msg" class="qs-delete-msg"></p>
       <div class="qs-modal-actions">
         <button class="btn" onclick="qsCloseDeleteModal()">Cancel</button>
         <button class="btn btn-danger" id="delete-modal-confirm">Delete</button>
@@ -1129,7 +1129,7 @@ $baseHref  = $scriptDir . '/';
       qsApplyQueryFilters();
     } catch (err) {
       document.getElementById('queries-table-wrap').innerHTML =
-        `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
+        `<p class="qs-load-error">${esc(err.message)}</p>`;
     }
   }
 
@@ -1168,13 +1168,13 @@ $baseHref  = $scriptDir . '/';
     const table = document.createElement('table');
     table.className = 'qs-table';
     table.innerHTML = `<thead><tr>
-      <th style="width:3rem">ID</th>
+      <th class="qs-th-id">ID</th>
       <th>Question</th>
       <th>Type</th>
       <th>Labels</th>
-      <th style="width:68px" title="% answered correctly out of answered (excl. skipped)">Hit %</th>
-      <th style="width:68px" title="% of total question appearances across all attempts">Freq %</th>
-      <th style="width:110px">Actions</th>
+      <th class="qs-th-stat" title="% answered correctly out of answered (excl. skipped)">Hit %</th>
+      <th class="qs-th-stat" title="% of total question appearances across all attempts">Freq %</th>
+      <th class="qs-th-actions-sm">Actions</th>
     </tr></thead>`;
     const tbody = document.createElement('tbody');
     for (const q of queries) {
@@ -1187,12 +1187,12 @@ $baseHref  = $scriptDir . '/';
         ? (st.success_pct >= 70 ? 'score-high' : st.success_pct >= 40 ? 'score-mid' : 'score-low')
         : '';
       tr.innerHTML = `
-        <td style="text-align:center;color:#888">${q.id}</td>
-        <td style="max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(q.query)}">${esc(q.query)}</td>
+        <td class="qs-id-cell">${q.id}</td>
+        <td class="qs-query-text-cell" title="${esc(q.query)}">${esc(q.query)}</td>
         <td><span class="badge badge-type">${esc(q.type)}</span></td>
-        <td>${labelsHtml || '<span style="color:#bbb">—</span>'}</td>
-        <td style="text-align:center" title="${st.correct ?? 0} correct / ${st.wrong ?? 0} wrong of ${st.appeared ?? 0} shown"><span class="${hitCls}">${hitPct}</span></td>
-        <td style="text-align:center" title="${st.appeared ?? 0} appearances">${freqPct}</td>
+        <td>${labelsHtml || '<span class="qs-empty-val">—</span>'}</td>
+        <td class="qs-center-td" title="${st.correct ?? 0} correct / ${st.wrong ?? 0} wrong of ${st.appeared ?? 0} shown"><span class="${hitCls}">${hitPct}</span></td>
+        <td class="qs-center-td" title="${st.appeared ?? 0} appearances">${freqPct}</td>
         <td>
           <button class="btn btn-sm" onclick="qsEditQuery(${q.id})">Edit</button>
           <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuery(${q.id})">Del</button>
@@ -1238,7 +1238,7 @@ $baseHref  = $scriptDir . '/';
     if (type === 'multiple_choice') {
       const opts = data?.options || ['', '', '', ''];
       const ans  = data?.answer ?? '0';
-      let html = `<div class="qs-field"><label>Options <span style="font-weight:400;color:#888">(mark correct with radio)</span></label><ul class="qs-options-list" id="mc-options-list">`;
+      let html = `<div class="qs-field"><label>Options <span class="qs-label-hint">(mark correct with radio)</span></label><ul class="qs-options-list" id="mc-options-list">`;
       opts.forEach((o, i) => {
         html += `<li>
           <input type="radio" name="mc-correct" value="${i}" ${parseInt(ans) === i ? 'checked' : ''} title="Correct answer">
@@ -1259,7 +1259,7 @@ $baseHref  = $scriptDir . '/';
 
     } else if (type === 'gap_filling') {
       const opts = data?.options || [''];
-      let html = `<div class="qs-field"><label>Accepted answers <span style="font-weight:400;color:#888">(all are correct, case-insensitive)</span></label><ul class="qs-options-list" id="gf-options-list">`;
+      let html = `<div class="qs-field"><label>Accepted answers <span class="qs-label-hint">(all are correct, case-insensitive)</span></label><ul class="qs-options-list" id="gf-options-list">`;
       opts.forEach(o => {
         html += `<li><input type="text" class="gf-opt-input" value="${esc(o)}" placeholder="Accepted answer…">
           <button class="btn btn-sm btn-ghost" onclick="this.closest('li').remove()" type="button">✕</button></li>`;
@@ -1399,7 +1399,7 @@ $baseHref  = $scriptDir . '/';
       const table = document.createElement('table');
       table.className = 'qs-table';
       table.innerHTML = `<thead><tr>
-        <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Attempts</th><th style="width:80px">Avg score</th><th style="width:120px">Actions</th>
+        <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Attempts</th><th class="qs-th-avgscore">Avg score</th><th class="qs-th-actions-md">Actions</th>
       </tr></thead>`;
       const tbody = document.createElement('tbody');
       for (const q of quests) {
@@ -1410,8 +1410,8 @@ $baseHref  = $scriptDir . '/';
           <td><span class="badge badge-${q.status}">${esc(q.status)}</span></td>
           <td>${q.wrong < 0 ? q.wrong : '—'}</td>
           <td>${q.revisable ? '✔' : '—'}</td>
-          <td style="text-align:center">${q.attempt_count ?? 0}</td>
-          <td style="text-align:center"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
+          <td class="qs-center-td">${q.attempt_count ?? 0}</td>
+          <td class="qs-center-td"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
           <td>
             <button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>
@@ -1421,7 +1421,7 @@ $baseHref  = $scriptDir . '/';
       table.appendChild(tbody);
       wrap.appendChild(table);
     } catch (err) {
-      wrap.innerHTML = `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
+      wrap.innerHTML = `<p class="qs-load-error">${esc(err.message)}</p>`;
     }
   }
 
@@ -1464,9 +1464,9 @@ $baseHref  = $scriptDir . '/';
     const labels = data?.labels?.join(', ') ?? '';
     const count  = data?.queries ?? 1;
     div.innerHTML = `
-      <input type="text" placeholder="Labels (comma-separated, AND)" value="${esc(labels)}" style="flex:1">
+      <input type="text" class="qs-label-group-label-input" placeholder="Labels (comma-separated, AND)" value="${esc(labels)}">
       <input type="number" class="qs-label-group-qty" min="1" value="${count}" title="Number of questions">
-      <span style="font-size:.78rem;color:#888;white-space:nowrap">questions</span>
+      <span class="qs-qty-label">questions</span>
       <button class="btn btn-sm btn-ghost" onclick="this.closest('.qs-label-group').remove()" type="button">✕</button>`;
     wrap.appendChild(div);
   }
@@ -1586,15 +1586,15 @@ $baseHref  = $scriptDir . '/';
 
       for (const group of groups) {
         const hdr = document.createElement('div');
-        hdr.style.cssText = 'margin:1.25rem 0 .4rem;display:flex;align-items:baseline;gap:.75rem';
-        hdr.innerHTML = `<strong style="font-size:1rem">${esc(group.quest_name)}</strong>`
-          + `<span style="font-size:.8rem;color:#888">${group.attempts.length} attempt${group.attempts.length !== 1 ? 's' : ''}</span>`;
+        hdr.className = 'qs-results-group-hdr';
+        hdr.innerHTML = `<strong class="qs-results-quest-name">${esc(group.quest_name)}</strong>`
+          + `<span class="qs-results-attempt-count">${group.attempts.length} attempt${group.attempts.length !== 1 ? 's' : ''}</span>`;
         wrap.appendChild(hdr);
 
         const table = document.createElement('table');
         table.className = 'qs-table';
         table.innerHTML = `<thead><tr>
-          <th>User</th><th>Date</th><th style="width:90px">Score / 10</th><th style="width:130px">Actions</th>
+          <th>User</th><th>Date</th><th class="qs-th-score">Score / 10</th><th class="qs-th-actions-lg">Actions</th>
         </tr></thead>`;
         const tbody = document.createElement('tbody');
         for (const a of group.attempts) {
@@ -1602,8 +1602,8 @@ $baseHref  = $scriptDir . '/';
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td><strong>${esc(a.username)}</strong></td>
-            <td style="color:#888;font-size:.82rem">${fmtDate(a.submitted_at)}</td>
-            <td style="text-align:center"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>
+            <td class="qs-date-td">${fmtDate(a.submitted_at)}</td>
+            <td class="qs-center-td"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>
             <td>
               <button class="btn btn-sm" onclick="qsAdminReviewAttempt(${a.id})">Review</button>
               <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteAttempt(${a.id})">Del</button>
@@ -1614,7 +1614,7 @@ $baseHref  = $scriptDir . '/';
         wrap.appendChild(table);
       }
     } catch (err) {
-      wrap.innerHTML = `<p style="padding:1rem;color:#c62828">${esc(err.message)}</p>`;
+      wrap.innerHTML = `<p class="qs-load-error">${esc(err.message)}</p>`;
     }
   }
 
@@ -1660,7 +1660,7 @@ $baseHref  = $scriptDir . '/';
           wrap.appendChild(grid);
         }
       } catch (err) {
-        wrap.innerHTML = `<p style="color:#c62828;padding:.5rem 0">${esc(err.message)}</p>`;
+        wrap.innerHTML = `<p class="qs-load-error-sm">${esc(err.message)}</p>`;
       }
     }
     // My attempts
@@ -1684,14 +1684,14 @@ $baseHref  = $scriptDir . '/';
                 <div class="qs-attempt-meta">${fmtDate(a.submitted_at)}</div>
               </div>
               <div class="qs-attempt-score ${scoreClass(a.score)}">${fmtScore(a.score)}</div>
-              <div style="padding-left:.75rem">
+              <div class="qs-attempt-actions">
                 ${a.revisable ? `<button class="btn btn-sm" onclick="qsReviewAttempt(${a.id})">Review</button>` : ''}
               </div>`;
             wrap.appendChild(div);
           }
         }
       } catch (err) {
-        wrap.innerHTML = `<p style="color:#c62828;padding:.5rem 0">${esc(err.message)}</p>`;
+        wrap.innerHTML = `<p class="qs-load-error-sm">${esc(err.message)}</p>`;
       }
     }
   }
@@ -1730,9 +1730,9 @@ $baseHref  = $scriptDir . '/';
     const pct      = Math.round((step / total) * 100);
 
     wrap.innerHTML = `
-      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <div class="qs-view-header">
         <button class="btn btn-sm btn-ghost" onclick="qsAbortWizard()">← Back to quests</button>
-        <strong style="flex:1;font-size:1rem">${esc(_wizardData.quest_name)}</strong>
+        <strong class="qs-view-title">${esc(_wizardData.quest_name)}</strong>
       </div>
       <div class="qs-wizard">
         <div class="qs-progress-bar-wrap">
@@ -1746,7 +1746,7 @@ $baseHref  = $scriptDir . '/';
         <div id="wizard-answer-area"></div>
         <div class="qs-wizard-nav">
           <button class="btn" onclick="qsWizardPrev()" ${step === 0 ? 'disabled' : ''}>← Previous</button>
-          <span style="font-size:.8rem;color:#888">${step+1} / ${total}</span>
+          <span class="qs-progress-label">${step+1} / ${total}</span>
           ${step < total - 1
             ? `<button class="btn btn-primary" onclick="qsWizardNext()">Next →</button>`
             : `<button class="btn btn-primary" onclick="qsSubmitWizard()">Submit quest</button>`
@@ -1883,9 +1883,9 @@ $baseHref  = $scriptDir . '/';
           <div class="sb-label">Your score</div>
           <div class="sb-detail">${data.correct} correct · ${data.incorrect} incorrect · ${data.skipped} skipped · ${data.total} total</div>
         </div>
-        <div class="sb-value">${fmtScore(data.score)}<span style="font-size:1.2rem;opacity:.7">/10</span></div>
+        <div class="sb-value">${fmtScore(data.score)}<span class="qs-score-suffix">/10</span></div>
       </div>
-      <p style="color:#555;margin-bottom:1.5rem;font-size:.95rem">Quest: <strong>${esc(_wizardData.quest_name)}</strong></p>
+      <p class="qs-result-text">Quest: <strong>${esc(_wizardData.quest_name)}</strong></p>
       <button class="btn btn-primary" onclick="qsLoadUserHome()">Back to quests</button>`;
   }
 
@@ -1932,10 +1932,10 @@ $baseHref  = $scriptDir . '/';
     }
 
     wrap.innerHTML = `
-      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <div class="qs-view-header">
         <button class="btn btn-sm btn-ghost" onclick="_reviewBackFn()">← Back</button>
-        <strong style="flex:1;font-size:1rem">${esc(_reviewData.quest_name)} — Review${_reviewIsAdmin && _reviewData.username ? ' (' + esc(_reviewData.username) + ')' : ''}</strong>
-        <span class="${scoreClass(_reviewData.score)}" style="font-size:1.1rem;font-weight:700">${fmtScore(_reviewData.score)}/10</span>
+        <strong class="qs-view-title">${esc(_reviewData.quest_name)} — Review${_reviewIsAdmin && _reviewData.username ? ' (' + esc(_reviewData.username) + ')' : ''}</strong>
+        <span class="${scoreClass(_reviewData.score)} qs-review-score">${fmtScore(_reviewData.score)}/10</span>
       </div>
       <div class="qs-wizard">
         <div class="qs-progress-bar-wrap">
@@ -1944,7 +1944,7 @@ $baseHref  = $scriptDir . '/';
         <div class="qs-question-header">
           <span class="qs-question-num">Question ${step + 1} / ${total}</span>
           <span class="qs-question-type-badge">${esc(q.type.replace(/_/g,' '))}</span>
-          <span class="${isCorrect ? 'score-high' : 'score-low'}" style="font-size:.8rem;font-weight:700">
+          <span class="${isCorrect ? 'score-high' : 'score-low'} qs-correct-indicator">
             ${isCorrect ? '✔ Correct' : '✘ Incorrect'}
           </span>
         </div>
@@ -1952,7 +1952,7 @@ $baseHref  = $scriptDir . '/';
         <div id="review-answer-area"></div>
         <div class="qs-wizard-nav">
           <button class="btn" onclick="qsReviewPrev()" ${step === 0 ? 'disabled' : ''}>← Previous</button>
-          <span style="font-size:.8rem;color:#888">${step+1} / ${total}</span>
+          <span class="qs-progress-label">${step+1} / ${total}</span>
           ${step < total - 1
             ? `<button class="btn btn-primary" onclick="qsReviewNext()">Next →</button>`
             : `<button class="btn btn-primary" onclick="_reviewBackFn()">Finish review</button>`
@@ -2048,7 +2048,7 @@ $baseHref  = $scriptDir . '/';
         ul.appendChild(li);
         if (!isOk) {
           const hint = document.createElement('li');
-          hint.style.cssText = 'grid-column:1/-1;margin-bottom:.4rem';
+          hint.className = 'qs-matching-hint-row';
           hint.innerHTML = `<span class="qs-review-correct">✔ Correct: ${esc(key)} → ${esc(correctVal)}</span>`;
           ul.appendChild(hint);
         }
