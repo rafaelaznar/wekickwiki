@@ -438,6 +438,8 @@ $baseHref  = $scriptDir . '/';
     .btn-ghost { background: transparent; border-color: transparent; color: #8A0808; }
     .btn-ghost:hover { background: #f0e0e0; border-color: #f0e0e0; }
     .btn svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    #pq-logout-btn { color: #c00; border-color: #c00; }
+    #pq-logout-btn:hover { background: #fff5f5; }
 
     /* ── Structure editor ─────────────────────────────────────────── */
     #structure-root-name {
@@ -881,12 +883,11 @@ $baseHref  = $scriptDir . '/';
     </a>
     <div id="pq-header-right">
       <span id="pq-user-badge"></span>
-      <button class="btn btn-sm" id="pq-theme-btn" title="Change theme" aria-label="Change theme" style="display:none" onclick="pqToggleThemePanel()">
+      <button class="btn" id="pq-theme-btn" title="Change theme" aria-label="Change theme" style="display:none" onclick="pqToggleThemePanel()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
       </button>
-      <button class="btn btn-sm" id="pq-logout-btn" onclick="pqLogout()">
+      <button class="btn" id="pq-logout-btn" title="Sign out" aria-label="Sign out" onclick="pqLogout()">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        Sign out
       </button>
     </div>
   </div>

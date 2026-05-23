@@ -80,6 +80,8 @@ body::after {
 .btn-ghost { background: transparent; border-color: transparent; color: #d4299a; }
 .btn-ghost:hover { background: #fce7f3; }
 .btn svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#qs-logout-btn { color: #c00; border-color: #c00; }
+#qs-logout-btn:hover { background: #fff5f5; }
 
 /* ── Tables ───────────────────────────────────────────────────────────── */
 .qs-table-wrap { overflow-x: auto; margin-top: 1rem; border: 2px solid #f9a8d4; border-radius: 8px; }

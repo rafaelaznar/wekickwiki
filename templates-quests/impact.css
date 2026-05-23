@@ -50,6 +50,8 @@ body {
 .btn-ghost { background: transparent; border-color: transparent; color: #e85d04; }
 .btn-ghost:hover { background: #1a1a2e; }
 .btn svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+#qs-logout-btn { color: #c00; border-color: #c00; }
+#qs-logout-btn:hover { background: #fff5f5; }
 
 /* ── Tables ───────────────────────────────────────────────────────────── */
 .qs-table-wrap { overflow-x: auto; margin-top: 1rem; border: 1px solid #2a2a4a; border-radius: 4px; }
