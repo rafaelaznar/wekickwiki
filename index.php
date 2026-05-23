@@ -1,48 +1,487 @@
 <?php
 // ═══════════════════════════════════════════════════════════════════════════
-// JWT, configuration and user helpers — shared with other apps via lib/auth.php
+// index.php — Central authentication hub for WeKickWiki
+//
+// Handles all auth API endpoints (login, user management) shared by:
+//   wiki.php, marks.php, quests.php
+//
+// Includes:
+//   lib/auth.php      — JWT helpers, load_users(), require_auth(), json_out()
+//   lib/users-api.php — ?action=login, get-users, save-users, add-guest,
+//                       edit-guest, delete-guest, reset-password, change-password
 // ═══════════════════════════════════════════════════════════════════════════
+
 require_once __DIR__ . '/lib/auth.php';
+require_once __DIR__ . '/lib/users-api.php';
 
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Base path detection
-// ═══════════════════════════════════════════════════════════════════════════
+// ── Base path detection ───────────────────────────────────────────────────────
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
 $baseHref  = $scriptDir . '/';
 
-// ═══════════════════════════════════════════════════════════════════════════
-// User-management API endpoints — shared via lib/users-api.php
-// Handles: login, get-users, save-users, add-guest, edit-guest, delete-guest,
-//          reset-password, change-password
-// ═══════════════════════════════════════════════════════════════════════════
-require_once __DIR__ . '/lib/users-api.php';
-require_once __DIR__ . '/lib/wiki-api.php';
-
-// Load validated settings before rendering the HTML shell; values are PHP-escaped on output.
-$settings = load_settings();
+// ── Read app name from settings ───────────────────────────────────────────────
+$_rawSettings = is_file(SETTINGS_FILE)
+    ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? [])
+    : [];
+$hubName = (!empty($_rawSettings['wikiName']) && is_string($_rawSettings['wikiName']))
+    ? $_rawSettings['wikiName']
+    : 'WeKickWiki';
+unset($_rawSettings);
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title><?= htmlspecialchars($settings['wikiName']) ?></title>
+  <title><?= htmlspecialchars($hubName) ?></title>
   <base href="<?= htmlspecialchars($baseHref) ?>">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <script src="vendor/marked.min.js"></script>
-  <script src="vendor/highlight.min.js"></script>
-  <link id="hljs-theme-link" rel="stylesheet" href="vendor/highlight-themes/<?= htmlspecialchars($settings['hljsTheme'], ENT_QUOTES) ?>">
-  <link rel="stylesheet" href="templates/<?= htmlspecialchars($settings['theme'], ENT_QUOTES) ?>">
-</head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    body {
+      line-height: 1.6;
+      color: #222;
+      font: normal 87.5%/1.4 Arial, system-ui, sans-serif;
+      background: #fbfaf9;
+    }
+
+    /* ── Login screen ─────────────────────────────────────────────────── */
+    #login-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #f4f4f5;
+      padding: 1rem;
+    }
+    #login-box {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.07);
+    }
+    #login-box h2 {
+      font-size: 1.3rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    #login-box label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 600;
+      margin-bottom: .9rem;
+    }
+    #login-box input {
+      display: block;
+      width: 100%;
+      margin-top: .25rem;
+      padding: .55rem .75rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 1rem;
+      outline: none;
+    }
+    #login-box input:focus { border-color: #05c; }
+    #login-box button {
+      width: 100%;
+      margin-top: 1.2rem;
+      padding: .65rem;
+      background: #05c;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #login-box button:hover { background: #004ab3; }
+    #login-error {
+      margin-top: .75rem;
+      font-size: .85rem;
+      color: #c00;
+      text-align: center;
+      min-height: 1.2rem;
+    }
+
+    /* ── Hub screen ───────────────────────────────────────────────────── */
+    #hub-screen { display: none; }
+
+    #hub-header {
+      border-bottom: 2px solid #222;
+      padding: .5rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: #fff;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,.1);
+      min-height: 50px;
+    }
+    #hub-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #111;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      text-decoration: none;
+    }
+    #hub-header-right {
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+    }
+    #hub-user-badge {
+      font-size: .82rem;
+      color: #555;
+      font-weight: 600;
+    }
+
+    /* ── Hub main ─────────────────────────────────────────────────────── */
+    #hub-main {
+      max-width: 860px;
+      margin: 80px auto 50px;
+      padding: 2rem 1.5rem;
+    }
+    #hub-main h2 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #444;
+      margin-bottom: 1.25rem;
+    }
+    #hub-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+    .hub-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .75rem;
+      padding: 2rem 1.5rem;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 10px;
+      text-decoration: none;
+      color: #222;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      transition: box-shadow .15s, border-color .15s, transform .12s;
+      cursor: pointer;
+    }
+    .hub-card:hover {
+      box-shadow: 0 6px 20px rgba(0,0,0,.12);
+      border-color: #05c;
+      transform: translateY(-2px);
+    }
+    .hub-card svg {
+      width: 2.5rem;
+      height: 2.5rem;
+      fill: none;
+      stroke: #05c;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .hub-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      text-align: center;
+    }
+    .hub-card p {
+      font-size: .82rem;
+      color: #777;
+      text-align: center;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .45rem .9rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fafafa;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      color: #333;
+      text-decoration: none;
+      transition: background .15s, border-color .15s;
+    }
+    .btn:hover { background: #eee; border-color: #bbb; }
+    .btn-primary { background: #05c; color: #fff; border-color: #05c; }
+    .btn-primary:hover { background: #004ab3; border-color: #004ab3; }
+    .btn-sm { padding: .25rem .55rem; font-size: .78rem; }
+    .btn-danger { background: #c0392b; color: #fff; border-color: #c0392b; }
+    .btn-danger:hover { background: #a93226; border-color: #a93226; }
+    .btn svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ── Users management panel ───────────────────────────────────────── */
+    #users-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 100;
+    }
+    #users-panel {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(820px, 96vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      background: #fff;
+      box-shadow: 0 8px 40px rgba(0,0,0,.22);
+      border-radius: 8px;
+      padding: 1.5rem 1.75rem 1.75rem;
+      z-index: 101;
+    }
+    #users-panel h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #users-panel button.close-btn {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #666;
+      line-height: 1;
+    }
+    #users-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+      align-items: start;
+      margin-bottom: .5rem;
+    }
+    @media (max-width: 560px) { #users-grid { grid-template-columns: 1fr; } }
+    .user-card {
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: .6rem .85rem;
+      background: #fafafa;
+    }
+    .admin-card { border-color: #b8d4f4; background: #f0f6ff; }
+    .user-card-view { display: flex; align-items: center; gap: .5rem; }
+    .user-card-info { flex: 1; min-width: 0; }
+    .user-card-name { font-size: .88rem; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-card-username { font-size: .75rem; color: #888; display: block; }
+    .user-card-badge {
+      display: inline-block;
+      font-size: .63rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #2a7ae2;
+      color: #fff;
+      border-radius: 3px;
+      padding: .05rem .35rem;
+      margin-top: .2rem;
+    }
+    .user-card-controls { display: flex; align-items: center; gap: .3rem; flex-shrink: 0; }
+    .user-card-edit { margin-top: .5rem; border-top: 1px solid #e0e0e0; padding-top: .5rem; }
+    .user-card-edit label { display: block; font-size: .8rem; font-weight: 600; color: #333; margin-top: .4rem; }
+    .user-card-edit label:first-of-type { margin-top: 0; }
+    .user-card-edit input {
+      display: block;
+      width: 100%;
+      margin-top: .15rem;
+      padding: .35rem .55rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .85rem;
+      outline: none;
+      font-family: inherit;
+    }
+    .user-card-edit input:focus { border-color: #05c; }
+    .guest-edit-status { font-size: .78rem; color: #c0392b; display: block; min-height: 1rem; margin-top: .25rem; }
+    #guest-add-form fieldset {
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: .75rem 1rem .85rem;
+      margin-top: .75rem;
+    }
+    #guest-add-form legend {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: #555;
+      padding: 0 .35rem;
+    }
+    #guest-add-form label { display: block; font-size: .82rem; font-weight: 600; color: #333; margin-top: .6rem; }
+    #guest-add-form label:first-of-type { margin-top: 0; }
+    #guest-add-form input {
+      display: block;
+      width: 100%;
+      margin-top: .2rem;
+      padding: .45rem .65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .92rem;
+      outline: none;
+      font-family: inherit;
+    }
+    #guest-add-form input:focus { border-color: #05c; }
+    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #ccc;
+      border-radius: 22px;
+      cursor: pointer;
+      transition: .25s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .25s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: #2a7ae2; }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(16px); }
+
+    /* ── Change password panel ────────────────────────────────────────── */
+    #change-password-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 102;
+    }
+    #change-password-panel {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(340px, 92vw);
+      background: #fff;
+      box-shadow: 0 8px 40px rgba(0,0,0,.22);
+      border-radius: 8px;
+      padding: 1.5rem 1.75rem 1.75rem;
+      z-index: 103;
+    }
+    #change-password-panel h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    #change-password-panel .close-btn {
+      background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #666; line-height: 1;
+    }
+    #change-password-form label { display: block; font-size: .82rem; font-weight: 600; color: #333; margin-top: .75rem; }
+    #change-password-form label:first-of-type { margin-top: 0; }
+    #change-password-form input {
+      display: block;
+      width: 100%;
+      margin-top: .2rem;
+      padding: .45rem .65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .92rem;
+      outline: none;
+      font-family: inherit;
+    }
+    #change-password-form input:focus { border-color: #05c; }
+    #change-password-form-actions {
+      display: flex;
+      gap: .6rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    #change-password-status { font-size: .8rem; color: #c0392b; flex: 1; line-height: 1.4; }
+
+    /* ── Reset password dialog ────────────────────────────────────────── */
+    #reset-password-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 200;
+    }
+    #reset-password-dialog {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(320px, 92vw);
+      background: #fff;
+      box-shadow: 0 8px 40px rgba(0,0,0,.22);
+      border-radius: 8px;
+      padding: 1.5rem 1.75rem 1.75rem;
+      z-index: 201;
+    }
+    #reset-password-dialog h4 { font-size: .95rem; font-weight: 700; margin-bottom: 1rem; }
+    #reset-password-dialog label { display: block; font-size: .82rem; font-weight: 600; color: #333; margin-top: .75rem; }
+    #reset-password-dialog label:first-of-type { margin-top: 0; }
+    #reset-password-dialog input {
+      display: block;
+      width: 100%;
+      margin-top: .2rem;
+      padding: .45rem .65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .92rem;
+      outline: none;
+      font-family: inherit;
+    }
+    #reset-password-dialog input:focus { border-color: #05c; }
+    #reset-password-actions {
+      display: flex;
+      gap: .6rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    #reset-password-status { font-size: .8rem; color: #c0392b; flex: 1; line-height: 1.4; }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    #footer {
+      text-align: center;
+      margin: 1rem auto 2rem;
+    }
+    #footer a { font-size: .75rem; color: #8A0808; }
+  </style>
+</head>
 <body>
 
-  <!-- ── Login screen ─────────────────────────────────────── -->
+  <!-- ── Login screen ──────────────────────────────────────────────── -->
   <div id="login-screen">
     <div id="login-box">
-      <h2><img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt=""><?= htmlspecialchars($settings['wikiName']) ?> — Sign in</h2>
+      <h2>
+        <img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt="">
+        <?= htmlspecialchars($hubName) ?> — Sign in
+      </h2>
       <form id="login-form" novalidate>
         <label>Username
           <input id="login-user" type="text" autocomplete="username" required autofocus>
@@ -50,126 +489,81 @@ $settings = load_settings();
         <label>Password
           <input id="login-pass" type="password" autocomplete="current-password" required>
         </label>
-        <button type="submit" title="Sign in" aria-label="Sign in"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-            <polyline points="10 17 15 12 10 7" />
-            <line x1="15" y1="12" x2="3" y2="12" />
-          </svg></button>
+        <button type="submit" title="Sign in" aria-label="Sign in">
+          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;margin-right:.4rem">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          Sign in
+        </button>
         <p id="login-error"></p>
       </form>
     </div>
   </div>
 
-  <!-- ── Wiki screen ──────────────────────────────────────── -->
-  <div id="wiki-screen" style="display:none">
-    <header>
-      <a id="header-title" href="" onclick="navigate('index');return false;"><img src="icon.svg" style="display:inline; width:1.5rem; height:1.5rem; margin-right:0.5rem; vertical-align:middle;" alt=""><?= htmlspecialchars($settings['wikiName']) ?></a>
-      <div id="header-right">
-        <span id="user-badge"></span>
-        <button class="btn" id="mobile-menu-btn" aria-label="Menu" aria-expanded="false" onclick="toggleMobileMenu()"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-        <div id="header-buttons">
-        <button class="btn" id="toc-btn" title="Table of contents" aria-label="Table of contents" style="display:none" onclick="toggleToc()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="3" y1="5" x2="21" y2="5" />
-            <line x1="6" y1="10" x2="21" y2="10" />
-            <line x1="10" y1="15" x2="21" y2="15" />
-            <line x1="6" y1="20" x2="21" y2="20" />
-          </svg></button>
-        <button class="btn" id="index-btn" title="Index" aria-label="Index" style="display:none" onclick="toggleIndex()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="21" y1="5" x2="3" y2="5" />
-            <line x1="18" y1="10" x2="3" y2="10" />
-            <line x1="14" y1="15" x2="3" y2="15" />
-            <line x1="18" y1="20" x2="3" y2="20" />
-          </svg></button>
-        <button class="btn" id="users-btn" title="Manage users" aria-label="Manage users" style="display:none" onclick="toggleUsersPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-            <circle cx="19" cy="8" r="3" stroke-width="1.5" />
-            <line x1="19" y1="11" x2="19" y2="14" />
-            <line x1="17.5" y1="12.5" x2="20.5" y2="12.5" />
-          </svg></button>
-        <button class="btn" id="backup-btn" title="Download backup" aria-label="Download backup" style="display:none" onclick="downloadBackup()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="8 17 12 21 16 17" />
-            <line x1="12" y1="12" x2="12" y2="21" />
-            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
-          </svg></button>
-        <button class="btn btn-danger" id="restore-btn" title="Restore backup" aria-label="Restore backup" style="display:none" onclick="restoreBackup()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="16 16 12 12 8 16" />
-            <line x1="12" y1="12" x2="12" y2="21" />
-            <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" />
-          </svg></button>
-        <input type="file" id="restore-input" accept=".txt" style="display:none">
-        <button class="btn" id="settings-btn" title="Settings" aria-label="Settings" style="display:none" onclick="toggleSettingsPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg></button>
-        <button class="btn" id="plugins-btn" title="Plugins" aria-label="Plugins" style="display:none" onclick="togglePluginsPanel()"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z" />
-            <line x1="16" y1="8" x2="2" y2="22" />
-            <line x1="17.5" y1="15" x2="9" y2="15" />
-          </svg></button>
-        <button class="btn" id="edit-btn" title="Edit" aria-label="Edit" style="display:none" onclick="toggleEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-          </svg></button>
-        <button class="btn btn-danger" id="delete-btn" title="Delete" aria-label="Delete" style="display:none" onclick="deletePage()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-            <path d="M10 11v6" />
-            <path d="M14 11v6" />
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-          </svg></button>
-        <button class="btn" id="home-btn" title="Home" aria-label="Home" style="display:none" onclick="navigate('index')"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg></button>
-        <button class="btn" id="top-btn" title="Go to top" aria-label="Go to top" style="display:none" onclick="window.scrollTo({top:0,behavior:'smooth'})"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="12" y1="19" x2="12" y2="5" />
-            <polyline points="5 12 12 5 19 12" />
-          </svg></button>
-        <button class="btn" id="odt-btn" title="Download as ODT" aria-label="Download as ODT" style="display:none" onclick="downloadOdt()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="12" y1="18" x2="12" y2="12" />
-            <polyline points="9 15 12 18 15 15" />
-          </svg></button>
-        <button class="btn btn-danger" id="logout-btn" title="Sign out" aria-label="Sign out" onclick="logout()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg></button>
-        <button class="btn" id="change-pass-btn" title="Change my password" aria-label="Change my password" style="display:none" onclick="toggleChangePasswordPanel()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg></button>
-        </div>
+  <!-- ── Hub screen (after login) ──────────────────────────────────── -->
+  <div id="hub-screen">
+    <header id="hub-header">
+      <div id="hub-title">
+        <img src="icon.svg" style="width:1.4rem;height:1.4rem;" alt="">
+        <?= htmlspecialchars($hubName) ?>
+      </div>
+      <div id="hub-header-right">
+        <span id="hub-user-badge"></span>
+        <button class="btn btn-sm" id="hub-users-btn" title="Manage users" aria-label="Manage users" style="display:none" onclick="hubToggleUsersPanel()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="3" stroke-width="1.5"/><line x1="19" y1="11" x2="19" y2="14"/><line x1="17.5" y1="12.5" x2="20.5" y2="12.5"/></svg>
+          Users
+        </button>
+        <button class="btn btn-sm" id="hub-change-pass-btn" title="Change my password" aria-label="Change my password" style="display:none" onclick="hubToggleChangePasswordPanel()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Password
+        </button>
+        <button class="btn btn-sm" onclick="hubLogout()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </button>
       </div>
     </header>
-    <nav id="nav"></nav>
-    <main id="content"></main>
 
-    <!-- Plugins panel -->
-    <div id="plugins-overlay" onclick="togglePluginsPanel()"></div>
-    <div id="plugins-panel">
-      <h3>Plugins <button class="close-btn" onclick="togglePluginsPanel()">&times;</button></h3>
-      <div id="plugins-list"></div>
-    </div>
+    <main id="hub-main">
+      <h2>Select a module</h2>
+      <div id="hub-cards">
+        <a href="wiki.php" class="hub-card">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+          <h3>Wiki</h3>
+          <p>Document and share knowledge</p>
+        </a>
+        <a href="marks.php" class="hub-card">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          <h3>Qualifications</h3>
+          <p>Track and review student grades</p>
+        </a>
+        <a href="quests.php" class="hub-card">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <h3>Quests</h3>
+          <p>Create and take interactive quizzes</p>
+        </a>
+      </div>
+    </main>
 
-    <!-- TOC panel -->
-    <div id="toc-overlay" onclick="toggleToc()"></div>
-    <div id="toc-panel">
-      <h3>Contents <button class="close-btn" onclick="toggleToc()">&times;</button></h3>
-      <div id="toc-list"></div>
-    </div>
-    <!-- Index panel -->
-    <div id="index-overlay" onclick="toggleIndex()"></div>
-    <div id="index-panel">
-      <h3>Pages <button class="close-btn" onclick="toggleIndex()">&times;</button></h3>
-      <div id="index-tree"></div>
-    </div>
-    <!-- Users management panel -->
-    <div id="users-overlay" onclick="toggleUsersPanel()"></div>
+    <!-- Users management panel (admin only) -->
+    <div id="users-overlay" onclick="hubToggleUsersPanel()"></div>
     <div id="users-panel">
-      <h3>Manage users <button class="close-btn" onclick="toggleUsersPanel()">&times;</button></h3>
+      <h3>Manage users <button class="close-btn" onclick="hubToggleUsersPanel()">&times;</button></h3>
       <div id="users-grid"></div>
       <div id="guest-add-form" style="display:none">
         <fieldset>
@@ -188,18 +582,18 @@ $settings = load_settings();
           </label>
           <div style="display:flex;gap:.5rem;margin-top:.6rem;align-items:center">
             <span id="guest-add-status" style="flex:1;font-size:.8rem;color:#c0392b"></span>
-            <button type="button" class="btn" onclick="hideAddGuestForm()">Cancel</button>
-            <button type="button" class="btn btn-primary" onclick="submitAddGuest()">Add</button>
+            <button type="button" class="btn btn-sm" onclick="hubHideAddGuestForm()">Cancel</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick="hubSubmitAddGuest()">Add</button>
           </div>
         </fieldset>
       </div>
-      <button type="button" class="btn" id="guest-add-btn" onclick="showAddGuestForm()" style="margin-top:.75rem;width:100%">+ Add guest user</button>
+      <button type="button" class="btn btn-sm" id="guest-add-btn" onclick="hubShowAddGuestForm()" style="margin-top:.75rem;width:100%">+ Add guest user</button>
     </div>
 
-    <!-- Change password panel (guest self-service) -->
-    <div id="change-password-overlay" onclick="toggleChangePasswordPanel()"></div>
+    <!-- Change password panel (self-service) -->
+    <div id="change-password-overlay" onclick="hubToggleChangePasswordPanel()"></div>
     <div id="change-password-panel">
-      <h3>Change my password <button class="close-btn" onclick="toggleChangePasswordPanel()">&times;</button></h3>
+      <h3>Change my password <button class="close-btn" onclick="hubToggleChangePasswordPanel()">&times;</button></h3>
       <form id="change-password-form" novalidate>
         <label>New password
           <input type="password" id="change-pass-new" autocomplete="new-password" placeholder="••••••••">
@@ -209,8 +603,8 @@ $settings = load_settings();
         </label>
         <div id="change-password-form-actions">
           <span id="change-password-status"></span>
-          <button type="button" class="btn" onclick="toggleChangePasswordPanel()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Change password</button>
+          <button type="button" class="btn btn-sm" onclick="hubToggleChangePasswordPanel()">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Change password</button>
         </div>
       </form>
     </div>
@@ -227,114 +621,20 @@ $settings = load_settings();
       </label>
       <div id="reset-password-actions">
         <span id="reset-password-status"></span>
-        <button type="button" class="btn" id="reset-password-cancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="reset-password-ok">Reset</button>
+        <button type="button" class="btn btn-sm" id="reset-password-cancel">Cancel</button>
+        <button type="button" class="btn btn-sm btn-primary" id="reset-password-ok">Reset</button>
       </div>
     </div>
-    <!-- Settings panel -->
-    <div id="settings-overlay" onclick="toggleSettingsPanel()"></div>
-    <!-- Confirm delete dialog -->
-    <div id="confirm-delete-overlay"></div>
-    <div id="confirm-delete-dialog" role="dialog" aria-modal="true">
-      <p id="confirm-delete-msg"></p>
-      <p class="confirm-delete-subtitle">This action cannot be undone.</p>
-      <div class="confirm-delete-actions">
-        <button class="btn" id="confirm-delete-cancel">Cancel</button>
-        <button class="btn btn-danger" id="confirm-delete-ok">Delete</button>
-      </div>
-    </div>
-    <div id="settings-panel">
-      <h3>Settings <button class="close-btn" onclick="toggleSettingsPanel()">&times;</button></h3>
-      <form id="settings-form" novalidate>
-        <label>Wiki name
-          <input type="text" id="settings-wiki-name" autocomplete="off" maxlength="64">
-        </label>
-        <label>Theme
-          <select id="settings-theme"></select>
-        </label>
-        <label>Code highlight theme
-          <select id="settings-hljs-theme"></select>
-        </label>
-        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
-          <input type="checkbox" id="settings-code-line-numbers" style="width:auto;cursor:pointer">
-          <label for="settings-code-line-numbers" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Show line numbers in code blocks</label>
-        </div>
-        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
-          <input type="checkbox" id="settings-guest-odt-download" style="width:auto;cursor:pointer">
-          <label for="settings-guest-odt-download" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest to download ODT</label>
-        </div>
-        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
-          <input type="checkbox" id="settings-guest-toc" style="width:auto;cursor:pointer">
-          <label for="settings-guest-toc" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest to view Table of contents</label>
-        </div>
-        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.85rem">
-          <input type="checkbox" id="settings-guest-index" style="width:auto;cursor:pointer">
-          <label for="settings-guest-index" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest to view Index</label>
-        </div>
-        <fieldset style="border:1px solid #e0e0e0;border-radius:6px;padding:.75rem 1rem .85rem;margin-top:1rem">
-          <legend style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#555;padding:0 .35rem">Security</legend>
-          <div style="display:flex;align-items:center;gap:.6rem;margin-top:.25rem">
-            <input type="checkbox" id="settings-guest-login-enabled" style="width:auto;cursor:pointer">
-            <label for="settings-guest-login-enabled" style="margin:0;font-weight:600;font-size:.82rem;color:#333;cursor:pointer">Allow guest logins</label>
-          </div>
-          <div id="settings-jwt-secret-row">
-            <label style="margin-top:.85rem">JWT Secret <span class="hint">(leave blank to keep)</span>
-              <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep" style="font-family:monospace;font-size:.85rem">
-            </label>
-            <label id="settings-admin-pass-label" style="display:none;margin-top:.6rem">Admin password <span class="hint">(required when changing JWT secret)</span>
-              <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
-            </label>
-          </div>
-          <label style="margin-top:.6rem">Token TTL <span class="hint">(seconds, 60&#x2013;86400)</span>
-            <input type="number" id="settings-token-ttl" min="60" max="86400" step="60">
-          </label>
-        </fieldset>
-        <div id="settings-form-actions">
-          <span id="settings-save-status"></span>
-          <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
-        </div>
-      </form>
-    </div>
-    <div id="editor">
-      <div id="editor-bar">
-        <button class="btn btn-primary" title="Save" aria-label="Save" onclick="save()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-            <polyline points="17 21 17 13 7 13 7 21" />
-            <polyline points="7 3 7 8 15 8" />
-          </svg></button>
-        <button class="btn" title="Cancel" aria-label="Cancel" onclick="cancelEdit()"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg></button>
-        <span id="save-status"></span>
-      </div>
-      <textarea id="editor-area" spellcheck="false"></textarea>
-    </div>
-  </div>
+  </div><!-- #hub-screen -->
 
   <div id="footer">
-    <a href="https://github.com/rafaelaznar/wekickwiki"><?= htmlspecialchars($settings['wikiName']) ?> 2026 v2 | MIT Licensed | By Rafael Aznar</a>
+    <a href="https://github.com/rafaelaznar/wekickwiki"><?= htmlspecialchars($hubName) ?> 2026 v2 | MIT Licensed | By Rafael Aznar</a>
   </div>
 
-  <div id="toast"></div>
-
-  <?php // Expose the base path and code-line-numbers flag to JavaScript before loading the main app 
-  ?>
   <script>
     window.WKW_BASE = <?= json_encode($baseHref) ?>;
-    window.WKW_CODE_LINE_NUMBERS = <?= $settings['codeLineNumbers'] ? 'true' : 'false' ?>;
-    window.WKW_GUEST_ODT_DOWNLOAD = <?= $settings['guestOdtDownload'] ? 'true' : 'false' ?>;
-    window.WKW_GUEST_TOC   = <?= $settings['guestToc']   ? 'true' : 'false' ?>;
-    window.WKW_GUEST_INDEX = <?= $settings['guestIndex'] ? 'true' : 'false' ?>;
   </script>
   <script src="lib/auth-client.js?v=<?= filemtime(__DIR__ . '/lib/auth-client.js') ?>"></script>
-  <script src="wiki.js?v=<?= filemtime(__DIR__ . '/wiki.js') ?>"></script>
-  <?php // Dynamically inject each enabled front-end plugin as a <script> tag 
-  ?>
-  <?php foreach (front_plugins() as $pf): ?>
-    <script src="front-plugins/<?= htmlspecialchars($pf, ENT_QUOTES) ?>"></script>
-  <?php endforeach; ?>
+  <script src="lib/hub.js?v=<?= filemtime(__DIR__ . '/lib/hub.js') ?>"></script>
 </body>
-
 </html>

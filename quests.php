@@ -15,7 +15,6 @@
 
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/data.php';
-require_once __DIR__ . '/lib/users-api.php';
 
 // ── Data-file paths ──────────────────────────────────────────────────────────
 define('QS_QUERIES_FILE',  __DIR__ . '/queries.json');
@@ -779,33 +778,6 @@ $baseHref  = $scriptDir . '/';
 </head>
 <body>
 
-  <!-- ── Login screen ─────────────────────────────────────────────────── -->
-  <div id="login-screen">
-    <div id="login-box">
-      <h2>
-        <img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt="">
-        <?= htmlspecialchars($qs_app_name) ?> — Sign in
-      </h2>
-      <form id="login-form" novalidate>
-        <label>Username
-          <input id="login-user" type="text" autocomplete="username" required autofocus>
-        </label>
-        <label>Password
-          <input id="login-pass" type="password" autocomplete="current-password" required>
-        </label>
-        <button type="submit">
-          <svg viewBox="0 0 24 24" style="width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;margin-right:.4rem" aria-hidden="true">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          Sign in
-        </button>
-        <p id="login-error"></p>
-      </form>
-    </div>
-  </div>
-
   <!-- ── App header ───────────────────────────────────────────────────── -->
   <div id="qs-header" style="display:none">
     <a href="quests.php">
@@ -1079,16 +1051,10 @@ $baseHref  = $scriptDir . '/';
 
   function qsLogout() {
     sessionStorage.clear();
-    document.getElementById('qs-header').style.display  = 'none';
-    document.getElementById('qs-screen').style.display  = 'none';
-    document.getElementById('login-screen').style.display = '';
-    document.getElementById('login-user').value = '';
-    document.getElementById('login-pass').value = '';
-    document.getElementById('login-error').textContent = '';
+    window.location.href = 'index.php';
   }
 
   function qsShowApp() {
-    document.getElementById('login-screen').style.display = 'none';
     document.getElementById('qs-header').style.display = 'flex';
     document.getElementById('qs-screen').style.display = 'block';
     document.getElementById('qs-user-badge').textContent = getUser() + ' (' + getRole() + ')';
@@ -1109,36 +1075,8 @@ $baseHref  = $scriptDir . '/';
     }
   }
 
-  // ── Login ──────────────────────────────────────────────────────────────────
-  document.getElementById('login-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const user  = document.getElementById('login-user').value.trim();
-    const pass  = document.getElementById('login-pass').value;
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
-    const hash = await sha256(pass);
-    try {
-      const res  = await fetch('quests.php?action=login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, hash })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        sessionStorage.setItem('wkw_token', data.token);
-        sessionStorage.setItem('wkw_role',  data.role);
-        sessionStorage.setItem('wkw_user',  user);
-        sessionStorage.setItem('wkw_name',  data.name || user);
-        qsShowApp();
-        qsRoute();
-      } else {
-        errEl.textContent = data.error || 'Authentication error';
-      }
-    } catch { errEl.textContent = 'Connection error'; }
-  });
-
   if (getToken()) { qsShowApp(); qsRoute(); }
+  else { window.location.href = 'index.php'; }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — Tab switching ───────────────────────────────────────────────────

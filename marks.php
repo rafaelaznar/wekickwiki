@@ -13,7 +13,6 @@
 
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/data.php';
-require_once __DIR__ . '/lib/users-api.php';  // handles ?action=login, get-users, etc.
 
 // ── Data-file paths ──────────────────────────────────────────────────────────
 define('PQ_ITEMS_FILE', __DIR__ . '/items.json');
@@ -874,32 +873,6 @@ $baseHref  = $scriptDir . '/';
 <body>
 
   <!-- ── Login screen (exact replica of index.php) ────────────────── -->
-  <div id="login-screen">
-    <div id="login-box">
-      <h2>
-        <img src="icon.svg" style="width:2rem;height:2rem;vertical-align:middle;margin-right:.5rem;" alt="">
-        <?= htmlspecialchars($pq_app_name) ?> — Sign in
-      </h2>
-      <form id="login-form" novalidate>
-        <label>Username
-          <input id="login-user" type="text" autocomplete="username" required autofocus>
-        </label>
-        <label>Password
-          <input id="login-pass" type="password" autocomplete="current-password" required>
-        </label>
-        <button type="submit" title="Sign in" aria-label="Sign in">
-          <svg viewBox="0 0 24 24" aria-hidden="true" style="width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;margin-right:.4rem">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
-          </svg>
-          Sign in
-        </button>
-        <p id="login-error"></p>
-      </form>
-    </div>
-  </div>
-
   <!-- ── App screen ────────────────────────────────────────────────── -->
   <div id="pq-header" style="display:none">
     <a href="marks.php">
@@ -1043,16 +1016,10 @@ $baseHref  = $scriptDir . '/';
 
   function pqLogout() {
     sessionStorage.clear();
-    document.getElementById('pq-header').style.display = 'none';
-    document.getElementById('pq-screen').style.display = 'none';
-    document.getElementById('login-screen').style.display = '';
-    document.getElementById('login-user').value = '';
-    document.getElementById('login-pass').value = '';
-    document.getElementById('login-error').textContent = '';
+    window.location.href = 'index.php';
   }
 
   function pqShowApp() {
-    document.getElementById('login-screen').style.display = 'none';
     document.getElementById('pq-header').style.display = 'flex';
     document.getElementById('pq-screen').style.display = 'block';
     document.getElementById('pq-user-badge').textContent = getUser() + ' (' + getRole() + ')';
@@ -1075,42 +1042,12 @@ $baseHref  = $scriptDir . '/';
     }
   }
 
-  // ── Login form (exact pattern from wiki.js) ────────────────────────────
-  document.getElementById('login-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const user  = document.getElementById('login-user').value.trim();
-    const pass  = document.getElementById('login-pass').value;
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = '';
-    if (!user || !pass) { errEl.textContent = 'Please fill in all fields'; return; }
-
-    const hash = await sha256(pass);
-    try {
-      const res  = await fetch('marks.php?action=login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, hash })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        sessionStorage.setItem('wkw_token', data.token);
-        sessionStorage.setItem('wkw_role',  data.role);
-        sessionStorage.setItem('wkw_user',  user);
-        sessionStorage.setItem('wkw_name',  data.name || user);
-        pqShowApp();
-        pqRoute();
-      } else {
-        errEl.textContent = data.error || 'Authentication error';
-      }
-    } catch {
-      errEl.textContent = 'Connection error';
-    }
-  });
-
   // Auto-restore session
   if (getToken()) {
     pqShowApp();
     pqRoute();
+  } else {
+    window.location.href = 'index.php';
   }
 
   // ── Tab switching ──────────────────────────────────────────────────────
@@ -1400,7 +1337,7 @@ $baseHref  = $scriptDir . '/';
 
     try {
       const [resUsers, resMarks] = await Promise.all([
-        apiFetch('marks.php?action=get-users'),
+        apiFetch('index.php?action=get-users'),
         apiFetch('marks.php?action=get-all-marks')
       ]);
       if (!resUsers.ok) throw new Error('Failed to load users');

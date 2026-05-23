@@ -722,322 +722,6 @@
       }
     });
 
-    // ── Users management panel ──────────────────────────────────────────────────
-    let usersOpen = false;
-
-    async function toggleUsersPanel() {
-      const overlay = document.getElementById('users-overlay');
-      const panel   = document.getElementById('users-panel');
-      usersOpen = !usersOpen;
-      overlay.style.display = panel.style.display = usersOpen ? 'block' : 'none';
-      if (!usersOpen) return;
-      await loadUsersPanel();
-    }
-
-    async function loadUsersPanel() {
-      const grid = document.getElementById('users-grid');
-      grid.innerHTML = '<p style="font-size:.82rem;color:#888;padding:.5rem 0">Loading…</p>';
-      const res = await apiFetch('?action=get-users');
-      if (!res || !res.ok) {
-        grid.innerHTML = '<p style="font-size:.82rem;color:#c0392b;padding:.5rem 0">Could not load users.</p>';
-        return;
-      }
-      const data = await res.json();
-      grid.innerHTML = '';
-      renderAdminCard(data.adminUser || '', data.adminName || '');
-      hideAddGuestForm();
-      renderGuestCards(data.guests || []);
-    }
-
-    function renderAdminCard(adminUser, adminName) {
-      const grid = document.getElementById('users-grid');
-      const div  = document.createElement('div');
-      div.className = 'user-card admin-card';
-      div.id = 'user-card-__admin';
-      div.innerHTML = `
-        <div class="user-card-view">
-          <div class="user-card-info">
-            <strong class="user-card-name">${escHtml(adminName || adminUser)}</strong>
-            <span class="user-card-username">@${escHtml(adminUser)}</span>
-            <span class="user-card-badge">Admin</span>
-          </div>
-          <div class="user-card-controls">
-            <button class="btn btn-sm" title="Change password" onclick="showResetPasswordModal('${escHtml(adminUser)}')">&#128273;</button>
-            <button class="btn btn-sm" title="Edit" onclick="startEditAdmin()">&#9998;</button>
-          </div>
-        </div>
-        <div class="user-card-edit" id="admin-card-edit" style="display:none">
-          <label>Username
-            <input type="text" id="users-admin-name" value="${escHtml(adminUser)}" autocomplete="off" maxlength="32" pattern="[a-z0-9_]+">
-          </label>
-          <label>Name
-            <input type="text" id="users-admin-displayname" value="${escHtml(adminName)}" autocomplete="off" maxlength="64">
-          </label>
-          <span class="guest-edit-status" id="users-admin-status"></span>
-          <div style="display:flex;gap:.4rem;margin-top:.4rem;justify-content:flex-end">
-            <button class="btn btn-sm" onclick="cancelEditAdmin()">Cancel</button>
-            <button class="btn btn-primary btn-sm" onclick="submitEditAdmin()">Save</button>
-          </div>
-        </div>`;
-      grid.appendChild(div);
-    }
-
-    function renderGuestCards(guests) {
-      const grid = document.getElementById('users-grid');
-      guests.forEach(g => {
-        const div = document.createElement('div');
-        div.className = 'user-card';
-        div.id = 'user-card-' + g.username;
-        div.innerHTML = `
-          <div class="user-card-view">
-            <label class="toggle-switch" title="${g.enabled ? 'Enabled – click to disable' : 'Disabled – click to enable'}" style="margin:0">
-              <input type="checkbox" ${g.enabled ? 'checked' : ''} onchange="toggleGuestEnabled('${g.username}', this)">
-              <span class="toggle-slider"></span>
-            </label>
-            <div class="user-card-info">
-              <strong class="user-card-name">${escHtml(g.name)}</strong>
-              <span class="user-card-username">@${escHtml(g.username)}</span>
-            </div>
-            <div class="user-card-controls">
-              <button class="btn btn-sm" title="Reset password" onclick="showResetPasswordModal('${g.username}')">&#128273;</button>
-              <button class="btn btn-sm" title="Edit" onclick="startEditGuest('${g.username}')">&#9998;</button>
-              <button class="btn btn-danger btn-sm" title="Delete" onclick="deleteGuest('${g.username}')">&#215;</button>
-            </div>
-          </div>
-          <div class="user-card-edit" id="guest-edit-${g.username}" style="display:none">
-            <label>Username
-              <input type="text" id="guest-edit-username-${g.username}" value="${escHtml(g.username)}" maxlength="32" autocomplete="off">
-            </label>
-            <label>Name
-              <input type="text" id="guest-edit-name-${g.username}" value="${escHtml(g.name)}" maxlength="64" autocomplete="off">
-            </label>
-            <span class="guest-edit-status" id="guest-edit-status-${g.username}"></span>
-            <div style="display:flex;gap:.4rem;margin-top:.4rem;justify-content:flex-end">
-              <button class="btn btn-sm" onclick="cancelEditGuest('${g.username}')">Cancel</button>
-              <button class="btn btn-primary btn-sm" onclick="submitEditGuest('${g.username}')">Save</button>
-            </div>
-          </div>`;
-        grid.appendChild(div);
-      });
-    }
-
-    function showAddGuestForm() {
-      document.getElementById('guest-add-form').style.display = '';
-      document.getElementById('guest-add-btn').style.display  = 'none';
-      document.getElementById('guest-add-username').value = '';
-      document.getElementById('guest-add-name').value     = '';
-      document.getElementById('guest-add-pass').value     = '';
-      document.getElementById('guest-add-pass2').value    = '';
-      document.getElementById('guest-add-status').textContent = '';
-      document.getElementById('guest-add-username').focus();
-    }
-
-    function hideAddGuestForm() {
-      document.getElementById('guest-add-form').style.display = 'none';
-      document.getElementById('guest-add-btn').style.display  = '';
-    }
-
-    async function submitAddGuest() {
-      const statusEl  = document.getElementById('guest-add-status');
-      const username  = document.getElementById('guest-add-username').value.trim().toLowerCase();
-      const name      = document.getElementById('guest-add-name').value.trim();
-      const pass      = document.getElementById('guest-add-pass').value;
-      const pass2     = document.getElementById('guest-add-pass2').value;
-      statusEl.textContent = '';
-      if (!/^[a-z0-9_]{2,32}$/.test(username)) { statusEl.textContent = 'Username: 2–32 chars (a-z, 0-9, _)'; return; }
-      if (!name)  { statusEl.textContent = 'Name cannot be empty.'; return; }
-      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
-      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
-      const hash = await sha256(pass);
-      statusEl.textContent = 'Adding…';
-      try {
-        const res  = await apiFetch('?action=add-guest', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, name, hash })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          showToast('Guest user added.');
-          await loadUsersPanel();
-        } else {
-          statusEl.textContent = data.error || 'Error adding guest.';
-        }
-      } catch { statusEl.textContent = 'Connection error.'; }
-    }
-
-    function startEditGuest(username) {
-      document.getElementById('guest-edit-' + username).style.display = '';
-      document.getElementById('guest-edit-username-' + username).focus();
-    }
-
-    function cancelEditGuest(username) {
-      document.getElementById('guest-edit-' + username).style.display = 'none';
-      document.getElementById('guest-edit-status-' + username).textContent = '';
-    }
-
-    async function submitEditGuest(oldUsername) {
-      const statusEl  = document.getElementById('guest-edit-status-' + oldUsername);
-      const newUsername = document.getElementById('guest-edit-username-' + oldUsername).value.trim().toLowerCase();
-      const name        = document.getElementById('guest-edit-name-' + oldUsername).value.trim();
-      statusEl.textContent = '';
-      if (!/^[a-z0-9_]{2,32}$/.test(newUsername)) { statusEl.textContent = 'Username: 2–32 chars (a-z, 0-9, _)'; return; }
-      if (!name) { statusEl.textContent = 'Name cannot be empty.'; return; }
-      // Read the current enabled state from the toggle in the view row
-      const enabledEl = document.querySelector(`#user-card-${oldUsername} input[type="checkbox"]`);
-      const enabled = enabledEl ? enabledEl.checked : true;
-      statusEl.textContent = 'Saving…';
-      try {
-        const res  = await apiFetch('?action=edit-guest', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oldUsername, newUsername, name, enabled })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          showToast('Guest updated.');
-          await loadUsersPanel();
-        } else {
-          statusEl.textContent = data.error || 'Error updating guest.';
-        }
-      } catch { statusEl.textContent = 'Connection error.'; }
-    }
-
-    async function toggleGuestEnabled(username, checkbox) {
-      // Persist the enabled change immediately via edit-guest (name unchanged)
-      const nameEl = document.getElementById('guest-edit-name-' + username);
-      // If edit form has a modified name, use it; otherwise read from the display
-      const nameDisplay = document.querySelector('#user-card-' + username + ' .user-card-name');
-      const name = (nameEl && nameEl.style.display !== 'none' && nameEl.value.trim()) ||
-                   (nameDisplay ? nameDisplay.textContent : username);
-      const enabled = checkbox.checked;
-      try {
-        const res = await apiFetch('?action=edit-guest', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ oldUsername: username, newUsername: username, name, enabled })
-        });
-        if (!res.ok) {
-          checkbox.checked = !enabled; // revert
-          const data = await res.json().catch(() => ({}));
-          showToast(data.error || 'Could not update status.', 'error');
-        }
-      } catch {
-        checkbox.checked = !enabled;
-        showToast('Connection error.', 'error');
-      }
-    }
-
-    async function deleteGuest(username) {
-      if (!confirm(`Delete guest "${username}"? This cannot be undone.`)) return;
-      try {
-        const res  = await apiFetch('?action=delete-guest', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          showToast('Guest deleted.');
-          await loadUsersPanel();
-        } else {
-          showToast(data.error || 'Error deleting guest.', 'error');
-        }
-      } catch { showToast('Connection error.', 'error'); }
-    }
-
-    // ── Reset password dialog (admin → any user) ────────────────────────────────
-    let _resetPasswordTarget = '';
-
-    function showResetPasswordModal(username) {
-      _resetPasswordTarget = username;
-      document.getElementById('reset-password-title').textContent = `Reset password for @${username}`;
-      document.getElementById('reset-pass-new').value     = '';
-      document.getElementById('reset-pass-confirm').value = '';
-      document.getElementById('reset-password-status').textContent = '';
-      document.getElementById('reset-password-overlay').style.display = 'block';
-      document.getElementById('reset-password-dialog').style.display  = 'block';
-      document.getElementById('reset-pass-new').focus();
-    }
-
-    function hideResetPasswordModal() {
-      _resetPasswordTarget = '';
-      document.getElementById('reset-password-overlay').style.display = 'none';
-      document.getElementById('reset-password-dialog').style.display  = 'none';
-    }
-
-    document.getElementById('reset-password-cancel').addEventListener('click', hideResetPasswordModal);
-    document.getElementById('reset-password-overlay').addEventListener('click', hideResetPasswordModal);
-    document.getElementById('reset-password-ok').addEventListener('click', async () => {
-      const statusEl = document.getElementById('reset-password-status');
-      const pass     = document.getElementById('reset-pass-new').value;
-      const pass2    = document.getElementById('reset-pass-confirm').value;
-      statusEl.textContent = '';
-      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
-      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
-      const hash = await sha256(pass);
-      statusEl.textContent = 'Resetting…';
-      try {
-        const res  = await apiFetch('?action=reset-password', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: _resetPasswordTarget, hash })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          hideResetPasswordModal();
-          showToast('Password reset successfully.');
-        } else {
-          statusEl.textContent = data.error || 'Error resetting password.';
-        }
-      } catch { statusEl.textContent = 'Connection error.'; }
-    });
-
-    // ── Admin card inline edit ───────────────────────────────────────────────────
-    function startEditAdmin() {
-      document.getElementById('admin-card-edit').style.display = '';
-      document.getElementById('users-admin-name').focus();
-    }
-
-    function cancelEditAdmin() {
-      document.getElementById('admin-card-edit').style.display = 'none';
-      document.getElementById('users-admin-status').textContent = '';
-    }
-
-    async function submitEditAdmin() {
-      const statusEl = document.getElementById('users-admin-status');
-      const adminUser = document.getElementById('users-admin-name').value.trim().toLowerCase();
-      const adminName = document.getElementById('users-admin-displayname').value.trim();
-      statusEl.textContent = '';
-      if (!/^[a-z0-9_]{2,32}$/.test(adminUser)) {
-        statusEl.textContent = 'Username: 2–32 chars, only a-z, 0-9, _';
-        return;
-      }
-      if (!adminName) {
-        statusEl.textContent = 'Name cannot be empty.';
-        return;
-      }
-      statusEl.textContent = 'Saving…';
-      try {
-        const res = await apiFetch('?action=save-users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ adminUser, adminName, adminHash: null })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          const currentUser = getUser();
-          if (currentUser !== adminUser) {
-            toggleUsersPanel();
-            showToast('Admin username changed — please sign in again.', 'success', 4000);
-            setTimeout(logout, 500);
-          } else {
-            showToast('Admin updated.');
-            await loadUsersPanel();
-          }
-        } else {
-          statusEl.textContent = data.error || 'Error saving admin.';
-        }
-      } catch {
-        statusEl.textContent = 'Connection error.';
-      }
-    }
-
     // ── Change-password panel (guest self-service) ──────────────────────────────
     let changePassOpen = false;
 
@@ -1064,7 +748,7 @@
       const hash = await sha256(pass);
       statusEl.textContent = 'Saving…';
       try {
-        const res  = await apiFetch('?action=change-password', {
+        const res  = await apiFetch(WKW_AUTH_BASE + '?action=change-password', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ hash })
         });
@@ -1095,7 +779,7 @@
         apiFetch('?action=get-settings'),
         apiFetch('?action=get-templates'),
         apiFetch('?action=get-hljs-themes'),
-        apiFetch('?action=get-users'),
+        apiFetch(WKW_AUTH_BASE + '?action=get-users'),
       ]);
       if (!sRes || !sRes.ok || !tRes || !tRes.ok || !hRes || !hRes.ok) {
         document.getElementById('settings-save-status').textContent = 'Could not load settings.';
@@ -1207,12 +891,11 @@
     const BASE = window.WKW_BASE;
 
     function getPage() {
-      const p = decodeURIComponent(location.pathname);
-      return (p.length > BASE.length ? p.slice(BASE.length) : '') || 'index';
+      return new URLSearchParams(location.search).get('p') || 'index';
     }
 
     function navigate(page, replace) {
-      const url = BASE + (page === 'index' ? '' : page);
+      const url = 'wiki.php' + (page === 'index' ? '' : '?p=' + encodeURIComponent(page));
       replace ? history.replaceState(null, '', url) : history.pushState(null, '', url);
       load(page);
     }
@@ -1227,22 +910,10 @@
      */
     function logout() {
       sessionStorage.clear();
-      showLogin();
+      window.location.href = WKW_AUTH_BASE;
     }
     // Register logout as the 401-unauthorized callback defined in lib/auth-client.js
     setOnUnauthorized(logout);
-
-    /**
-     * Switch the UI to the login screen.
-     * Hides the wiki shell, clears any previous error message, and wipes the
-     * password field so credentials are not left in the DOM.
-     */
-    function showLogin() {
-      document.getElementById('login-screen').style.display = 'flex';
-      document.getElementById('wiki-screen').style.display = 'none';
-      document.getElementById('login-error').textContent = '';
-      document.getElementById('login-pass').value = '';
-    }
 
     /**
      * Switch the UI to the main wiki shell after a successful login.
@@ -1253,7 +924,6 @@
      *            'guest-mode' CSS class applied to the wiki-screen wrapper
      */
     function showWiki() {
-      document.getElementById('login-screen').style.display = 'none';
       document.getElementById('wiki-screen').style.display = '';
       document.getElementById('user-badge').textContent = getUser();
       const isAdmin = getRole() === 'admin';
@@ -1261,7 +931,7 @@
       document.getElementById('toc-btn').style.display   = (isAdmin || (isGuest && window.WKW_GUEST_TOC))   ? '' : 'none';
       document.getElementById('edit-btn').style.display   = isAdmin ? '' : 'none';
       document.getElementById('index-btn').style.display  = (isAdmin || (isGuest && window.WKW_GUEST_INDEX)) ? '' : 'none';
-      document.getElementById('users-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('hub-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
       document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
@@ -1273,45 +943,6 @@
         document.getElementById('home-btn').style.display = '';
       }
     }
-
-    // ── Login form ──────────────────────────────────────────────────────────────
-    document.getElementById('login-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const user = document.getElementById('login-user').value.trim();
-      const pass = document.getElementById('login-pass').value;
-      const errEl = document.getElementById('login-error');
-      errEl.textContent = '';
-      if (!user || !pass) {
-        errEl.textContent = 'Please fill in all fields';
-        return;
-      }
-
-      const hash = await sha256(pass);
-      try {
-        const res = await fetch('?action=login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user,
-            hash
-          })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          sessionStorage.setItem('wkw_token', data.token);
-          sessionStorage.setItem('wkw_role', data.role);
-          sessionStorage.setItem('wkw_user', user);
-          showWiki();
-          route();
-        } else {
-          errEl.textContent = data.error || 'Authentication error';
-        }
-      } catch {
-        errEl.textContent = 'Connection error';
-      }
-    });
 
     // ── Wiki ────────────────────────────────────────────────────────────────────
     let currentPage = 'index';
@@ -1353,7 +984,7 @@
       let nav = '<a href="" onclick="navigate(\'index\');return false;">Home</a>';
       parts.forEach((p, i) => {
         const t = parts.slice(0, i + 1).join('/');
-        nav += ' &rsaquo; <a href="' + BASE + t + '" onclick="navigate(\'' + t + '\');return false;">' + p + '</a>';
+        nav += ' &rsaquo; <a href="wiki.php?p=' + encodeURIComponent(t) + '" onclick="navigate(\'' + t + '\');return false;">' + p + '</a>';
       });
       document.getElementById('nav').innerHTML = nav;
 
@@ -1372,7 +1003,7 @@
         if (h && !h.startsWith('http') && !h.startsWith('#') && !h.startsWith('mailto:')) {
           const base = page.includes('/') ? page.slice(0, page.lastIndexOf('/') + 1) : '';
           const target = resolvePath(base, h);
-          a.href = BASE + target;
+          a.href = 'wiki.php?p=' + encodeURIComponent(target);
           a.addEventListener('click', e => {
             e.preventDefault();
             navigate(target);
@@ -1460,7 +1091,7 @@
       overlay.style.display = panel.style.display = indexOpen ? 'block' : 'none';
       if (!indexOpen) return;
 
-      const res = await apiFetch(BASE + '?action=index');
+      const res = await apiFetch('?action=index');
       if (!res || !res.ok) return;
       const data = await res.json();
 
@@ -1488,7 +1119,7 @@
           html += '<li>';
           if (isPage || isAdmin) {
             const badge = (!isPage && isAdmin) ? ' <span class="index-no-page" title="No page file for this directory">\u2205</span>' : '';
-            html += '<a href="' + BASE + (path === 'index' ? '' : path) + '" onclick="navigate(\'' + path + '\');toggleIndex();return false;">' + key + badge + '</a>';
+            html += '<a href="' + (path === 'index' ? 'wiki.php' : 'wiki.php?p=' + encodeURIComponent(path)) + '" onclick="navigate(\'' + path + '\');toggleIndex();return false;">' + key + badge + '</a>';
           } else {
             html += '<span class="index-dir-label">' + key + '</span>';
           }
@@ -1685,7 +1316,7 @@
 
     async function route() {
       if (!getToken()) {
-        showLogin();
+        window.location.href = WKW_AUTH_BASE;
         return;
       }
       if (!_pluginStateLoaded) {
