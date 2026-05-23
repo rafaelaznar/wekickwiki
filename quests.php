@@ -367,6 +367,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
 
     if (isset($body['id'])) {
         $id  = (int)$body['id'];
+
+      // Quests with attempts are immutable.
+      $attempts = qs_load_attempts();
+      foreach ($attempts as $a) {
+        if ((int)($a['quest_id'] ?? 0) === $id) {
+          json_out(409, ['error' => 'Quest has attempts and cannot be changed']);
+        }
+      }
+
         $idx = -1;
         foreach ($quests as $i => $q) { if ((int)($q['id'] ?? 0) === $id) { $idx = $i; break; } }
         if ($idx === -1) json_out(404, ['error' => 'Quest not found']);
@@ -1403,6 +1412,11 @@ $baseHref  = $scriptDir . '/';
       </tr></thead>`;
       const tbody = document.createElement('tbody');
       for (const q of quests) {
+        const hasAttempts = (q.attempt_count ?? 0) > 0;
+        const actionsHtml = hasAttempts
+          ? ''
+          : `<button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>`;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><strong>${esc(q.name)}</strong></td>
@@ -1412,10 +1426,7 @@ $baseHref  = $scriptDir . '/';
           <td>${q.revisable ? '✔' : '—'}</td>
           <td class="qs-center-td">${q.attempt_count ?? 0}</td>
           <td class="qs-center-td"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
-          <td>
-            <button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>
-          </td>`;
+          <td>${actionsHtml}</td>`;
         tbody.appendChild(tr);
       }
       table.appendChild(tbody);
