@@ -32,6 +32,31 @@ function qs_save_queries(array $d): void  { data_write(QS_QUERIES_FILE,  $d); }
 function qs_save_quests(array $d):  void  { data_write(QS_QUESTS_FILE,   $d); }
 function qs_save_attempts(array $d): void { data_write(QS_ATTEMPTS_FILE, $d); }
 
+function qs_guest_usernames_lookup(): array
+{
+  $lookup = [];
+  foreach (load_users() as $u) {
+    if (!is_array($u)) continue;
+    if (($u['role'] ?? 'guest') !== 'guest') continue;
+    $username = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($u['username'] ?? ''))));
+    if ($username !== '') $lookup[$username] = true;
+  }
+  return $lookup;
+}
+
+function qs_filter_allowed_to_guests(array $allowed): array
+{
+  if (in_array('all', $allowed, true)) return ['all'];
+
+  $guest_lookup = qs_guest_usernames_lookup();
+  $filtered = [];
+  foreach ($allowed as $u) {
+    if (isset($guest_lookup[$u])) $filtered[] = $u;
+  }
+  $filtered = array_values(array_unique($filtered));
+  return empty($filtered) ? ['all'] : $filtered;
+}
+
 /**
  * Randomly select questions from $all_queries matching the quest's label groups.
  * Each group is an AND of labels (a question must have ALL labels in a group).
@@ -194,7 +219,21 @@ function qs_sanitize_quest(array $b): array
         $count = max(1, (int)($g['queries'] ?? 1));
         $groups[] = ['labels' => array_values(array_unique($labels)), 'queries' => $count];
     }
-    return ['name' => $name, 'date' => $date, 'status' => $status, 'revisable' => $revisable, 'wrong' => $wrong, 'queries' => $groups];
+    // allowed: ['all'] means any authenticated user; otherwise a list of specific usernames
+    $allowed_raw = (array)($b['allowed'] ?? ['all']);
+    if (in_array('all', $allowed_raw, true)) {
+        $allowed = ['all'];
+    } else {
+        $allowed = [];
+        foreach ($allowed_raw as $u) {
+            $u = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)$u)));
+            if ($u !== '') $allowed[] = $u;
+        }
+        $allowed = array_values(array_unique($allowed));
+        if (empty($allowed)) $allowed = ['all'];
+    }
+    $allowed = qs_filter_allowed_to_guests($allowed);
+    return ['name' => $name, 'date' => $date, 'status' => $status, 'revisable' => $revisable, 'wrong' => $wrong, 'allowed' => $allowed, 'queries' => $groups];
 }
 
 
@@ -350,6 +389,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-que
         $q['avg_score'] = count($arr) ? round(array_sum($arr) / count($arr), 2) : null;
         return $q;
     }, $quests);
+
+    // Sort by quest date descending (newest first), then by id descending.
+    usort($result, function ($a, $b) {
+      $da = (string)($a['date'] ?? '');
+      $db = (string)($b['date'] ?? '');
+      $cmp = strcmp($db, $da);
+      if ($cmp !== 0) return $cmp;
+      return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0);
+    });
+
     json_out(200, $result);
 }
 
@@ -484,6 +533,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     json_out(200, ['ok' => true]);
 }
 
+// GET ?action=get-quest-users  — returns guest users (for allowed-field UI)
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-quest-users') {
+    $claims = require_auth();
+    if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+    $users = load_users();
+    $list  = [];
+    foreach ($users as $u) {
+        if (!is_array($u)) continue;
+      if (($u['role'] ?? 'guest') !== 'guest') continue;
+        $list[] = [
+            'username' => $u['username'] ?? '',
+            'name'     => $u['name']     ?? '',
+            'role'     => $u['role']     ?? 'guest',
+        ];
+    }
+    json_out(200, $list);
+}
+
+// POST ?action=save-quest-allowed  — update only the allowed field (works even with attempts)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-quest-allowed') {
+    $claims = require_auth();
+    if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($body)) json_out(400, ['error' => 'Invalid JSON']);
+    $id = (int)($body['id'] ?? 0);
+    if (!$id) json_out(400, ['error' => 'id required']);
+
+    $allowed_raw = (array)($body['allowed'] ?? ['all']);
+    if (in_array('all', $allowed_raw, true)) {
+        $allowed = ['all'];
+    } else {
+        $allowed = [];
+        foreach ($allowed_raw as $u) {
+            $u = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)$u)));
+            if ($u !== '') $allowed[] = $u;
+        }
+        $allowed = array_values(array_unique($allowed));
+        if (empty($allowed)) $allowed = ['all'];
+    }
+      $allowed = qs_filter_allowed_to_guests($allowed);
+
+    $quests = qs_load_quests();
+    $idx = -1;
+    foreach ($quests as $i => $q) {
+      if ((int)($q['id'] ?? 0) === $id) { $idx = $i; break; }
+    }
+    if ($idx === -1) json_out(404, ['error' => 'Quest not found']);
+
+    // No se puede retirar el permiso a usuarios que ya han completado el cuestionario
+    $attempts = qs_load_attempts();
+    $guest_lookup = qs_guest_usernames_lookup();
+    $completed_users = [];
+    foreach ($attempts as $a) {
+      if ((int)($a['quest_id'] ?? 0) === $id && ($a['status'] ?? '') === 'completed') {
+        $u = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($a['username'] ?? ($a['usename'] ?? '')))));
+        if (!isset($guest_lookup[$u])) continue;
+        if ($u !== '') $completed_users[$u] = true;
+      }
+    }
+    // Si algún usuario con intento completado no está en la nueva lista allowed (y no es 'all'), error
+    if (!in_array('all', $allowed, true)) {
+      $missing = [];
+      foreach (array_keys($completed_users) as $u) {
+        if (!in_array($u, $allowed, true)) $missing[] = $u;
+      }
+      if ($missing) {
+        json_out(409, ['error' => 'No se puede retirar el permiso a usuarios que ya han completado el cuestionario: ' . implode(', ', $missing)]);
+      }
+    }
+
+    $quests[$idx]['allowed'] = $allowed;
+    qs_save_quests($quests);
+    json_out(200, ['ok' => true]);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ── USER ENDPOINTS (admin + guest) ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════════
@@ -491,6 +616,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
 // GET ?action=get-open-quests  — quests open and not yet completed by this user
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-open-quests') {
     $claims   = require_auth();
+  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $quests   = qs_load_quests();
@@ -510,6 +636,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
     foreach ($quests as $q) {
         if (($q['status'] ?? '') !== 'open') continue;
         if (in_array((int)($q['id'] ?? 0), $done, true)) continue;
+        // Check authorization
+        $allowed = (array)($q['allowed'] ?? ['all']);
+        if (!in_array('all', $allowed, true) && !in_array($username, $allowed, true)) continue;
         // Estimate total questions
         $total = 0;
         foreach ($q['queries'] as $g) $total += (int)($g['queries'] ?? 0);
@@ -527,6 +656,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
 // POST ?action=start-quest  — body: {quest_id}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-quest') {
     $claims   = require_auth();
+  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $body     = json_decode(file_get_contents('php://input'), true);
@@ -539,6 +669,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
     foreach ($quests as $q) { if ((int)($q['id'] ?? 0) === $quest_id) { $quest = $q; break; } }
     if (!$quest) json_out(404, ['error' => 'Quest not found']);
     if (($quest['status'] ?? '') !== 'open') json_out(403, ['error' => 'Quest is not open']);
+
+    // Check authorization
+    $allowed = (array)($quest['allowed'] ?? ['all']);
+    if (!in_array('all', $allowed, true) && !in_array($username, $allowed, true)) {
+        json_out(403, ['error' => 'You are not authorized to take this quest']);
+    }
 
     // Check user hasn't already completed it
     $attempts = qs_load_attempts();
@@ -612,6 +748,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
 // POST ?action=submit-attempt  — body: {attempt_id, answers:[{id, answer}]}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit-attempt') {
     $claims    = require_auth();
+  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username  = $claims['sub'] ?? '';
 
     $body      = json_decode(file_get_contents('php://input'), true);
@@ -664,6 +801,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
 // GET ?action=get-my-attempts
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-my-attempts') {
     $claims   = require_auth();
+  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $attempts = qs_load_attempts();
@@ -850,6 +988,7 @@ $baseHref  = $scriptDir . '/';
             class="qs-filter-label-input"
             oninput="qsApplyQueryFilters()">
           <datalist id="qf-label-list"></datalist>
+          <button class="btn btn-sm" type="button" onclick="qsResetQueryFilters()">Reset</button>
           <span id="qf-count" class="qs-filter-count"></span>
         </div>
         <div id="queries-table-wrap" class="qs-table-wrap">
@@ -866,6 +1005,31 @@ $baseHref  = $scriptDir . '/';
           </button>
           <span id="quests-admin-status" class="qs-status" style="display:none"></span>
         </div>
+        <div class="qs-filter-bar">
+          <select id="qsf-status" class="qs-filter-select" onchange="qsApplyQuestFilters()">
+            <option value="">All status</option>
+            <option value="open">Open</option>
+            <option value="closed">Closed</option>
+          </select>
+          <select id="qsf-attempts" class="qs-filter-select" onchange="qsApplyQuestFilters()">
+            <option value="">All attempts</option>
+            <option value="0">Attempts = 0</option>
+            <option value="gt0">Attempts &gt; 0</option>
+          </select>
+          <select id="qsf-avgscore" class="qs-filter-select" onchange="qsApplyQuestFilters()">
+            <option value="">All avg scores</option>
+            <option value="lt5">Avg score &lt; 5</option>
+            <option value="ge5">Avg score ≥ 5</option>
+          </select>
+          <select id="qsf-month" class="qs-filter-select" onchange="qsApplyQuestFilters()">
+            <option value="">All months</option>
+          </select>
+          <select id="qsf-year" class="qs-filter-select" onchange="qsApplyQuestFilters()">
+            <option value="">All years</option>
+          </select>
+          <button class="btn btn-sm" type="button" onclick="qsResetQuestFilters()">Reset</button>
+          <span id="qsf-count" class="qs-filter-count"></span>
+        </div>
         <div id="quests-admin-table-wrap" class="qs-table-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
         </div>
@@ -878,6 +1042,27 @@ $baseHref  = $scriptDir . '/';
             <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
             Reload
           </button>
+        </div>
+        <div class="qs-filter-bar">
+          <select id="rf-quest" class="qs-filter-select" onchange="qsApplyResultsFilters()">
+            <option value="">All quests</option>
+          </select>
+          <select id="rf-user" class="qs-filter-select" onchange="qsApplyResultsFilters()">
+            <option value="">All users</option>
+          </select>
+          <select id="rf-month" class="qs-filter-select" onchange="qsApplyResultsFilters()">
+            <option value="">All months</option>
+          </select>
+          <select id="rf-year" class="qs-filter-select" onchange="qsApplyResultsFilters()">
+            <option value="">All years</option>
+          </select>
+          <select id="rf-score" class="qs-filter-select" onchange="qsApplyResultsFilters()">
+            <option value="">All scores</option>
+            <option value="lt5">Score &lt; 5</option>
+            <option value="ge5">Score ≥ 5</option>
+          </select>
+          <button class="btn btn-sm" type="button" onclick="qsResetResultsFilters()">Reset</button>
+          <span id="rf-count" class="qs-filter-count"></span>
         </div>
         <div id="results-table-wrap" class="qs-table-wrap">
           <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
@@ -988,9 +1173,28 @@ $baseHref  = $scriptDir . '/';
           Add group
         </button>
       </div>
+      <div class="qs-field">
+        <label>Allowed users</label>
+        <div id="qst-allowed-wrap"><div class="qs-loading"><div class="qs-spinner"></div> Loading users…</div></div>
+      </div>
       <div class="qs-modal-actions">
         <button class="btn" onclick="qsCloseQuestModal()">Cancel</button>
         <button class="btn btn-primary" onclick="qsSaveQuest()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Access modal —— manage quest allowed field independently -->
+  <div class="qs-overlay" id="access-modal-overlay">
+    <div class="qs-modal qs-modal-sm" onclick="event.stopPropagation()">
+      <button class="qs-modal-close" onclick="qsCloseAccessModal()" aria-label="Close">&times;</button>
+      <h3 id="access-modal-title">Manage access</h3>
+      <div id="access-modal-content">
+        <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+      </div>
+      <div class="qs-modal-actions">
+        <button class="btn" onclick="qsCloseAccessModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="qsSaveAccess()">Save</button>
       </div>
     </div>
   </div>
@@ -1161,6 +1365,16 @@ $baseHref  = $scriptDir . '/';
     }
 
     qsRenderQueriesTable(filtered);
+  }
+
+  function qsResetQueryFilters() {
+    const search = document.getElementById('qf-search');
+    const type = document.getElementById('qf-type');
+    const label = document.getElementById('qf-label');
+    if (search) search.value = '';
+    if (type) type.value = '';
+    if (label) label.value = '';
+    qsApplyQueryFilters();
   }
 
   function qsRenderQueriesTable(queries) {
@@ -1393,6 +1607,136 @@ $baseHref  = $scriptDir . '/';
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — QUESTS tab ──────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  let _questsAllItems = [];
+
+  function qsMonthName(monthNum) {
+    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return names[monthNum - 1] || String(monthNum);
+  }
+
+  function qsPopulateQuestFilters(items) {
+    const monthSel = document.getElementById('qsf-month');
+    const yearSel  = document.getElementById('qsf-year');
+    if (!monthSel || !yearSel) return;
+
+    const keepMonth = monthSel.value;
+    const keepYear  = yearSel.value;
+
+    const months = [...new Set(items.map(q => {
+      const d = String(q.date ?? '');
+      return d.length >= 7 ? d.slice(0, 7) : '';
+    }).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+    const years = [...new Set(items.map(q => {
+      const d = String(q.date ?? '');
+      return d.length >= 4 ? d.slice(0, 4) : '';
+    }).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+
+    monthSel.innerHTML = '<option value="">All months</option>'
+      + months.map(m => {
+        const monthNum = parseInt(m.slice(5, 7), 10);
+        const yearNum  = m.slice(0, 4);
+        const label = `${qsMonthName(monthNum)} ${yearNum}`;
+        return `<option value="${esc(m)}">${esc(label)}</option>`;
+      }).join('');
+    yearSel.innerHTML = '<option value="">All years</option>'
+      + years.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join('');
+
+    monthSel.value = months.includes(keepMonth) ? keepMonth : '';
+    yearSel.value  = years.includes(keepYear) ? keepYear : '';
+  }
+
+  function qsRenderQuestsAdminTable(quests) {
+    const wrap = document.getElementById('quests-admin-table-wrap');
+    if (!wrap) return;
+
+    wrap.innerHTML = '';
+    if (!quests.length) {
+      wrap.innerHTML = '<p class="qs-empty">No quests match the selected filters.</p>';
+      return;
+    }
+
+    const table = document.createElement('table');
+    table.className = 'qs-table';
+    table.innerHTML = `<thead><tr>
+      <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Allowed</th><th>Attempts</th><th class="qs-th-avgscore">Avg score</th><th class="qs-th-actions-md">Actions</th>
+    </tr></thead>`;
+    const tbody = document.createElement('tbody');
+    for (const q of quests) {
+      const hasAttempts = (q.attempt_count ?? 0) > 0;
+      const allowedVal  = q.allowed ?? ['all'];
+      const allowedHtml = allowedVal.includes('all')
+        ? '<span class="badge badge-open">All</span>'
+        : allowedVal.map(u => `<span class="badge badge-label">${esc(u)}</span>`).join(' ');
+      const allowedJson = JSON.stringify(allowedVal).replace(/'/g, '&#39;');
+      const editDel = hasAttempts ? '' :
+        `<button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
+        <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>`;
+      const actionsHtml = editDel +
+        `<button class="btn btn-sm" onclick='qsOpenAccessModal(${q.id}, ${allowedJson})'>Access</button>`;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><strong>${esc(q.name)}</strong></td>
+        <td>${esc(q.date || '—')}</td>
+        <td><span class="badge badge-${q.status}">${esc(q.status)}</span></td>
+        <td>${q.wrong < 0 ? q.wrong : '—'}</td>
+        <td>${q.revisable ? '✔' : '—'}</td>
+        <td>${allowedHtml}</td>
+        <td class="qs-center-td">${q.attempt_count ?? 0}</td>
+        <td class="qs-center-td"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
+        <td>${actionsHtml}</td>`;
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+  }
+
+  function qsApplyQuestFilters() {
+    const status = document.getElementById('qsf-status')?.value ?? '';
+    const attemptsFilter = document.getElementById('qsf-attempts')?.value ?? '';
+    const avgScoreFilter = document.getElementById('qsf-avgscore')?.value ?? '';
+    const month  = document.getElementById('qsf-month')?.value ?? ''; // YYYY-MM
+    const year   = document.getElementById('qsf-year')?.value ?? '';  // YYYY
+    const countEl = document.getElementById('qsf-count');
+
+    const filtered = _questsAllItems.filter(q => {
+      if (status && String(q.status ?? '') !== status) return false;
+
+      const attempts = Number(q.attempt_count ?? 0);
+      if (attemptsFilter === '0' && attempts !== 0) return false;
+      if (attemptsFilter === 'gt0' && !(attempts > 0)) return false;
+
+      const avgScore = Number(q.avg_score ?? NaN);
+      if (avgScoreFilter === 'lt5' && !(Number.isFinite(avgScore) && avgScore < 5)) return false;
+      if (avgScoreFilter === 'ge5' && !(Number.isFinite(avgScore) && avgScore >= 5)) return false;
+
+      const d = String(q.date ?? '');
+      if (month && !d.startsWith(month)) return false;
+      if (year && !d.startsWith(year)) return false;
+      return true;
+    }).sort((a, b) => {
+      const cmpDate = String(b.date ?? '').localeCompare(String(a.date ?? ''));
+      if (cmpDate !== 0) return cmpDate;
+      return Number(b.id ?? 0) - Number(a.id ?? 0);
+    });
+
+    if (countEl) countEl.textContent = `${filtered.length} quest${filtered.length !== 1 ? 's' : ''}`;
+    qsRenderQuestsAdminTable(filtered);
+  }
+
+  function qsResetQuestFilters() {
+    const status = document.getElementById('qsf-status');
+    const attempts = document.getElementById('qsf-attempts');
+    const avgscore = document.getElementById('qsf-avgscore');
+    const month = document.getElementById('qsf-month');
+    const year = document.getElementById('qsf-year');
+    if (status) status.value = '';
+    if (attempts) attempts.value = '';
+    if (avgscore) avgscore.value = '';
+    if (month) month.value = '';
+    if (year) year.value = '';
+    qsApplyQuestFilters();
+  }
+
   async function qsLoadQuestsAdmin() {
     const wrap = document.getElementById('quests-admin-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
@@ -1400,44 +1744,18 @@ $baseHref  = $scriptDir . '/';
       const res    = await apiFetch('quests.php?action=get-quests-admin');
       if (!res.ok) throw new Error('Failed to load quests');
       const quests = await res.json();
-      wrap.innerHTML = '';
-      if (!quests.length) {
-        wrap.innerHTML = '<p class="qs-empty">No quests yet. Click "Add quest" to create one.</p>';
-        return;
-      }
-      const table = document.createElement('table');
-      table.className = 'qs-table';
-      table.innerHTML = `<thead><tr>
-        <th>Name</th><th>Date</th><th>Status</th><th>Wrong</th><th>Revisable</th><th>Attempts</th><th class="qs-th-avgscore">Avg score</th><th class="qs-th-actions-md">Actions</th>
-      </tr></thead>`;
-      const tbody = document.createElement('tbody');
-      for (const q of quests) {
-        const hasAttempts = (q.attempt_count ?? 0) > 0;
-        const actionsHtml = hasAttempts
-          ? ''
-          : `<button class="btn btn-sm" onclick="qsEditQuest(${q.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteQuest(${q.id})">Del</button>`;
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td><strong>${esc(q.name)}</strong></td>
-          <td>${esc(q.date || '—')}</td>
-          <td><span class="badge badge-${q.status}">${esc(q.status)}</span></td>
-          <td>${q.wrong < 0 ? q.wrong : '—'}</td>
-          <td>${q.revisable ? '✔' : '—'}</td>
-          <td class="qs-center-td">${q.attempt_count ?? 0}</td>
-          <td class="qs-center-td"><span class="${scoreClass(q.avg_score)}">${fmtScore(q.avg_score)}</span></td>
-          <td>${actionsHtml}</td>`;
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-      wrap.appendChild(table);
+      _questsAllItems = Array.isArray(quests) ? quests : [];
+      qsPopulateQuestFilters(_questsAllItems);
+      qsApplyQuestFilters();
     } catch (err) {
       wrap.innerHTML = `<p class="qs-load-error">${esc(err.message)}</p>`;
+      const countEl = document.getElementById('qsf-count');
+      if (countEl) countEl.textContent = '';
     }
   }
 
   // ── Quest modal ────────────────────────────────────────────────────────────
-  function qsOpenQuestModal(questData = null) {
+  async function qsOpenQuestModal(questData = null) {
     _editingQuestId = questData ? questData.id : null;
     document.getElementById('quest-modal-title').textContent  = questData ? 'Edit quest' : 'Add quest';
     document.getElementById('qst-name').value      = questData?.name ?? '';
@@ -1451,6 +1769,9 @@ $baseHref  = $scriptDir . '/';
     const wrap   = document.getElementById('qst-label-groups');
     wrap.innerHTML = '';
     groups.forEach(g => qsAddLabelGroup(g));
+
+    // Render allowed field
+    await qsRenderAllowedField('qst', questData?.allowed ?? ['all']);
 
     document.getElementById('quest-modal-overlay').classList.add('open');
   }
@@ -1499,7 +1820,17 @@ $baseHref  = $scriptDir . '/';
       groups.push({ labels, queries: count });
     });
 
-    const body = { name, date, status, wrong, revisable, queries: groups };
+    // Read allowed field
+    const allowedMode = document.querySelector('input[name="qst-allowed-mode"]:checked')?.value;
+    let allowed;
+    if (allowedMode === 'specific') {
+      allowed = [...document.querySelectorAll('input[name="qst-user-cb"]:checked')].map(cb => cb.value);
+      if (!allowed.length) allowed = ['all'];
+    } else {
+      allowed = ['all'];
+    }
+
+    const body = { name, date, status, wrong, revisable, allowed, queries: groups };
     if (_editingQuestId !== null) body.id = _editingQuestId;
 
     const res  = await apiFetch('quests.php?action=save-quest', {
@@ -1567,8 +1898,235 @@ $baseHref  = $scriptDir . '/';
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // ── ADMIN — Allowed users helpers ───────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  let _questUsersCache = null;
+
+  async function qsGetQuestUsers() {
+    if (_questUsersCache) return _questUsersCache;
+    const res = await apiFetch('quests.php?action=get-quest-users');
+    if (res.ok) _questUsersCache = await res.json();
+    return _questUsersCache || [];
+  }
+
+  /**
+   * Render the allowed-users radio+checkboxes into the element with id `${prefix}-allowed-wrap`.
+   * prefix is 'qst' (quest modal) or 'acc' (access modal).
+   */
+  async function qsRenderAllowedField(prefix, allowed) {
+    const wrap  = document.getElementById(prefix + '-allowed-wrap');
+    if (!wrap) return;
+    const isAll = (allowed ?? ['all']).includes('all');
+    const users = await qsGetQuestUsers();
+
+    let html = `
+      <div class="qs-allowed-mode">
+        <label><input type="radio" name="${prefix}-allowed-mode" value="all" ${isAll ? 'checked' : ''}
+          onchange="qsToggleAllowedUsers('${prefix}')"> All guest users</label>
+        <label><input type="radio" name="${prefix}-allowed-mode" value="specific" ${!isAll ? 'checked' : ''}
+          onchange="qsToggleAllowedUsers('${prefix}')"> Specific users</label>
+      </div>
+      <div id="${prefix}-allowed-users" class="qs-allowed-users-list" ${isAll ? 'style="display:none"' : ''}>`;
+    if (!users.length) {
+      html += '<p class="qs-empty">No guest users found.</p>';
+    } else {
+      for (const u of users) {
+        const checked = !isAll && (allowed ?? []).includes(u.username);
+        html += `<label class="qs-allowed-user">
+          <input type="checkbox" name="${prefix}-user-cb" value="${esc(u.username)}" ${checked ? 'checked' : ''}>
+          ${esc(u.name || u.username)}
+          <span class="qs-allowed-uname">(${esc(u.username)})</span>
+        </label>`;
+      }
+    }
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  function qsToggleAllowedUsers(prefix) {
+    const mode = document.querySelector(`input[name="${prefix}-allowed-mode"]:checked`)?.value;
+    const usersDiv = document.getElementById(prefix + '-allowed-users');
+    if (usersDiv) usersDiv.style.display = mode === 'specific' ? '' : 'none';
+  }
+
+  // ── Access modal (for managing allowed on quests with attempts) ─────────────
+  let _accessModalQuestId = null;
+
+  async function qsOpenAccessModal(id, currentAllowed) {
+    _accessModalQuestId = id;
+    document.getElementById('access-modal-title').textContent = 'Manage access — quest #' + id;
+    document.getElementById('access-modal-content').innerHTML =
+      '<div id="acc-allowed-wrap"><div class="qs-loading"><div class="qs-spinner"></div> Loading…</div></div>';
+    document.getElementById('access-modal-overlay').classList.add('open');
+    await qsRenderAllowedField('acc', currentAllowed);
+  }
+
+  function qsCloseAccessModal() {
+    document.getElementById('access-modal-overlay').classList.remove('open');
+    _accessModalQuestId = null;
+  }
+
+  async function qsSaveAccess() {
+    const mode = document.querySelector('input[name="acc-allowed-mode"]:checked')?.value;
+    let allowed;
+    if (mode === 'specific') {
+      allowed = [...document.querySelectorAll('input[name="acc-user-cb"]:checked')].map(cb => cb.value);
+      if (!allowed.length) allowed = ['all'];
+    } else {
+      allowed = ['all'];
+    }
+    const res  = await apiFetch('quests.php?action=save-quest-allowed', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: _accessModalQuestId, allowed })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      qsCloseAccessModal();
+      qsToast('Access updated');
+      qsLoadQuestsAdmin();
+    } else {
+      qsToast(data.error || 'Save failed', 'error');
+    }
+  }
+
+  document.getElementById('access-modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('access-modal-overlay')) qsCloseAccessModal();
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — RESULTS tab ─────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  let _resultsAllItems = [];
+
+  function qsPopulateResultsFilters(items) {
+    const questSel = document.getElementById('rf-quest');
+    const userSel  = document.getElementById('rf-user');
+    const monthSel = document.getElementById('rf-month');
+    const yearSel  = document.getElementById('rf-year');
+    if (!questSel || !userSel || !monthSel || !yearSel) return;
+
+    const keepQuest = questSel.value;
+    const keepUser  = userSel.value;
+    const keepMonth = monthSel.value;
+    const keepYear  = yearSel.value;
+
+    const quests = [...new Set(items.map(a => String(a.quest_name ?? '')).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const users  = [...new Set(items.map(a => String(a.username ?? '')).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const months = [...new Set(items.map(a => {
+      const d = String(a.submitted_at ?? '');
+      return d.length >= 7 ? d.slice(0, 7) : '';
+    }).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+    const years  = [...new Set(items.map(a => {
+      const d = String(a.submitted_at ?? '');
+      return d.length >= 4 ? d.slice(0, 4) : '';
+    }).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+
+    questSel.innerHTML = '<option value="">All quests</option>'
+      + quests.map(q => `<option value="${esc(q)}">${esc(q)}</option>`).join('');
+    userSel.innerHTML = '<option value="">All users</option>'
+      + users.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+    monthSel.innerHTML = '<option value="">All months</option>'
+      + months.map(m => {
+        const monthNum = parseInt(m.slice(5, 7), 10);
+        const yearNum  = m.slice(0, 4);
+        const label = `${qsMonthName(monthNum)} ${yearNum}`;
+        return `<option value="${esc(m)}">${esc(label)}</option>`;
+      }).join('');
+    yearSel.innerHTML = '<option value="">All years</option>'
+      + years.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join('');
+
+    questSel.value = quests.includes(keepQuest) ? keepQuest : '';
+    userSel.value  = users.includes(keepUser) ? keepUser : '';
+    monthSel.value = months.includes(keepMonth) ? keepMonth : '';
+    yearSel.value  = years.includes(keepYear) ? keepYear : '';
+  }
+
+  function qsApplyResultsFilters() {
+    const wrap = document.getElementById('results-table-wrap');
+    const countEl = document.getElementById('rf-count');
+    if (!wrap) return;
+
+    const quest = document.getElementById('rf-quest')?.value ?? '';
+    const user  = document.getElementById('rf-user')?.value ?? '';
+    const month = document.getElementById('rf-month')?.value ?? ''; // YYYY-MM
+    const year  = document.getElementById('rf-year')?.value ?? '';  // YYYY
+    const score = document.getElementById('rf-score')?.value ?? '';
+
+    const filtered = _resultsAllItems.filter(a => {
+      if (quest && String(a.quest_name ?? '') !== quest) return false;
+      if (user && String(a.username ?? '') !== user) return false;
+
+      const submitted = String(a.submitted_at ?? '');
+      if (month && !submitted.startsWith(month)) return false;
+      if (year && !submitted.startsWith(year)) return false;
+
+      const sc = Number(a.score ?? NaN);
+      if (score === 'lt5' && !(sc < 5)) return false;
+      if (score === 'ge5' && !(sc >= 5)) return false;
+      return true;
+    }).sort((a, b) => String(b.submitted_at ?? '').localeCompare(String(a.submitted_at ?? '')));
+
+    wrap.innerHTML = '';
+    if (countEl) countEl.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`;
+    if (!filtered.length) {
+      wrap.innerHTML = '<p class="qs-empty">No results match the selected filters.</p>';
+      return;
+    }
+
+    // Group by quest_id preserving first appearance in date-desc list
+    const groupMap = new Map();
+    for (const a of filtered) {
+      if (!groupMap.has(a.quest_id)) groupMap.set(a.quest_id, { quest_name: a.quest_name, attempts: [] });
+      groupMap.get(a.quest_id).attempts.push(a);
+    }
+    const groups = [...groupMap.values()];
+
+    for (const group of groups) {
+      const hdr = document.createElement('div');
+      hdr.className = 'qs-results-group-hdr';
+      hdr.innerHTML = `<strong class="qs-results-quest-name">${esc(group.quest_name)}</strong>`
+        + `<span class="qs-results-attempt-count">${group.attempts.length} attempt${group.attempts.length !== 1 ? 's' : ''}</span>`;
+      wrap.appendChild(hdr);
+
+      const table = document.createElement('table');
+      table.className = 'qs-table';
+      table.innerHTML = `<thead><tr>
+        <th>Quest</th><th>User</th><th>Date</th><th class="qs-th-score">Score / 10</th><th class="qs-th-actions-lg">Actions</th>
+      </tr></thead>`;
+      const tbody = document.createElement('tbody');
+      for (const a of group.attempts) {
+        const sc = a.score;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${esc(a.quest_name)}</strong></td>
+          <td><strong>${esc(a.username)}</strong></td>
+          <td class="qs-date-td">${fmtDate(a.submitted_at)}</td>
+          <td class="qs-center-td"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>
+          <td>
+            <button class="btn btn-sm" onclick="qsAdminReviewAttempt(${a.id})">Review</button>
+            <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteAttempt(${a.id})">Del</button>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      wrap.appendChild(table);
+    }
+  }
+
+  function qsResetResultsFilters() {
+    const quest = document.getElementById('rf-quest');
+    const user = document.getElementById('rf-user');
+    const month = document.getElementById('rf-month');
+    const year = document.getElementById('rf-year');
+    const score = document.getElementById('rf-score');
+    if (quest) quest.value = '';
+    if (user) user.value = '';
+    if (month) month.value = '';
+    if (year) year.value = '';
+    if (score) score.value = '';
+    qsApplyResultsFilters();
+  }
+
   async function qsLoadResults() {
     const wrap = document.getElementById('results-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
@@ -1576,56 +2134,16 @@ $baseHref  = $scriptDir . '/';
       const res   = await apiFetch('quests.php?action=get-all-attempts');
       if (!res.ok) throw new Error('Failed to load results');
       const items = await res.json();
-      wrap.innerHTML = '';
-      if (!items.length) {
-        wrap.innerHTML = '<p class="qs-empty">No completed attempts yet.</p>';
-        return;
-      }
+      _resultsAllItems = (Array.isArray(items) ? items : []).sort((a, b) =>
+        String(b.submitted_at ?? '').localeCompare(String(a.submitted_at ?? ''))
+      );
 
-      // Group by quest_id preserving insertion order (items already sorted date desc)
-      const groupMap = new Map();
-      for (const a of items) {
-        if (!groupMap.has(a.quest_id)) groupMap.set(a.quest_id, { quest_name: a.quest_name, attempts: [] });
-        groupMap.get(a.quest_id).attempts.push(a);
-      }
-      // Sort groups by date of their most-recent attempt (first item per group)
-      const groups = [...groupMap.values()].sort((a, b) => {
-        const da = a.attempts[0]?.submitted_at ?? '';
-        const db = b.attempts[0]?.submitted_at ?? '';
-        return db.localeCompare(da);
-      });
-
-      for (const group of groups) {
-        const hdr = document.createElement('div');
-        hdr.className = 'qs-results-group-hdr';
-        hdr.innerHTML = `<strong class="qs-results-quest-name">${esc(group.quest_name)}</strong>`
-          + `<span class="qs-results-attempt-count">${group.attempts.length} attempt${group.attempts.length !== 1 ? 's' : ''}</span>`;
-        wrap.appendChild(hdr);
-
-        const table = document.createElement('table');
-        table.className = 'qs-table';
-        table.innerHTML = `<thead><tr>
-          <th>User</th><th>Date</th><th class="qs-th-score">Score / 10</th><th class="qs-th-actions-lg">Actions</th>
-        </tr></thead>`;
-        const tbody = document.createElement('tbody');
-        for (const a of group.attempts) {
-          const sc = a.score;
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td><strong>${esc(a.username)}</strong></td>
-            <td class="qs-date-td">${fmtDate(a.submitted_at)}</td>
-            <td class="qs-center-td"><span class="${scoreClass(sc)}">${fmtScore(sc)}</span></td>
-            <td>
-              <button class="btn btn-sm" onclick="qsAdminReviewAttempt(${a.id})">Review</button>
-              <button class="btn btn-sm btn-danger" onclick="qsConfirmDeleteAttempt(${a.id})">Del</button>
-            </td>`;
-          tbody.appendChild(tr);
-        }
-        table.appendChild(tbody);
-        wrap.appendChild(table);
-      }
+      qsPopulateResultsFilters(_resultsAllItems);
+      qsApplyResultsFilters();
     } catch (err) {
       wrap.innerHTML = `<p class="qs-load-error">${esc(err.message)}</p>`;
+      const countEl = document.getElementById('rf-count');
+      if (countEl) countEl.textContent = '';
     }
   }
 

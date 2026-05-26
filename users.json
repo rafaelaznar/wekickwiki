@@ -1,15 +1,43 @@
 [
-    {
-        "username": "admin",
-        "hash": "f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61",
-        "role": "admin",
-        "name": "Kate"
-    },
-    {
-        "username": "guest",
-        "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
-        "role": "guest",
-        "name": "Ralph",
-        "enabled": true
-    }
+  {
+    "username": "admin",
+    "hash": "f102261abcb0b4fe003994b9e9f2f2efdd64a80b52ba930d401b5a2a694a0e61",
+    "role": "admin",
+    "name": "Kate"
+  },
+  {
+    "username": "guest",
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest",
+    "name": "Ralph",
+    "enabled": true
+  },
+  {
+    "username": "guest2",
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest",
+    "name": "Peter",
+    "enabled": true
+  },
+  {
+    "username": "guest3",
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest",
+    "name": "Anna",
+    "enabled": true
+  },
+  {
+    "username": "guest4",
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest",
+    "name": "Maria",
+    "enabled": true
+  },
+  {
+    "username": "guest5",
+    "hash": "18fb145c0a15beae4d671e61688f90624c42e93872b642c346e4fc87f92fbbf4",
+    "role": "guest",
+    "name": "John",
+    "enabled": true
+  }
 ]

@@ -741,9 +741,27 @@ body {
 .qs-th-stat { width: 68px; }
 .qs-th-actions-sm { width: 110px; }
 .qs-th-avgscore { width: 80px; }
-.qs-th-actions-md { width: 120px; }
+.qs-th-actions-md { width: 180px; }
 .qs-th-score { width: 90px; }
 .qs-th-actions-lg { width: 130px; }
+
+/* ── Allowed users field ─────────────────────────────────────────────────────── */
+.qs-allowed-mode { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-bottom: .5rem; font-size: .9rem; }
+.qs-allowed-mode label { display: flex; align-items: center; gap: .35rem; cursor: pointer; }
+.qs-allowed-users-list { display: flex; flex-direction: column; gap: .4rem;
+  border: 1px solid #ddd; border-radius: 6px; padding: .6rem .75rem;
+  max-height: 180px; overflow-y: auto; background: #fafafa; }
+.qs-allowed-user { display: flex; align-items: center; gap: .5rem; font-size: .88rem; cursor: pointer; }
+.qs-allowed-user input[type="checkbox"] { cursor: pointer; flex-shrink: 0; }
+.qs-allowed-uname { color: #888; font-size: .8rem; }
+
+/* Manage Access modal: specific users in two columns */
+#acc-allowed-wrap .qs-allowed-users-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: .9rem;
+  row-gap: .45rem;
+}
 
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 680px) {
@@ -751,5 +769,6 @@ body {
   .qs-quest-cards { grid-template-columns: 1fr; }
   .qs-matching-row { grid-template-columns: 1fr; gap: .25rem; }
   .qs-matching-arrow { display: none; }
+  #acc-allowed-wrap .qs-allowed-users-list { grid-template-columns: 1fr; }
   .qs-score-box { flex-direction: column; gap: .75rem; text-align: center; }
 }
