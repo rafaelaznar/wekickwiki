@@ -57,6 +57,185 @@ function qs_filter_allowed_to_guests(array $allowed): array
   return empty($filtered) ? ['all'] : $filtered;
 }
 
+  function qs_moodle_inner_text($raw): string
+  {
+    $text = trim((string)$raw);
+    if ($text === '') return '';
+
+    $text = preg_replace('/<\s*br\s*\/?\s*>/i', "\n", $text);
+    $text = preg_replace('/<\/\s*(p|div|li|h[1-6])\s*>/i', "\n", $text);
+    $text = strip_tags($text);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $text = str_replace("\xc2\xa0", ' ', $text);
+    $text = preg_replace('/[ \t]+/u', ' ', $text);
+    $text = preg_replace('/\n{2,}/u', "\n", $text);
+    return trim($text);
+  }
+
+  function qs_moodle_labels_from_category(string $path): array
+  {
+    $path = trim($path);
+    if ($path === '') return [];
+    $path = preg_replace('#^\$course\$/top/?#i', '', $path);
+    $parts = array_filter(array_map('trim', explode('/', (string)$path)), fn($p) => $p !== '');
+    return array_values(array_unique($parts));
+  }
+
+  function qs_moodle_parse_question(SimpleXMLElement $qNode, array $labels): ?array
+  {
+    $type = strtolower(trim((string)($qNode['type'] ?? '')));
+    $query = qs_moodle_inner_text($qNode->questiontext->text ?? '');
+    if ($query === '') $query = qs_moodle_inner_text($qNode->name->text ?? '');
+    if ($query === '') return null;
+
+    if ($type === 'multichoice') {
+      if (strtolower(trim((string)($qNode->single ?? 'true'))) === 'false') {
+        return null; // This app only supports one correct option.
+      }
+      $options = [];
+      $bestIdx = 0;
+      $bestFraction = -INF;
+      foreach ($qNode->answer as $ansNode) {
+        $opt = qs_moodle_inner_text($ansNode->text ?? '');
+        if ($opt === '') continue;
+        $fraction = (float)($ansNode['fraction'] ?? 0);
+        $idx = count($options);
+        $options[] = $opt;
+        if ($fraction > $bestFraction) {
+          $bestFraction = $fraction;
+          $bestIdx = $idx;
+        }
+      }
+      if (empty($options)) return null;
+      return [
+        'type' => 'multiple_choice',
+        'query' => $query,
+        'labels' => $labels,
+        'options' => $options,
+        'answer' => (string)$bestIdx,
+      ];
+    }
+
+    if ($type === 'truefalse') {
+      $answer = null;
+      foreach ($qNode->answer as $ansNode) {
+        $fraction = (float)($ansNode['fraction'] ?? 0);
+        if ($fraction <= 0) continue;
+        $txt = strtolower(qs_moodle_inner_text($ansNode->text ?? ''));
+        if (in_array($txt, ['true', 'verdadero', 'yes', 'si', 'sí', '1'], true)) {
+          $answer = '1';
+          break;
+        }
+        if (in_array($txt, ['false', 'falso', 'no', '0'], true)) {
+          $answer = '0';
+          break;
+        }
+      }
+      if ($answer === null) {
+        foreach ($qNode->answer as $i => $ansNode) {
+          $fraction = (float)($ansNode['fraction'] ?? 0);
+          if ($fraction > 0) {
+            $answer = ((int)$i === 0) ? '1' : '0';
+            break;
+          }
+        }
+      }
+      if ($answer === null) return null;
+      return [
+        'type' => 'binary',
+        'query' => $query,
+        'labels' => $labels,
+        'answer' => $answer,
+      ];
+    }
+
+    if ($type === 'shortanswer') {
+      $options = [];
+      foreach ($qNode->answer as $ansNode) {
+        $fraction = (float)($ansNode['fraction'] ?? 0);
+        if ($fraction <= 0) continue;
+        $opt = qs_moodle_inner_text($ansNode->text ?? '');
+        if ($opt === '' || strpos($opt, '*') !== false) continue;
+        $options[] = $opt;
+      }
+      $options = array_values(array_unique($options));
+      if (empty($options)) return null;
+      return [
+        'type' => 'gap_filling',
+        'query' => $query,
+        'labels' => $labels,
+        'options' => $options,
+      ];
+    }
+
+    if ($type === 'matching') {
+      $pairs = [];
+      foreach ($qNode->subquestion as $subNode) {
+        $left = qs_moodle_inner_text($subNode->text ?? '');
+        $right = qs_moodle_inner_text($subNode->answer->text ?? '');
+        if ($left === '' || $right === '') continue;
+        $pairs[$left] = $right;
+      }
+      if (empty($pairs)) return null;
+      return [
+        'type' => 'matching',
+        'query' => $query,
+        'labels' => $labels,
+        'options' => $pairs,
+      ];
+    }
+
+    return null;
+  }
+
+  function qs_parse_moodle_xml_to_queries(string $xmlRaw): array
+  {
+    if (!function_exists('simplexml_load_string')) {
+      throw new RuntimeException('SimpleXML extension is not enabled on this server');
+    }
+
+    libxml_use_internal_errors(true);
+    $xml = simplexml_load_string($xmlRaw, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
+    if (!$xml) {
+      $errs = libxml_get_errors();
+      $msg = !empty($errs) ? trim($errs[0]->message) : 'Malformed XML';
+      libxml_clear_errors();
+      throw new RuntimeException($msg);
+    }
+    libxml_clear_errors();
+
+    $items = [];
+    $labels = [];
+    $stats = [
+      'total' => 0,
+      'categories' => 0,
+      'imported' => 0,
+      'skipped' => 0,
+      'by_type' => ['multiple_choice' => 0, 'binary' => 0, 'gap_filling' => 0, 'matching' => 0],
+    ];
+
+    foreach (($xml->question ?? []) as $qNode) {
+      $stats['total']++;
+      $srcType = strtolower(trim((string)($qNode['type'] ?? '')));
+
+      if ($srcType === 'category') {
+        $stats['categories']++;
+        $labels = qs_moodle_labels_from_category(qs_moodle_inner_text($qNode->category->text ?? ''));
+        continue;
+      }
+
+      $parsed = qs_moodle_parse_question($qNode, $labels);
+      if (!$parsed) continue;
+
+      $items[] = $parsed;
+      $stats['imported']++;
+      $stats['by_type'][$parsed['type']] = ($stats['by_type'][$parsed['type']] ?? 0) + 1;
+    }
+
+    $stats['skipped'] = max(0, $stats['total'] - $stats['categories'] - $stats['imported']);
+    return ['items' => $items, 'stats' => $stats];
+  }
+
 /**
  * Randomly select questions from $all_queries matching the quest's label groups.
  * Each group is an AND of labels (a question must have ALL labels in a group).
@@ -340,6 +519,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     qs_save_queries($queries);
     json_out(200, ['ok' => true, 'id' => $clean['id']]);
 }
+
+  // POST ?action=import-moodle-xml  — multipart/form-data with file field "file"
+  if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'import-moodle-xml') {
+    $claims = require_auth();
+    if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
+
+    $f = $_FILES['file'] ?? null;
+    if (!is_array($f)) json_out(400, ['error' => 'XML file is required']);
+
+    $uploadErr = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
+    if ($uploadErr !== UPLOAD_ERR_OK) {
+      json_out(400, ['error' => 'Upload failed (code ' . $uploadErr . ')']);
+    }
+
+    $tmp = (string)($f['tmp_name'] ?? '');
+    if ($tmp === '' || !is_uploaded_file($tmp)) json_out(400, ['error' => 'Invalid uploaded file']);
+
+    $xmlRaw = file_get_contents($tmp);
+    if (!is_string($xmlRaw) || trim($xmlRaw) === '') json_out(400, ['error' => 'Uploaded file is empty']);
+
+    try {
+      $parsed = qs_parse_moodle_xml_to_queries($xmlRaw);
+    } catch (Throwable $e) {
+      json_out(400, ['error' => 'Invalid Moodle XML: ' . $e->getMessage()]);
+    }
+
+    $items = (array)($parsed['items'] ?? []);
+    if (empty($items)) json_out(400, ['error' => 'No compatible questions found in XML']);
+
+    $queries = qs_load_queries();
+    $nextId = data_next_id($queries);
+    $added = 0;
+
+    foreach ($items as $item) {
+      $clean = qs_sanitize_query((array)$item);
+      if ($clean['query'] === '') continue;
+      $clean['id'] = $nextId++;
+      $queries[] = $clean;
+      $added++;
+    }
+
+    if ($added === 0) json_out(400, ['error' => 'No valid questions could be imported']);
+
+    qs_save_queries($queries);
+    $stats = (array)($parsed['stats'] ?? []);
+    $skipped = max(0, ((int)($stats['total'] ?? 0)) - ((int)($stats['categories'] ?? 0)) - $added);
+    json_out(200, [
+      'ok' => true,
+      'imported' => $added,
+      'total_xml_questions' => (int)($stats['total'] ?? 0),
+      'categories' => (int)($stats['categories'] ?? 0),
+      'skipped' => $skipped,
+      'by_type' => $stats['by_type'] ?? [],
+    ]);
+  }
 
 // POST ?action=delete-query  — body: {id}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete-query') {
@@ -969,6 +1203,11 @@ $baseHref  = $scriptDir . '/';
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add question
           </button>
+          <button class="btn" type="button" onclick="qsPickMoodleXmlFile()">
+            <svg viewBox="0 0 24 24"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+            Import Moodle XML
+          </button>
+          <input id="qm-xml-file" type="file" accept=".xml,text/xml,application/xml" onchange="qsHandleMoodleXmlFile(this)" style="display:none">
           <span id="queries-status" class="qs-status" style="display:none"></span>
         </div>
         <!-- Filter bar -->
@@ -1375,6 +1614,48 @@ $baseHref  = $scriptDir . '/';
     if (type) type.value = '';
     if (label) label.value = '';
     qsApplyQueryFilters();
+  }
+
+  function qsPickMoodleXmlFile() {
+    const input = document.getElementById('qm-xml-file');
+    if (!input) return;
+    input.value = '';
+    input.click();
+  }
+
+  async function qsHandleMoodleXmlFile(input) {
+    const file = input?.files?.[0];
+    if (!file) return;
+
+    qsSetStatus('queries-status', 'Importing XML…', 'info');
+
+    const fd = new FormData();
+    fd.append('file', file, file.name || 'questions.xml');
+
+    try {
+      const res = await apiFetch('quests.php?action=import-moodle-xml', {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        qsSetStatus('queries-status', '', '');
+        qsToast(data.error || 'Import failed', 'error');
+        return;
+      }
+
+      const imported = Number(data.imported ?? 0);
+      const skipped = Number(data.skipped ?? 0);
+      qsSetStatus('queries-status', `Imported ${imported} question${imported !== 1 ? 's' : ''}`, 'success');
+      qsToast(`XML import completed: ${imported} imported, ${skipped} skipped`);
+      qsLoadQueries();
+    } catch (err) {
+      qsSetStatus('queries-status', '', '');
+      qsToast('Import failed', 'error');
+    } finally {
+      input.value = '';
+    }
   }
 
   function qsRenderQueriesTable(queries) {
