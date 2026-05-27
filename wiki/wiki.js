@@ -1,0 +1,1360 @@
+    // ══════════════════════════════════════════════════════════════════════════════
+    // WKW Plugin Engine — Hooks / Filters (WordPress-style)
+    // Initialised here so plugins loaded after wiki.js can call registerPlugin().
+    // ══════════════════════════════════════════════════════════════════════════════
+    window.WKW = (() => {
+      const _filters = {};      // hook → [{fn, prio, plugin}]
+      const _plugins = {};      // id   → meta
+      const _disabled = new Set(); // disabled plugin ids (server-side state)
+      return {
+        /**
+         * Declare a plugin and bind its hook handlers.
+         * @param {object} meta     - {id, name, version, description, author, hooks[], priority?}
+         * @param {object} handlers - { 'hook.name': fn, ... }
+         */
+        registerPlugin(meta, handlers = {}) {
+          if (!meta?.id) { console.warn('[WKW] Plugin missing id'); return; }
+          if (_plugins[meta.id]) { console.warn('[WKW] Already registered:', meta.id); return; }
+          _plugins[meta.id] = { ...meta, loadedAt: Date.now() };
+          const prio = meta.priority ?? 10;
+          for (const [hook, fn] of Object.entries(handlers)) {
+            (_filters[hook] ??= []).push({ fn, prio, plugin: meta.id });
+          }
+          console.info(`[WKW Plugin] ${meta.id} ${meta.version ?? ''} loaded`);
+        },
+        /**
+         * Pass a value through all handlers registered on a filter hook.
+         * Handlers whose plugin is disabled are skipped.
+         * @param  {string} hook  - Hook name
+         * @param  {*}      value - Initial value
+         * @param  {...*}   args  - Extra arguments forwarded to every handler
+         * @returns {*} Transformed value
+         */
+        applyFilters(hook, value, ...args) {
+          return (_filters[hook] ?? [])
+            .slice()
+            .sort((a, b) => a.prio - b.prio)
+            .reduce((val, { fn, plugin }) => _disabled.has(plugin) ? val : fn(val, ...args), value);
+        },
+        /**
+         * Fire all action handlers registered on a hook (return value ignored).
+         * Handlers whose plugin is disabled are skipped.
+         * @param {string} hook - Hook name
+         * @param {...*}   args - Arguments forwarded to every handler
+         */
+        doAction(hook, ...args) {
+          (_filters[hook] ?? [])
+            .slice()
+            .sort((a, b) => a.prio - b.prio)
+            .filter(({ plugin }) => !_disabled.has(plugin))
+            .forEach(({ fn }) => fn(...args));
+        },
+        /** Returns a snapshot of all registered plugin metadata. */
+        getPlugins() { return { ..._plugins }; },
+        /** Returns true if the plugin with the given id is enabled. */
+        isEnabled(id) { return !_disabled.has(id); },
+        /** Enable or disable a plugin in memory (call save-plugin-state to persist). */
+        setEnabled(id, val) { val ? _disabled.delete(id) : _disabled.add(id); },
+        /** Initialise the disabled set from an array of disabled plugin ids (from server). */
+        loadState(disabledArr) {
+          _disabled.clear();
+          if (Array.isArray(disabledArr)) disabledArr.forEach(id => _disabled.add(id));
+        },
+        /**
+         * Namespace for ODT utilities exposed to plugins.
+         * Populated at the bottom of wiki.js once the functions are defined.
+         */
+        odt: {}
+      };
+    })();
+
+    // ── Symbol substitution ─────────────────────────────────────────────────────
+    // Applied as a markdown preprocessor so it works with any marked version.
+    // Longer/more-specific patterns are listed before shorter overlapping ones.
+    const SYMBOL_SUBS = [
+      // Must come before their shorter prefixes
+      [/---/g,      '\u2014'],   // em dash
+      [/--/g,       '\u2013'],   // en dash
+      [/\.\.\./g,   '\u2026'],   // ellipsis
+      [/<=>/g,      '\u21D4'],   // left-right double arrow
+      [/=>/g,       '\u21D2'],   // right double arrow
+      [/<=/g,       '\u21D0'],   // left double arrow
+      [/->/g,       '\u2192'],   // right arrow
+      [/<-/g,       '\u2190'],   // left arrow
+      [/\+-/g,      '\u00B1'],   // plus-minus
+      [/\(c\)/gi,   '\u00A9'],   // copyright
+      [/\(r\)/gi,   '\u00AE'],   // registered
+      [/\(tm\)/gi,  '\u2122'],   // trademark
+      [/\(p\)/gi,   '\u2117'],   // sound-recording copyright
+      [/\(e\)/gi,   '\u20AC'],   // euro
+      [/\(deg\)/gi, '\u00B0'],   // degree
+      [/\(1\/2\)/g, '\u00BD'],   // one-half
+      [/\(1\/4\)/g, '\u00BC'],   // one-quarter
+      [/\(3\/4\)/g, '\u00BE'],   // three-quarters
+      [/\(x\)/gi,   '\u00D7'],   // multiplication sign
+      [/!=|\/=/g,   '\u2260'],   // not equal
+      [/>=/g,       '\u2265'],   // greater-or-equal
+    ];
+
+    function applySymbols(md) {
+      // Split on fenced code blocks and inline code spans — leave those untouched.
+      const parts = md.split(/(```[\s\S]*?```|`[^`]*`)/g);
+      return parts.map((chunk, i) => {
+        if (i % 2 === 1) return chunk; // inside code → leave untouched
+        // Process line by line so table separator rows (|---|---|) are never touched.
+        return chunk.split('\n').map(line => {
+          // A table separator line only contains |, -, :, and spaces (may be indented).
+          if (/^\s*\|[\s|:\-]+\|?\s*$/.test(line)) return line;
+          for (const [re, ch] of SYMBOL_SUBS) line = line.replace(re, ch);
+          return line;
+        }).join('\n');
+      }).join('');
+    }
+
+    /**
+     * Convert Markdown to HTML, running it through the WKW filter pipeline.
+     * Sequence: wkw.md.preprocess → applySymbols → marked.parse → wkw.html.postrender
+     * @param {string} md - Raw Markdown source
+     * @returns {string} Rendered HTML
+     */
+    function parseWiki(md) {
+      // Allow plugins to pre-process raw Markdown before any other transformation.
+      md = WKW.applyFilters('wkw.md.preprocess', md);
+      let html = marked.parse(applySymbols(md));
+      // Allow plugins to post-process the rendered HTML (e.g. add widgets or callout boxes).
+      html = WKW.applyFilters('wkw.html.postrender', html);
+      return html;
+    }
+
+    /**
+     * Wrap each line of a highlighted code block in a <span class="ln-line"> element
+     * so that CSS counters can display gutter line-numbers.
+     * The parent <pre> gets the `ln-enabled` class which activates the CSS counter.
+     * @param {HTMLElement} block - A <code> element produced by Highlight.js
+     */
+    function addLineNumbers(block) {
+      const lines = block.innerHTML.split('\n');
+      // Highlight.js appends a trailing newline — drop the resulting empty entry.
+      if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+      block.innerHTML = lines.map(line => `<span class="ln-line">${line}</span>`).join('');
+      block.parentElement.classList.add('ln-enabled');
+    }
+
+    /**
+     * Run Highlight.js on every <pre><code> block inside a content container.
+     * If the WKW_CODE_LINE_NUMBERS global flag is truthy (set by index.php from
+     * settings.json), line numbers are also injected via addLineNumbers().
+     * No-ops gracefully when hljs is not loaded.
+     * @param {HTMLElement} contentEl - The container element to search within
+     */
+    function highlightContent(contentEl) {
+      if (window.hljs) {
+        contentEl.querySelectorAll('pre code').forEach(function (block) {
+          hljs.highlightElement(block);
+          if (window.WKW_CODE_LINE_NUMBERS) addLineNumbers(block);
+        });
+      }
+    }
+
+    // ── Toast ───────────────────────────────────────────────────────────────────
+    /** Timer handle for auto-hiding the toast; cleared on each new showToast call. */
+    let _toastTimer;
+
+    /**
+     * Display a brief ephemeral notification at the bottom of the screen.
+     * Replaces any currently visible toast — the hide timer is always reset.
+     * @param {string} msg               - Text to display
+     * @param {'success'|'error'} type   - CSS class applied to the toast element
+     * @param {number}            duration - Milliseconds until auto-hide (default 3000)
+     */
+    function showToast(msg, type = 'success', duration = 3000) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = type + ' show';
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+    }
+
+    // ── Icons ───────────────────────────────────────────────────────────────────
+    const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    const ICON_VIEW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+    const ICON_PLUS = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+
+    // ── ODT download (client-side generation) ───────────────────────────────────
+    function odtXmlEsc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /**
+     * Convert an HTML inline fragment (as produced by marked or written in the source)
+     * to the equivalent ODT <text:span> XML.
+     *
+     * Handles:
+     *  - HTML tags: <strong>, <em>, <code>, <s>, <u>, <ins>, <mark>, <br>, <a>
+     *  - Markdown inline syntax: **bold**, __bold__, *italic*, _italic_, ~~strike~~, `code`
+     *  - Markdown links [text](url) and images ![alt](url)
+     *  - HTML entities (named, decimal, hex) decoded then re-escaped for XML
+     *
+     * The parser is character-by-character and intentionally non-recursive for
+     * performance — nested spans are handled by recursive odtInline calls only
+     * for the innermost paired-marker cases.
+     *
+     * @param {string} text - Input fragment (may contain HTML tags and Markdown markers)
+     * @returns {string} ODT XML fragment using <text:span> elements
+     */
+    function odtInline(text) {
+      // Decode a handful of HTML entities that may come from applySymbols / inline HTML
+      function decEnt(s) {
+        return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>')
+                .replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&nbsp;/g,'\u00a0')
+                .replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(+n))
+                .replace(/&#x([0-9a-f]+);/gi,(_,h)=>String.fromCodePoint(parseInt(h,16)));
+      }
+      let out = ''; let i = 0;
+      while (i < text.length) {
+        // HTML tags
+        if (text[i] === '<') {
+          const tag = text.slice(i).match(/^<(\/?)(strong|b|em|i|code|s|del|strike|u|ins|mark|br)(\s[^>]*)?\/?>|^<a(\s[^>]*)?>|^<\/a>/i);
+          if (tag) {
+            const full = tag[0];
+            const closing = full.startsWith('</');
+            const tagName = (tag[1] !== undefined ? tag[2] : (full.match(/<(a|br)/i)||[])[1]||'').toLowerCase();
+            if (tagName === 'br') { out += '<text:line-break/>'; }
+            else if (!closing) {
+              const style = {strong:'C_Bold',b:'C_Bold',em:'C_Italic',i:'C_Italic',
+                            code:'C_Code',s:'C_Strike',del:'C_Strike',strike:'C_Strike',
+                            u:'C_Under',ins:'C_Under',mark:'C_Mark',a:''}[tagName];
+              if (style) out += '<text:span text:style-name="'+style+'">';
+              else if (tagName === 'a') out += '<text:span>'; // plain span for links
+            } else {
+              out += '</text:span>';
+            }
+            i += full.length; continue;
+          }
+          // HTML entity starting with &
+          const ent = text.slice(i).match(/^&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/);
+          if (ent) { out += odtXmlEsc(decEnt(ent[0])); i += ent[0].length; continue; }
+        }
+        if (text[i] === '&') {
+          const ent = text.slice(i).match(/^&([a-zA-Z]+|#\d+|#x[0-9a-fA-F]+);/);
+          if (ent) { out += odtXmlEsc(decEnt(ent[0])); i += ent[0].length; continue; }
+        }
+        if (text.startsWith('**', i)) {
+          const j = text.indexOf('**', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Bold">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text.startsWith('__', i)) {
+          const j = text.indexOf('__', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Bold">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text.startsWith('~~', i)) {
+          const j = text.indexOf('~~', i + 2);
+          if (j !== -1) { out += '<text:span text:style-name="C_Strike">' + odtInline(text.slice(i+2,j)) + '</text:span>'; i = j+2; continue; }
+        }
+        if (text[i] === '*' && !text.startsWith('**', i)) {
+          const j = text.indexOf('*', i + 1);
+          if (j !== -1 && !text.startsWith('**', j)) { out += '<text:span text:style-name="C_Italic">' + odtInline(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '_' && !text.startsWith('__', i)) {
+          const j = text.indexOf('_', i + 1);
+          if (j !== -1 && !text.startsWith('__', j)) { out += '<text:span text:style-name="C_Italic">' + odtInline(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '`') {
+          const j = text.indexOf('`', i + 1);
+          if (j !== -1) { out += '<text:span text:style-name="C_Code">' + odtXmlEsc(text.slice(i+1,j)) + '</text:span>'; i = j+1; continue; }
+        }
+        if (text[i] === '!' && text[i+1] === '[') {
+          const m = text.slice(i).match(/^!\[([^\]]*)\]\([^)]*\)/);
+          if (m) { if (m[1]) out += odtXmlEsc('['+m[1]+']'); i += m[0].length; continue; }
+        }
+        if (text[i] === '[') {
+          const m = text.slice(i).match(/^\[([^\]]*)\]\([^)]*\)/);
+          if (m) { out += odtInline(m[1]); i += m[0].length; continue; }
+        }
+        out += odtXmlEsc(text[i]); i++;
+      }
+      return out;
+    }
+
+    /** Module-level table counter — reset to 0 by buildOdtContent(), incremented for each GFM or HTML table so that every table gets a unique name in the ODT XML. */
+    let _odtTableCounter = 0;
+
+    /**
+     * Convert a block of Markdown to ODT XML paragraphs, lists, tables, and headings.
+     * This is the core document-body generator — it is called once for the main
+     * document and recursively for every blockquote level.
+     *
+     * Supported Markdown constructs:
+     *  - Headings (H1–H6)                 → <text:h>
+     *  - Paragraphs (with soft-wrap join)   → <text:p P_Body>
+     *  - Fenced code blocks (```)           → consecutive <text:p P_Pre>
+     *  - Horizontal rules (---, ***, ___) → <text:p P_HR>
+     *  - Bullet lists (-, *, +)             → <text:list LS_Bullet>
+     *  - Ordered lists (1. 2. …)           → <text:list LS_Number>
+     *  - GFM tables (pipe syntax)           → <table:table T_Table>
+     *  - HTML <table> blocks                → delegated to wkw.odt.htmlTable plugin filter
+     *  - Blockquotes (>)                    → recursive odtBody(content, inQuote=true)
+     *
+     * When called with inQuote=true the paragraph styles switch to the P_Quote
+     * family so the visual indentation and muted colour are applied.
+     *
+     * @param {string}  md      - Markdown source to convert
+     * @param {boolean} inQuote - true when rendering inside a blockquote
+     * @returns {string} ODT XML fragment ready to be inserted into <office:text>
+     */
+    function odtBody(md, inQuote) {
+      // Pre-process: collect GFM tables and blockquotes into token objects.
+      function parseBlocks(rawLines) {
+        const tokens = [];
+        let j = 0;
+        while (j < rawLines.length) {
+          // Fenced code block: pass all lines through as-is so that blockquote
+          // lines (>) and table lines (|) inside fences are never mis-classified.
+          if (/^```/.test(rawLines[j])) {
+            tokens.push({ type: 'line', text: rawLines[j] }); j++; // opening fence
+            while (j < rawLines.length) {
+              tokens.push({ type: 'line', text: rawLines[j] });
+              if (/^```/.test(rawLines[j])) { j++; break; }
+              j++;
+            }
+            continue;
+          }
+          // HTML table block: collect lines until </table>
+          // Strip inline code spans before testing so `<table>` inside backticks is ignored.
+          if (/<table(\s[^>]*)?>/.test(rawLines[j].replace(/`[^`]*`/g, ''))) {
+            let html = '';
+            while (j < rawLines.length) {
+              html += rawLines[j] + ' ';
+              j++;
+              if (/<\/table>/i.test(html)) break;
+            }
+            tokens.push({ type: 'htmltable', html: html.trim() });
+            continue;
+          }
+          // Blockquote: one or more consecutive lines starting with >
+          if (/^>/.test(rawLines[j])) {
+            const qLines = [];
+            while (j < rawLines.length && /^>/.test(rawLines[j])) {
+              qLines.push(rawLines[j].replace(/^>\s?/, '')); j++;
+            }
+            tokens.push({ type: 'quote', content: qLines.join('\n') });
+            continue;
+          }
+          // A GFM table needs at least 3 lines: header | sep | body...
+          // Header: contains |   Sep: only |, -, :, space
+          if (j + 2 < rawLines.length
+              && /\|/.test(rawLines[j])
+              && /^\s*\|?[\s|:\-]+\|?\s*$/.test(rawLines[j+1])) {
+            const splitCells = line => line.replace(/^\|/,'').replace(/\|$/,'').split('|').map(c => c.trim());
+            const headers = splitCells(rawLines[j]);
+            let k = j + 2;
+            const rows = [];
+            while (k < rawLines.length && /\|/.test(rawLines[k])
+                   && !/^\s*\|?[\s|:\-]+\|?\s*$/.test(rawLines[k])) {
+              rows.push(splitCells(rawLines[k])); k++;
+            }
+            tokens.push({ type: 'table', headers, rows });
+            j = k;
+          } else {
+            tokens.push({ type: 'line', text: rawLines[j] }); j++;
+          }
+        }
+        return tokens;
+      }
+      const S_BODY = inQuote ? 'P_Quote' : 'P_Body';
+      const S_PRE  = inQuote ? 'P_QuotePre' : 'P_Pre';
+      const S_LI   = inQuote ? 'P_QuoteLi' : 'P_Li';
+
+      function odtTable(headers, rows) {
+        _odtTableCounter++;
+        const tname = 'Tbl' + _odtTableCounter;
+        const cols = headers.length;
+        let t = '<table:table table:name="'+odtXmlEsc(tname)+'" table:style-name="T_Table">';
+        for (let c = 0; c < cols; c++) t += '<table:table-column table:style-name="T_Col"/>';
+        // header row
+        t += '<table:table-header-rows><table:table-row>';
+        for (const h of headers)
+          t += '<table:table-cell table:style-name="T_CellH" office:value-type="string"><text:p text:style-name="P_TH">'+odtInline(h)+'</text:p></table:table-cell>';
+        t += '</table:table-row></table:table-header-rows>';
+        // body rows
+        for (const row of rows) {
+          t += '<table:table-row>';
+          for (let c = 0; c < cols; c++) {
+            const cell = row[c] !== undefined ? row[c] : '';
+            t += '<table:table-cell table:style-name="T_Cell" office:value-type="string"><text:p text:style-name="P_TD">'+odtInline(cell)+'</text:p></table:table-cell>';
+          }
+          t += '</table:table-row>';
+        }
+        t += '</table:table>';
+        return t;
+      }
+
+      const rawLines = md.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n');
+      const tokens = parseBlocks(rawLines);
+      const lines = tokens.map(t =>
+        t.type === 'line'      ? t.text :
+        t.type === 'table'     ? '\x00TABLE\x00' + JSON.stringify({h:t.headers,r:t.rows}) :
+        t.type === 'htmltable' ? '\x00HTMLTABLE\x00' + t.html :
+        /* quote */               '\x00QUOTE\x00' + t.content
+      );
+
+      let out = '', i = 0, inList = false, lstType = '', inCode = false, codeBuf = [];
+      while (i < lines.length) {
+        const line = lines[i];
+        if (/^```/.test(line)) {
+          if (inCode) {
+            inCode = false;
+            if (inList) { out += '</text:list>'; inList = false; }
+            for (const cl of codeBuf) out += '<text:p text:style-name="'+S_PRE+'">' + odtXmlEsc(cl) + '</text:p>';
+            codeBuf = [];
+          } else {
+            if (inList) { out += '</text:list>'; inList = false; }
+            inCode = true;
+          }
+          i++; continue;
+        }
+        if (inCode) { codeBuf.push(line); i++; continue; }
+        const isUL = /^(\s*)[-*+]\s+(.*)$/.exec(line);
+        const isOL = !isUL && /^\d+\.\s+(.*)$/.exec(line);
+        if (inList && !isUL && !isOL && line.trim() !== '') { out += '</text:list>'; inList = false; }
+        if (line.startsWith('\x00TABLE\x00')) {
+          const td = JSON.parse(line.slice(7));
+          out += odtTable(td.h, td.r);
+        } else if (line.startsWith('\x00HTMLTABLE\x00')) {
+          if (inList) { out += '</text:list>'; inList = false; }
+          out += WKW.applyFilters('wkw.odt.htmlTable', '', line.slice(11), { odtXmlEsc, odtInline, nextTableName: () => 'Tbl' + (++_odtTableCounter) });
+        } else if (line.startsWith('\x00QUOTE\x00')) {
+          if (inList) { out += '</text:list>'; inList = false; }
+          out += odtBody(line.slice(7), true);
+        } else {
+          const hd = /^(#{1,6})\s+(.+)$/.exec(line);
+          if (hd) {
+            const lvl = hd[1].length;
+            out += '<text:h text:style-name="P_H'+lvl+'" text:outline-level="'+lvl+'">'+odtInline(hd[2])+'</text:h>';
+          } else if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+            out += '<text:p text:style-name="P_HR"/>';
+          } else if (isUL) {
+            if (!inList || lstType !== 'ul') { if (inList) out += '</text:list>'; out += '<text:list text:style-name="LS_Bullet">'; inList = true; lstType = 'ul'; }
+            out += '<text:list-item><text:p text:style-name="'+S_LI+'">'+odtInline(isUL[2])+'</text:p></text:list-item>';
+          } else if (isOL) {
+            if (!inList || lstType !== 'ol') { if (inList) out += '</text:list>'; out += '<text:list text:style-name="LS_Number">'; inList = true; lstType = 'ol'; }
+            out += '<text:list-item><text:p text:style-name="'+S_LI+'">'+odtInline(isOL[1])+'</text:p></text:list-item>';
+          } else if (line.trim() === '') {
+            // blank
+          } else {
+            const pl = [line];
+            while (i+1 < lines.length && lines[i+1].trim() !== ''
+              && !/^#{1,6}\s/.test(lines[i+1]) && !/^```/.test(lines[i+1])
+              && !/^(\s*)[-*+]\s/.test(lines[i+1]) && !/^\d+\.\s/.test(lines[i+1])
+              && !/^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i+1])
+              && !lines[i+1].startsWith('\x00TABLE\x00')
+              && !lines[i+1].startsWith('\x00HTMLTABLE\x00')
+              && !lines[i+1].startsWith('\x00QUOTE\x00')
+            ) { i++; pl.push(lines[i]); }
+            out += '<text:p text:style-name="'+S_BODY+'">'+odtInline(pl.join(' '))+'</text:p>';
+          }
+        }
+        i++;
+      }
+      if (inList) out += '</text:list>';
+      return out;
+    }
+
+    /** Stub retained for API completeness — not needed for the Flat ODT (FODT) format used here,
+     *  which embeds all content in a single XML file without a ZIP manifest. */
+    function buildOdtManifest() { /* not used in flat-ODT mode */ }
+
+    /**
+     * Assemble a complete Flat ODT (FODT) XML document from Markdown source.
+     *
+     * Flat ODT is a single-file XML variant of the ODF format (no ZIP container).
+     * The document structure is:
+     *   <?xml ...?>
+     *   <office:document> (with all namespace declarations)
+     *     <office:font-face-decls>  — monospace font for code
+     *     <office:automatic-styles> — all paragraph/character/table/list styles
+     *     <office:body>
+     *       <office:text>           — generated by odtBody()
+     *
+     * Automatic styles defined here (name → purpose):
+     *   P_Body, P_H1–H6, P_Pre, P_HR, P_Li   — block paragraph styles
+     *   C_Bold, C_Italic, C_Code, C_Strike, C_Under, C_Mark — inline character styles
+     *   LS_Bullet, LS_Number                   — list styles
+     *   T_Table, T_Col, T_CellH, T_Cell        — table / column / cell styles
+     *   P_TH, P_TD                             — table header/data paragraph styles
+     *   P_Quote, P_QuotePre, P_QuoteLi         — blockquote paragraph styles
+     *
+     * Plugins can add extra styles via the `wkw.odt.styles` filter.
+     * applySymbols() is called here so the final document contains Unicode
+     * typographic characters rather than ASCII sequences.
+     *
+     * @param {string} md - Raw Markdown source of the current page
+     * @returns {string} Complete FODT XML document as a string
+     */
+    function buildOdtContent(md) {
+      _odtTableCounter = 0;
+      const xmlns =
+        ' xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"'
+        +' xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"'
+        +' xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"'
+        +' xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
+        +' xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"'
+        +' xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"';
+      const astyles =
+        '<style:style style:name="P_Body" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.1cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="12pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H1" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.5cm" fo:margin-bottom="0.25cm"/>'
+        +'<style:text-properties fo:font-size="18pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H2" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.4cm" fo:margin-bottom="0.2cm"/>'
+        +'<style:text-properties fo:font-size="15pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H3" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.35cm" fo:margin-bottom="0.15cm"/>'
+        +'<style:text-properties fo:font-size="13pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H4" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.3cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:font-weight="bold" fo:color="#8A0808"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H5" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.25cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="11pt" fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_H6" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-top="0.2cm" fo:margin-bottom="0.1cm"/>'
+        +'<style:text-properties fo:font-size="10pt" fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Pre" style:family="paragraph">'
+        +'<style:paragraph-properties fo:background-color="#f5f5f5" fo:padding="0.1cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_HR" style:family="paragraph">'
+        +'<style:paragraph-properties fo:border-bottom="0.05cm solid #cccccc" fo:padding-bottom="0.15cm" fo:margin-bottom="0.15cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Li" style:family="paragraph">'
+        +'<style:text-properties fo:font-size="12pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Bold" style:family="text">'
+        +'<style:text-properties fo:font-weight="bold"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Italic" style:family="text">'
+        +'<style:text-properties fo:font-style="italic"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Code" style:family="text">'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt" fo:background-color="#f0f0f0"/>'
+        +'</style:style>'
+        +'<text:list-style style:name="LS_Bullet">'
+        +'<text:list-level-style-bullet text:level="1" text:bullet-char="&#x2022;">'
+        +'<style:list-level-properties text:space-before="0.5cm" text:min-label-width="0.5cm"/>'
+        +'</text:list-level-style-bullet>'
+        +'</text:list-style>'
+        +'<text:list-style style:name="LS_Number">'
+        +'<text:list-level-style-number text:level="1" style:num-format="1" style:num-suffix=".">'
+        +'<style:list-level-properties text:space-before="0.5cm" text:min-label-width="0.5cm"/>'
+        +'</text:list-level-style-number>'
+        +'</text:list-style>'
+        +'<style:style style:name="T_Table" style:family="table">'
+        +'<style:table-properties style:width="16cm" fo:margin-top="0.3cm" fo:margin-bottom="0.3cm" table:border-model="collapsing"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_Col" style:family="table-column">'
+        +'<style:table-column-properties style:column-width="4cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_CellH" style:family="table-cell">'
+        +'<style:table-cell-properties fo:border="0.05cm solid #dddddd" fo:background-color="#f5f5f5" fo:padding="0.12cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="T_Cell" style:family="table-cell">'
+        +'<style:table-cell-properties fo:border="0.05cm solid #dddddd" fo:padding="0.12cm"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_TH" style:family="paragraph">'
+        +'<style:text-properties fo:font-weight="bold" fo:font-size="11pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_TD" style:family="paragraph">'
+        +'<style:text-properties fo:font-size="11pt"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_Quote" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm" fo:padding-left="0.3cm" fo:border-left="0.1cm solid #cccccc" fo:margin-top="0.05cm" fo:margin-bottom="0.05cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_QuotePre" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm" fo:padding-left="0.3cm" fo:border-left="0.1cm solid #cccccc" fo:background-color="#f5f5f5" fo:padding="0.1cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+        +'<style:text-properties style:font-name="Liberation Mono" fo:font-family="Liberation Mono" fo:font-size="10pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="P_QuoteLi" style:family="paragraph">'
+        +'<style:paragraph-properties fo:margin-left="0.8cm"/>'
+        +'<style:text-properties fo:font-size="12pt" fo:color="#555555"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Strike" style:family="text">'
+        +'<style:text-properties style:text-line-through-style="solid"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Under" style:family="text">'
+        +'<style:text-properties style:text-underline-style="solid" style:text-underline-width="auto" style:text-underline-color="font-color"/>'
+        +'</style:style>'
+        +'<style:style style:name="C_Mark" style:family="text">'
+        +'<style:text-properties fo:background-color="#ffff00"/>'
+        +'</style:style>';
+      const extraStyles = WKW.applyFilters('wkw.odt.styles', '');
+      return '\x3C?xml version="1.0" encoding="UTF-8"?>'
+        +'<office:document'
+        +xmlns
+        +' office:version="1.3"'
+        +' office:mimetype="application/vnd.oasis.opendocument.text">'
+        +'<office:font-face-decls>'
+        +'<style:font-face style:name="Liberation Mono" svg:font-family="&apos;Liberation Mono&apos;" style:font-family-generic="modern" style:font-pitch="fixed"/>'
+        +'</office:font-face-decls>'
+        +'<office:automatic-styles>'+astyles+extraStyles+'</office:automatic-styles>'
+        +'<office:body><office:text>'
+        +odtBody(applySymbols(md))
+        +'</office:text></office:body>'
+        +'</office:document>';
+    }
+
+    /**
+     * Generate and download the current page as a Flat ODT file (.fodt).
+     * All processing is client-side — no network request is made for the conversion.
+     * The download is triggered by programmatically clicking a temporary <a> element.
+     * The ODT button is disabled for the duration to prevent double-clicks.
+     */
+    async function downloadOdt() {
+      if (!rawMd) return;
+      const btn = document.getElementById('odt-btn');
+      btn.disabled = true;
+      try {
+        const xml = buildOdtContent(rawMd);
+        const blob = new Blob([xml], {type: 'application/vnd.oasis.opendocument.text-flat-xml'});
+        const filename = currentPage.split('/').pop() + '.fodt';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Downloaded: ' + filename);
+      } catch(e) {
+        console.error('ODT error:', e);
+        showToast('Error generating ODT: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ── Backup & Restore ────────────────────────────────────────────────────────
+    async function downloadBackup() {
+      const btn = document.getElementById('backup-btn');
+      btn.disabled = true;
+      try {
+        const res = await apiFetch('?action=backup');
+        if (!res || !res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(data.error || 'Error generating backup', 'error');
+          return;
+        }
+        // Derive filename from Content-Disposition header or build a fallback
+        let filename = 'wkw-backup.txt';
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m  = cd.match(/filename="?([^";\s]+)"?/);
+        if (m) filename = m[1];
+
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showToast('Backup downloaded: ' + filename);
+      } catch {
+        showToast('Connection error during backup', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /**
+     * Trigger the hidden file-input that lets the admin choose a backup archive
+     * to restore. The actual restore logic lives in the 'change' event handler below.
+     */
+    function restoreBackup() {
+      document.getElementById('restore-input').click();
+    }
+
+    /**
+     * Handle backup file selection from the restore file input.
+     * Requires explicit confirmation before proceeding because restoring
+     * permanently replaces the entire pages/ directory on the server.
+     * On success reloads the current page so content reflects the restored state.
+     */
+    document.getElementById('restore-input').addEventListener('change', async function () {
+      const file = this.files[0];
+      if (!file) return;
+
+      const confirmed = confirm(
+        '⚠️ RESTORE BACKUP\n\n' +
+        'This will permanently DELETE the entire pages/ directory and replace ALL wiki content with the uploaded backup.\n\n' +
+        'This operation CANNOT be undone.\n\n' +
+        'Are you sure you want to continue?'
+      );
+      this.value = ''; // reset input regardless
+      if (!confirmed) return;
+
+      const btn = document.getElementById('restore-btn');
+      btn.disabled = true;
+      const fd = new FormData();
+      fd.append('backup', file);
+      try {
+        const res = await apiFetch('?action=restore', { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (res && res.ok) {
+          showToast('Backup restored — ' + data.pages + ' page(s) recovered.', 'success', 5000);
+          load(currentPage);
+        } else {
+          showToast(data.error || 'Error restoring backup', 'error');
+        }
+      } catch {
+        showToast('Connection error during restore', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ── Change-password panel (guest self-service) ──────────────────────────────
+    let changePassOpen = false;
+
+    function toggleChangePasswordPanel() {
+      changePassOpen = !changePassOpen;
+      document.getElementById('change-password-overlay').style.display = changePassOpen ? 'block' : 'none';
+      document.getElementById('change-password-panel').style.display   = changePassOpen ? 'block' : 'none';
+      if (changePassOpen) {
+        document.getElementById('change-pass-new').value     = '';
+        document.getElementById('change-pass-confirm').value = '';
+        document.getElementById('change-password-status').textContent = '';
+        document.getElementById('change-pass-new').focus();
+      }
+    }
+
+    document.getElementById('change-password-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('change-password-status');
+      const pass     = document.getElementById('change-pass-new').value;
+      const pass2    = document.getElementById('change-pass-confirm').value;
+      statusEl.textContent = '';
+      if (!pass)  { statusEl.textContent = 'Password is required.'; return; }
+      if (pass !== pass2) { statusEl.textContent = 'Passwords do not match.'; return; }
+      const hash = await sha256(pass);
+      statusEl.textContent = 'Saving…';
+      try {
+        const res  = await apiFetch(WKW_AUTH_BASE + '?action=change-password', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hash })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toggleChangePasswordPanel();
+          showToast('Password changed successfully.');
+        } else {
+          statusEl.textContent = data.error || 'Error changing password.';
+        }
+      } catch { statusEl.textContent = 'Connection error.'; }
+    });
+
+    // ── Settings panel ──────────────────────────────────────────────────────────
+    let settingsOpen = false;
+
+    async function toggleSettingsPanel() {
+      const overlay = document.getElementById('settings-overlay');
+      const panel   = document.getElementById('settings-panel');
+      settingsOpen = !settingsOpen;
+      overlay.style.display = panel.style.display = settingsOpen ? 'block' : 'none';
+      if (!settingsOpen) {
+        document.getElementById('settings-save-status').textContent = '';
+        return;
+      }
+      // Load current settings, available templates, and users in parallel
+      const [sRes, tRes, hRes, uRes] = await Promise.all([
+        apiFetch('?action=get-settings'),
+        apiFetch('?action=get-templates'),
+        apiFetch('?action=get-hljs-themes'),
+        apiFetch(WKW_AUTH_BASE + '?action=get-users'),
+      ]);
+      if (!sRes || !sRes.ok || !tRes || !tRes.ok || !hRes || !hRes.ok) {
+        document.getElementById('settings-save-status').textContent = 'Could not load settings.';
+        return;
+      }
+      const settings   = await sRes.json();
+      const templates  = await tRes.json();
+      const hljsThemes = await hRes.json();
+      const usersData  = (uRes && uRes.ok) ? await uRes.json() : {};
+      const hasGuests  = Array.isArray(usersData.guests) && usersData.guests.length > 0;
+      document.getElementById('settings-jwt-secret-row').style.display = hasGuests ? 'none' : '';
+      document.getElementById('settings-wiki-name').value = settings.wikiName || '';
+      const sel = document.getElementById('settings-theme');
+      sel.innerHTML = '';
+      for (const t of (templates.templates || [])) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === settings.theme) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      const hSel = document.getElementById('settings-hljs-theme');
+      hSel.innerHTML = '';
+      for (const t of (hljsThemes.themes || [])) {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t.replace(/\.css$/, '').replace(/[-_]/g, ' ');
+        if (t === settings.hljsTheme) opt.selected = true;
+        hSel.appendChild(opt);
+      }
+      document.getElementById('settings-save-status').textContent = '';
+      document.getElementById('settings-code-line-numbers').checked = !!settings.codeLineNumbers;
+      document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
+      document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
+      document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
+      document.getElementById('settings-guest-login-enabled').checked = settings.guestLoginEnabled !== false;
+      document.getElementById('settings-jwt-secret').value    = '';
+      document.getElementById('settings-admin-pass').value     = '';
+      document.getElementById('settings-admin-pass-label').style.display = 'none';
+      document.getElementById('settings-token-ttl').value      = settings.tokenTtl ?? 3600;
+    }
+
+    /**
+     * Handle the settings form submission.
+     * Collects wikiName, theme, hljsTheme, codeLineNumbers, and guestOdtDownload
+     * then POSTs them to ?action=save-settings as JSON.
+     * On success the page is reloaded after a short delay so all theme and
+     * configuration changes take effect immediately (themes are server-injected
+     * into the <head> of index.php and cannot be hot-swapped client-side).
+     */
+    document.getElementById('settings-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const statusEl = document.getElementById('settings-save-status');
+      statusEl.textContent = 'Saving\u2026';
+      const wikiName         = document.getElementById('settings-wiki-name').value.trim();
+      const theme            = document.getElementById('settings-theme').value;
+      const hljsTheme        = document.getElementById('settings-hljs-theme').value;
+      const codeLineNumbers  = document.getElementById('settings-code-line-numbers').checked;
+      const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
+      const guestToc         = document.getElementById('settings-guest-toc').checked;
+      const guestIndex       = document.getElementById('settings-guest-index').checked;
+      const guestLoginEnabled = document.getElementById('settings-guest-login-enabled').checked;
+      const jwtSecret = document.getElementById('settings-jwt-secret').value.trim();
+      const adminPass = document.getElementById('settings-admin-pass').value;
+      const tokenTtl  = parseInt(document.getElementById('settings-token-ttl').value, 10) || 3600;
+      if (!wikiName) {
+        statusEl.textContent = 'Wiki name cannot be empty.';
+        return;
+      }
+      if (jwtSecret !== '' && jwtSecret.length < 16) {
+        statusEl.textContent = 'JWT secret must be at least 16 characters.';
+        return;
+      }
+      if (jwtSecret !== '' && !adminPass) {
+        statusEl.textContent = 'When changing the JWT secret, a new admin password is required.';
+        return;
+      }
+      const adminHash = adminPass ? await sha256(adminPass) : null;
+      try {
+        const res = await apiFetch('?action=save-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex, guestLoginEnabled, jwtSecret, tokenTtl, adminHash }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toggleSettingsPanel();
+          if (jwtSecret) {
+            showToast('JWT secret changed \u2014 please sign in again.', 'success', 3000);
+            setTimeout(logout, 2000);
+          } else {
+            showToast('Settings saved. Reloading\u2026', 'success', 2000);
+            setTimeout(() => location.reload(), 1500);
+          }
+        } else {
+          statusEl.textContent = data.error || 'Error saving settings.';
+        }
+      } catch {
+        statusEl.textContent = 'Connection error.';
+      }
+    });
+
+    // Show/hide admin password field when JWT secret input changes
+    document.getElementById('settings-jwt-secret').addEventListener('input', function () {
+      document.getElementById('settings-admin-pass-label').style.display = this.value.trim() ? '' : 'none';
+    });
+
+    // ── Base & routing helpers ──────────────────────────────────────────────────
+    const BASE = window.WKW_BASE;
+
+    function getPage() {
+      return new URLSearchParams(location.search).get('p') || 'index';
+    }
+
+    function navigate(page, replace) {
+      const url = 'wiki.php' + (page === 'index' ? '' : '?p=' + encodeURIComponent(page));
+      replace ? history.replaceState(null, '', url) : history.pushState(null, '', url);
+      load(page);
+    }
+
+    // ── Auth helpers ────────────────────────────────────────────────────────────
+    // getToken, getRole, getUser, sha256, sha256Fallback, apiFetch
+    // are defined in lib/auth-client.js (loaded before this script).
+
+    /**
+     * Clear the current session and redirect to the login screen.
+     * Called automatically by apiFetch() on 401 responses and by the logout button.
+     */
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = WKW_AUTH_BASE;
+    }
+    // Register logout as the 401-unauthorized callback defined in lib/auth-client.js
+    setOnUnauthorized(logout);
+
+    /**
+     * Switch the UI to the main wiki shell after a successful login.
+     * Adapts the toolbar to the current role:
+     *   admin — all buttons visible
+     *   guest — edit/index/users/backup/restore/settings/plugins hidden;
+     *            TOC panel hidden (guest sees the inline TOC instead);
+     *            'guest-mode' CSS class applied to the wiki-screen wrapper
+     */
+    function showWiki() {
+      document.getElementById('wiki-screen').style.display = '';
+      document.getElementById('user-badge').textContent = getUser();
+      const isAdmin = getRole() === 'admin';
+      const isGuest = getRole() === 'guest';
+      document.getElementById('toc-btn').style.display   = (isAdmin || (isGuest && window.WKW_GUEST_TOC))   ? '' : 'none';
+      document.getElementById('edit-btn').style.display   = isAdmin ? '' : 'none';
+      document.getElementById('index-btn').style.display  = (isAdmin || (isGuest && window.WKW_GUEST_INDEX)) ? '' : 'none';
+      document.getElementById('hub-btn').style.display = ''; // Show for everyone
+      document.getElementById('backup-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('restore-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('settings-btn').style.display = isAdmin ? '' : 'none';
+      document.getElementById('plugins-btn').style.display  = isAdmin ? '' : 'none';
+      document.getElementById('change-pass-btn').style.display = isGuest ? '' : 'none';
+      document.getElementById('top-btn').style.display = ''; // Show for everyone
+      if (isGuest) {
+        document.getElementById('wiki-screen').classList.add('guest-mode');
+        document.getElementById('home-btn').style.display = '';
+      }
+    }
+
+    // ── Wiki ────────────────────────────────────────────────────────────────────
+    let currentPage = 'index';
+    let rawMd = '';
+    let editing = false;
+    let isNewPage = false;
+
+    async function load(page) {
+      currentPage = page;
+      editing = false;
+      closeToc();
+      document.getElementById('editor').style.display = 'none';
+      document.getElementById('content').style.display = '';
+      document.getElementById('edit-btn').innerHTML = ICON_EDIT;
+      document.getElementById('edit-btn').title = 'Edit';
+      document.getElementById('save-status').textContent = '';
+
+      const res = await apiFetch('?page=' + encodeURIComponent(page));
+      if (!res) return;
+      rawMd = await res.text();
+      const isAdmin = getRole() === 'admin';
+      if (res.status === 404 && isAdmin) {
+        document.getElementById('delete-btn').style.display = 'none';
+        document.getElementById('odt-btn').style.display = 'none';
+        document.getElementById('content').innerHTML =
+          '<p style="color:#888;margin-bottom:.75rem">This page does not exist yet.</p>' +
+          '<button class="btn btn-primary" title="Create page" aria-label="Create page" onclick="createPage()">' + ICON_PLUS + '</button>';
+      } else {
+        document.getElementById('delete-btn').style.display = isAdmin ? '' : 'none';
+        const canDownloadOdt = isAdmin || (getRole() === 'guest' && window.WKW_GUEST_ODT_DOWNLOAD);
+        document.getElementById('odt-btn').style.display = canDownloadOdt ? '' : 'none';
+        document.getElementById('content').innerHTML = parseWiki(rawMd);
+        addHeadingIds();
+        highlightContent(document.getElementById('content'));
+        WKW.doAction('wkw.page.afterLoad', page, document.getElementById('content'));
+      }
+
+      const parts = page === 'index' ? [] : page.split('/');
+      let nav = '<a href="" onclick="navigate(\'index\');return false;">Home</a>';
+      parts.forEach((p, i) => {
+        const t = parts.slice(0, i + 1).join('/');
+        nav += ' &rsaquo; <a href="wiki.php?p=' + encodeURIComponent(t) + '" onclick="navigate(\'' + t + '\');return false;">' + p + '</a>';
+      });
+      document.getElementById('nav').innerHTML = nav;
+
+      function resolvePath(base, rel) {
+        const parts = (base + rel).split('/');
+        const out = [];
+        for (const p of parts) {
+          if (p === '..') out.pop();
+          else if (p !== '.') out.push(p);
+        }
+        return out.join('/');
+      }
+
+      document.querySelectorAll('#content a[href]').forEach(a => {
+        const h = a.getAttribute('href');
+        if (h && !h.startsWith('http') && !h.startsWith('#') && !h.startsWith('mailto:')) {
+          const base = page.includes('/') ? page.slice(0, page.lastIndexOf('/') + 1) : '';
+          const target = resolvePath(base, h);
+          a.href = 'wiki.php?p=' + encodeURIComponent(target);
+          a.addEventListener('click', e => {
+            e.preventDefault();
+            navigate(target);
+          });
+        }
+      });
+
+      const h1 = document.querySelector('#content h1');
+      document.title = (h1 ? h1.textContent : page) + ' — Wiki';
+      window.scrollTo(0, 0);
+    }
+
+    function createPage() {
+      rawMd = '';
+      isNewPage = true;
+      openEdit();
+    }
+
+    // ── TOC panel ────────────────────────────────────────────────────────────────
+    function slugify(text) {
+      return text.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-') || 'heading';
+    }
+
+    function addHeadingIds() {
+      const seen = {};
+      document.querySelectorAll('#content h1, #content h2, #content h3').forEach(h => {
+        let slug = slugify(h.textContent);
+        if (seen[slug]) {
+          seen[slug]++;
+          slug += '-' + seen[slug];
+        } else {
+          seen[slug] = 1;
+        }
+        h.id = slug;
+        if (h.tagName === 'H1' || h.tagName === 'H2') {
+          h.dataset.label = h.textContent;
+          const btn = document.createElement('a');
+          btn.className = 'go-top-btn';
+          btn.href = '#';
+          btn.setAttribute('aria-label', 'Go to top');
+          btn.textContent = '\u2191';
+          btn.addEventListener('click', e => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+          h.appendChild(btn);
+        }
+      });
+    }
+
+    let tocOpen = false;
+
+    function closeToc() {
+      if (!tocOpen) return;
+      tocOpen = false;
+      document.getElementById('toc-overlay').style.display = 'none';
+      document.getElementById('toc-panel').style.display = 'none';
+    }
+
+    function toggleToc() {
+      const overlay = document.getElementById('toc-overlay');
+      const panel = document.getElementById('toc-panel');
+      tocOpen = !tocOpen;
+      overlay.style.display = panel.style.display = tocOpen ? 'block' : 'none';
+      if (!tocOpen) return;
+
+      const headings = document.querySelectorAll('#content h1, #content h2, #content h3');
+      if (!headings.length) {
+        document.getElementById('toc-list').innerHTML = '<p style="color:#888;font-size:.85rem;padding:.25rem 0">No headings on this page.</p>';
+        return;
+      }
+      let html = '<ul>';
+      headings.forEach(h => {
+        const cls = 'toc-' + h.tagName.toLowerCase();
+        const id = h.id;
+        html += '<li><a class="' + cls + '" href="#' + id + '" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\'});closeToc();return false;">' + (h.dataset.label || h.textContent) + '</a></li>';
+      });
+      html += '</ul>';
+      document.getElementById('toc-list').innerHTML = html;
+    }
+
+    // ── Page index panel ────────────────────────────────────────────────────────
+    let indexOpen = false;
+    async function toggleIndex() {
+      const overlay = document.getElementById('index-overlay');
+      const panel = document.getElementById('index-panel');
+      indexOpen = !indexOpen;
+      overlay.style.display = panel.style.display = indexOpen ? 'block' : 'none';
+      if (!indexOpen) return;
+
+      const res = await apiFetch('?action=index');
+      if (!res || !res.ok) return;
+      const data = await res.json();
+
+      // Build tree from flat list
+      const tree = {};
+      for (const page of data.pages) {
+        const parts = page.split('/');
+        let node = tree;
+        for (const p of parts) {
+          node[p] = node[p] || {};
+          node = node[p];
+        }
+      }
+
+      const pageSet = new Set(data.pages);
+      function renderTree(node, prefix) {
+        const keys = Object.keys(node).sort();
+        if (!keys.length) return '';
+        let html = '<ul>';
+        for (const key of keys) {
+          const path = prefix ? prefix + '/' + key : key;
+          const hasChildren = Object.keys(node[key]).length > 0;
+          const isPage = pageSet.has(path);
+          const isAdmin = getRole() === 'admin';
+          html += '<li>';
+          if (isPage || isAdmin) {
+            const badge = (!isPage && isAdmin) ? ' <span class="index-no-page" title="No page file for this directory">\u2205</span>' : '';
+            html += '<a href="' + (path === 'index' ? 'wiki.php' : 'wiki.php?p=' + encodeURIComponent(path)) + '" onclick="navigate(\'' + path + '\');toggleIndex();return false;">' + key + badge + '</a>';
+          } else {
+            html += '<span class="index-dir-label">' + key + '</span>';
+          }
+          if (hasChildren) html += renderTree(node[key], path);
+          html += '</li>';
+        }
+        html += '</ul>';
+        return html;
+      }
+
+      document.getElementById('index-tree').innerHTML = renderTree(tree, '');
+    }
+
+    function showConfirmDelete(message) {
+      return new Promise(resolve => {
+        const overlay = document.getElementById('confirm-delete-overlay');
+        const dialog  = document.getElementById('confirm-delete-dialog');
+        document.getElementById('confirm-delete-msg').textContent = message;
+        overlay.style.display = dialog.style.display = 'block';
+        function close(result) {
+          overlay.style.display = dialog.style.display = 'none';
+          document.getElementById('confirm-delete-ok').removeEventListener('click', onOk);
+          document.getElementById('confirm-delete-cancel').removeEventListener('click', onCancel);
+          overlay.removeEventListener('click', onCancel);
+          resolve(result);
+        }
+        function onOk()     { close(true);  }
+        function onCancel() { close(false); }
+        document.getElementById('confirm-delete-ok').addEventListener('click', onOk);
+        document.getElementById('confirm-delete-cancel').addEventListener('click', onCancel);
+        overlay.addEventListener('click', onCancel);
+      });
+    }
+
+    async function deletePage() {
+      if (!await showConfirmDelete('Delete page “' + currentPage + '”?')) return;
+      const res = await apiFetch('?action=delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          page: currentPage
+        })
+      });
+      if (res && res.ok) {
+        showToast('Page \u201c' + currentPage + '\u201d deleted.');
+        navigate('index', true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Error deleting page', 'error');
+      }
+    }
+
+    function toggleEdit() {
+      editing ? cancelEdit() : openEdit();
+    }
+
+    function openEdit() {
+      editing = true;
+      document.getElementById('editor-area').value = rawMd;
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('editor').style.display = 'flex';
+      document.getElementById('edit-btn').innerHTML = ICON_VIEW;
+      document.getElementById('edit-btn').title = 'View';
+      document.getElementById('editor-area').focus();
+    }
+
+    function cancelEdit() {
+      editing = false;
+      isNewPage = false;
+      document.getElementById('editor').style.display = 'none';
+      document.getElementById('content').style.display = '';
+      document.getElementById('edit-btn').innerHTML = ICON_EDIT;
+      document.getElementById('edit-btn').title = 'Edit';
+    }
+
+    async function save() {
+      const status = document.getElementById('save-status');
+      const content = document.getElementById('editor-area').value;
+      status.textContent = 'Saving…';
+      const res = await apiFetch('?action=save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          page: currentPage,
+          content
+        })
+      });
+      if (res && res.ok) {
+        const wasNew = isNewPage;
+        rawMd = content;
+        status.textContent = '';
+        cancelEdit();
+        document.getElementById('content').innerHTML = parseWiki(rawMd);
+        addHeadingIds();
+        highlightContent(document.getElementById('content'));
+        WKW.doAction('wkw.page.afterLoad', currentPage, document.getElementById('content'));
+        if (getRole() === 'admin') document.getElementById('delete-btn').style.display = '';
+        const canDownloadOdt = (getRole() === 'admin') || (getRole() === 'guest' && window.WKW_GUEST_ODT_DOWNLOAD);
+        document.getElementById('odt-btn').style.display = canDownloadOdt ? '' : 'none';
+        showToast(wasNew ? 'Page \u201c' + currentPage + '\u201d created.' : 'Page \u201c' + currentPage + '\u201d saved.');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        status.textContent = '';
+        showToast(data.error || 'Could not save the page. Please try again.', 'error');
+      }
+    }
+
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && editing) {
+        e.preventDefault();
+        save();
+      }
+      if (e.key === 'Escape' && editing) {
+        cancelEdit();
+      }
+    });
+
+    // ── Plugin panel ─────────────────────────────────────────────────────────────
+    let _pluginsOpen = false;
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderPluginsPanel() {
+      const plugins = WKW.getPlugins();
+      const ids = Object.keys(plugins);
+      const list = document.getElementById('plugins-list');
+      if (ids.length === 0) {
+        list.innerHTML = '<p id="plugins-empty">No plugins installed.</p>';
+        return;
+      }
+      const isAdmin = getRole() === 'admin';
+      list.innerHTML = ids.map(id => {
+        const p = plugins[id];
+        const enabled = WKW.isEnabled(id);
+        return `<div class="plugin-card">
+  <div class="plugin-info">
+    <strong>${escHtml(p.name ?? id)}</strong><span class="plugin-version">v${escHtml(p.version ?? '?')}</span><br>
+    <small>${escHtml(p.description ?? '')}</small>
+  </div>
+  <div class="plugin-toggle">
+    <label class="toggle-switch" title="${enabled ? 'Disable' : 'Enable'} plugin">
+      <input type="checkbox" ${enabled ? 'checked' : ''} ${isAdmin ? '' : 'disabled'}
+             onchange="pluginToggleChange('${escHtml(id)}', this)">
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+</div>`;
+      }).join('');
+    }
+
+    function togglePluginsPanel() {
+      _pluginsOpen = !_pluginsOpen;
+      document.getElementById('plugins-overlay').style.display = _pluginsOpen ? 'block' : 'none';
+      document.getElementById('plugins-panel').style.display   = _pluginsOpen ? 'block' : 'none';
+      if (_pluginsOpen) renderPluginsPanel();
+    }
+
+    async function pluginToggleChange(id, checkbox) {
+      const newEnabled = checkbox.checked;
+      checkbox.disabled = true;
+      WKW.setEnabled(id, newEnabled);
+      const allIds  = Object.keys(WKW.getPlugins());
+      const disabled = allIds.filter(pid => !WKW.isEnabled(pid));
+      try {
+        const res = await apiFetch('?action=save-plugin-state', {
+          method: 'POST',
+          body:   JSON.stringify({ disabled })
+        });
+        if (!res.ok) {
+          WKW.setEnabled(id, !newEnabled);
+          checkbox.checked = !newEnabled;
+          console.error('[WKW] Failed to save plugin state', res.status);
+        }
+      } catch (err) {
+        WKW.setEnabled(id, !newEnabled);
+        checkbox.checked = !newEnabled;
+        console.error('[WKW] Error saving plugin state', err);
+      }
+      checkbox.disabled = false;
+    }
+
+    // ── Router ──────────────────────────────────────────────────────────────────
+    let _pluginStateLoaded = false;
+
+    async function route() {
+      if (!getToken()) {
+        window.location.href = WKW_AUTH_BASE;
+        return;
+      }
+      if (!_pluginStateLoaded) {
+        _pluginStateLoaded = true;
+        try {
+          const res = await apiFetch('?action=get-plugin-state');
+          if (res.ok) {
+            const data = await res.json();
+            WKW.loadState(data.disabled ?? []);
+          }
+        } catch (e) {
+          console.warn('[WKW] Could not load plugin state', e);
+        }
+      }
+      showWiki();
+      load(getPage());
+    }
+    // Expose ODT utilities for plugins (functions are defined above in this file)
+    WKW.odt.xmlEsc = odtXmlEsc;
+    WKW.odt.inline = odtInline;
+
+    // ── Mobile menu ──────────────────────────────────────────────────────────────
+    function toggleMobileMenu() {
+      const menu = document.getElementById('header-buttons');
+      const btn  = document.getElementById('mobile-menu-btn');
+      const open = menu.classList.toggle('is-open');
+      btn.setAttribute('aria-expanded', open);
+    }
+
+    document.addEventListener('click', e => {
+      const menu = document.getElementById('header-buttons');
+      const btn  = document.getElementById('mobile-menu-btn');
+      if (!menu || !btn) return;
+      if (menu.classList.contains('is-open') && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('is-open');
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    window.addEventListener('popstate', route);
+    route();

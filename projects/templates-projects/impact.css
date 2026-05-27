@@ -1,0 +1,63 @@
+/* ── Projects App — Impact Theme ───────────────────────────────────────────
+   Dark header (#111) with strong orange (#d97706) accent. High-contrast.
+   ─────────────────────────────────────────────────────────────────────── */
+
+@import url('default.css');
+
+:root {
+  --pt-accent:       #d97706;
+  --pt-accent-dark:  #b45309;
+  --pt-accent-light: #fffbeb;
+  --pt-bg:           #f9f8f6;
+}
+
+#pt-header {
+  background: #111;
+  border-bottom-color: var(--pt-accent);
+}
+#pt-header a { color: #fff; }
+#pt-user-badge { color: #bbb; }
+
+.pt-tab.active        { background: var(--pt-accent); border-color: var(--pt-accent); color: #fff; }
+.pt-tab:hover:not(.active) { background: var(--pt-accent-light); color: var(--pt-accent); }
+.pt-tabs              { border-bottom-color: var(--pt-accent); }
+.pt-tab               { background: #f4f2ee; }
+
+.pt-table thead th    { background: #222; border-right-color: #444; }
+.pt-table tbody tr:hover td { background: var(--pt-accent-light); }
+
+.pt-task-link         { color: var(--pt-accent); }
+
+.pt-badge.pt-status-in_progress { background: #fef9c3; color: #713f12; }
+.pt-badge.pt-status-done        { background: #d1fae5; color: #065f46; }
+.pt-badge.pt-status-blocked     { background: #fee2e2; color: #991b1b; }
+.pt-badge.pt-status-in_review   { background: #ffedd5; color: #9a3412; }
+
+.pt-burndown-val      { color: var(--pt-accent); }
+
+.pt-board-col-header  { border-bottom-color: #ddd; }
+.pt-user-task-card-title { color: var(--pt-accent); }
+.pt-user-task-card:hover { border-color: var(--pt-accent); }
+.pt-theme-option.active  { background: var(--pt-accent); border-color: var(--pt-accent); color: #fff; }
+.pt-theme-option:hover   { border-color: var(--pt-accent); background: var(--pt-accent-light); }
+
+.pt-section-title     { color: var(--pt-accent); }
+.pt-detail-section h4 { color: var(--pt-accent); }
+.pt-spec-tab.active   { color: var(--pt-accent); }
+.pt-spec-preview blockquote { border-left-color: var(--pt-accent); }
+.pt-spec-preview h1, .pt-spec-preview h2, .pt-spec-preview h3 { color: var(--pt-accent); }
+
+.btn-primary  { background: var(--pt-accent); border-color: var(--pt-accent); color: #fff; }
+.btn-primary:hover { background: var(--pt-accent-dark); border-color: var(--pt-accent-dark); }
+.btn-ghost    { color: var(--pt-accent); }
+.btn-ghost:hover { background: var(--pt-accent-light); }
+
+.pt-modal-body input:focus,
+.pt-modal-body select:focus,
+.pt-modal-body textarea:focus {
+  border-color: var(--pt-accent);
+  box-shadow: 0 0 0 2px rgba(217,119,6,.14);
+}
+
+.pt-spinner { border-top-color: var(--pt-accent); }
+#pt-project-select:focus { border-color: var(--pt-accent); }

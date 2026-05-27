@@ -1,0 +1,98 @@
+[
+    {
+        "name": "guest",
+        "subitems": [
+            {
+                "name": "primera evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": 3
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": 2.5
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": 7.5
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": 10
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "mark": 5
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": 8
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": 4.5
+                    }
+                ]
+            },
+            {
+                "name": "segunda evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": 7
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": 9
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": 3
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": 4
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "subitems": [
+                                    {
+                                        "name": "Trabajo 2: nota",
+                                        "mark": 4.7
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": 6
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": 3
+                    }
+                ]
+            }
+        ]
+    }
+]

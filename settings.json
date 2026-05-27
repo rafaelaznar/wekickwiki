@@ -10,5 +10,7 @@
     "guestLoginEnabled": true,
     "jwtSecret": "wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7",
     "tokenTtl": 3600,
-    "pqTheme": "default.css"
+    "pqTheme": "default.css",
+    "feedbackTheme": "default.css",
+    "projectsTheme": "default.css"
 }

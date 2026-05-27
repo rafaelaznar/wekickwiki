@@ -1,0 +1,8 @@
+[
+    {"key": "todo",        "name": "To Do",       "order": 0},
+    {"key": "in_progress", "name": "In Progress",  "order": 1},
+    {"key": "in_review",   "name": "In Review",    "order": 2},
+    {"key": "done",        "name": "Done",         "order": 3},
+    {"key": "blocked",     "name": "Blocked",      "order": 4},
+    {"key": "cancelled",   "name": "Cancelled",    "order": 5}
+]

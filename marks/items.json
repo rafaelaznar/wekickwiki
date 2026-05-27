@@ -1,0 +1,104 @@
+{
+    "name": "curso 2023-2024",
+    "weight": 100,
+    "subitems": [
+        {
+            "name": "primera evaluación",
+            "weight": 40,
+            "subitems": [
+                {
+                    "name": "primer examen",
+                    "weight": 20
+                },
+                {
+                    "name": "trabajo1",
+                    "weight": 30,
+                    "subitems": [
+                        {
+                            "name": "trabajo 1: criterio a",
+                            "weight": 25
+                        },
+                        {
+                            "name": "trabajo 1: criterio b",
+                            "weight": 75
+                        }
+                    ]
+                },
+                {
+                    "name": "trabajo2",
+                    "weight": 30,
+                    "subitems": [
+                        {
+                            "name": "trabajo 2: criterio a",
+                            "weight": 10
+                        },
+                        {
+                            "name": "trabajo 2: criterio b",
+                            "weight": 15
+                        },
+                        {
+                            "name": "trabajo 2: criterio c",
+                            "weight": 75
+                        }
+                    ]
+                },
+                {
+                    "name": "segundo examen",
+                    "weight": 20
+                }
+            ]
+        },
+        {
+            "name": "segunda evaluación",
+            "weight": 60,
+            "subitems": [
+                {
+                    "name": "primer examen",
+                    "weight": 20
+                },
+                {
+                    "name": "trabajo1",
+                    "weight": 30,
+                    "subitems": [
+                        {
+                            "name": "trabajo 1: criterio a",
+                            "weight": 25
+                        },
+                        {
+                            "name": "trabajo 1: criterio b",
+                            "weight": 75
+                        }
+                    ]
+                },
+                {
+                    "name": "trabajo2",
+                    "weight": 30,
+                    "subitems": [
+                        {
+                            "name": "trabajo 2: criterio a",
+                            "weight": 25
+                        },
+                        {
+                            "name": "trabajo 2: criterio b",
+                            "weight": 25,
+                            "subitems": [
+                                {
+                                    "name": "Trabajo 2: nota",
+                                    "weight": 100
+                                }
+                            ]
+                        },
+                        {
+                            "name": "trabajo 2: criterio c",
+                            "weight": 50
+                        }
+                    ]
+                },
+                {
+                    "name": "segundo examen",
+                    "weight": 20
+                }
+            ]
+        }
+    ]
+}
