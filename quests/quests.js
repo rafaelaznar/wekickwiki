@@ -879,7 +879,13 @@
     }).sort((a, b) => String(b.submitted_at ?? '').localeCompare(String(a.submitted_at ?? '')));
 
     wrap.innerHTML = '';
-    if (countEl) countEl.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}`;
+    if (countEl) {
+      const scores = filtered.map(a => Number(a.score)).filter(s => !isNaN(s));
+      const avgTxt = scores.length
+        ? ` — avg: <span class="${scoreClass(scores.reduce((s, v) => s + v, 0) / scores.length)}">${fmtScore(scores.reduce((s, v) => s + v, 0) / scores.length)}</span>`
+        : '';
+      countEl.innerHTML = `${filtered.length} result${filtered.length !== 1 ? 's' : ''}${avgTxt}`;
+    }
     if (!filtered.length) {
       wrap.innerHTML = '<p class="qs-empty">No results match the selected filters.</p>';
       return;
@@ -1451,4 +1457,4 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
-  }
+  }
