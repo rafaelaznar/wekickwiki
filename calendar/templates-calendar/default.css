@@ -401,6 +401,77 @@ body {
   display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1rem;
 }
 
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+.cal-tab-bar {
+  display: flex;
+  border-bottom: 2px solid #ddd;
+  margin-bottom: 1rem;
+}
+.cal-tab {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  padding: .5rem 1.1rem;
+  font-size: .88rem;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-family: inherit;
+  transition: color .15s, border-color .15s;
+}
+.cal-tab:hover { color: #0055cc; }
+.cal-tab.active { color: #0055cc; border-bottom-color: #0055cc; }
+.cal-tab svg {
+  width: 1em; height: 1em;
+  fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ── Upcoming list ───────────────────────────────────────────────────────── */
+.cal-upcoming-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .25rem 0;
+}
+.cal-upcoming-item {
+  display: flex;
+  align-items: flex-start;
+  gap: .75rem;
+  padding: .65rem .9rem;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: background .12s, box-shadow .12s;
+}
+.cal-upcoming-item:hover {
+  background: #f0f4ff;
+  box-shadow: 0 1px 4px rgba(0,85,204,.1);
+}
+.cal-upcoming-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #0055cc;
+  flex-shrink: 0;
+  margin-top: .25rem;
+}
+.cal-upcoming-main {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  min-width: 0;
+}
+.cal-upcoming-title { font-weight: 600; font-size: .9rem; color: #111; }
+.cal-upcoming-meta  { font-size: .78rem; color: #666; }
+.cal-upcoming-empty { color: #888; font-size: .9rem; padding: 1.5rem 0; text-align: center; }
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   #cal-screen { margin-top: 60px; padding: .5rem .35rem 2rem; }

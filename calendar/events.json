@@ -1,1 +1,22 @@
-[]
+[
+    {
+        "title": "My first event",
+        "description": "My first event description",
+        "date": "2026-05-27",
+        "end_date": null,
+        "time": null,
+        "end_time": null,
+        "color": "#fb8c00",
+        "id": 1
+    },
+    {
+        "title": "My next event",
+        "description": "Next multidate event",
+        "date": "2026-06-02",
+        "end_date": "2026-06-05",
+        "time": null,
+        "end_time": null,
+        "color": "#0f9d58",
+        "id": 2
+    }
+]

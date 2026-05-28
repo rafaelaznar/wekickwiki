@@ -47,13 +47,26 @@ function calRoute() {
   const themeBtn = document.getElementById('cal-theme-btn');
   if (themeBtn) themeBtn.style.display = role === 'admin' ? '' : 'none';
   if (role === 'admin') {
-    document.getElementById('admin-panel').style.display = '';
-    document.getElementById('user-panel').style.display = 'none';
+    document.getElementById('admin-toolbar').style.display = '';
+    document.getElementById('user-toolbar').style.display = 'none';
   } else {
-    document.getElementById('admin-panel').style.display = 'none';
-    document.getElementById('user-panel').style.display = '';
+    document.getElementById('admin-toolbar').style.display = 'none';
+    document.getElementById('user-toolbar').style.display = '';
   }
   calLoadEvents();
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function calSwitchTab(tab) {
+  const isCalendar = tab === 'calendar';
+  document.getElementById('cal-tab-calendar').style.display  = isCalendar ? '' : 'none';
+  document.getElementById('cal-tab-upcoming').style.display  = isCalendar ? 'none' : '';
+  const btnCal = document.getElementById('cal-tab-btn-calendar');
+  const btnUp  = document.getElementById('cal-tab-btn-upcoming');
+  btnCal.classList.toggle('active', isCalendar);
+  btnCal.setAttribute('aria-selected', isCalendar);
+  btnUp.classList.toggle('active', !isCalendar);
+  btnUp.setAttribute('aria-selected', !isCalendar);
 }
 
 // Auto-restore session
@@ -71,11 +84,68 @@ async function calLoadEvents() {
     if (!res.ok) throw new Error('Failed to load events');
     calEvents = await res.json();
     calRender();
+    calRenderUpcoming();
   } catch (err) {
     const gridId = getRole() === 'admin' ? 'cal-grid-admin' : 'cal-grid-user';
     document.getElementById(gridId).innerHTML =
       '<p class="cal-load-error">' + err.message + '</p>';
   }
+}
+
+// ── Upcoming events list ──────────────────────────────────────────────────
+function calRenderUpcoming() {
+  const wrap = document.getElementById('cal-upcoming-list');
+  if (!wrap) return;
+  const today = new Date();
+  const todayStr = _calDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const upcoming = calEvents
+    .filter(ev => (ev.end_date || ev.date) >= todayStr)
+    .sort((a, b) => {
+      const d = a.date.localeCompare(b.date);
+      return d !== 0 ? d : (a.time || '').localeCompare(b.time || '');
+    })
+    .slice(0, 20);
+
+  if (upcoming.length === 0) {
+    wrap.innerHTML = '<p class="cal-upcoming-empty">No upcoming events.</p>';
+    return;
+  }
+
+  const ul = document.createElement('ul');
+  ul.className = 'cal-upcoming-list';
+
+  upcoming.forEach(ev => {
+    const li = document.createElement('li');
+    li.className = 'cal-upcoming-item';
+    li.addEventListener('click', () => calOpenDetailModal(ev.id));
+
+    const dot = document.createElement('span');
+    dot.className = 'cal-upcoming-dot';
+    if (ev.color) dot.style.backgroundColor = ev.color;
+
+    const main = document.createElement('div');
+    main.className = 'cal-upcoming-main';
+
+    const title = document.createElement('span');
+    title.className = 'cal-upcoming-title';
+    title.textContent = ev.title;
+
+    const meta = document.createElement('span');
+    meta.className = 'cal-upcoming-meta';
+    let metaText = _calFormatDateRange(ev);
+    if (ev.time) metaText += ' · ' + ev.time + (ev.end_time ? '–' + ev.end_time : '');
+    meta.textContent = metaText;
+
+    main.appendChild(title);
+    main.appendChild(meta);
+    li.appendChild(dot);
+    li.appendChild(main);
+    ul.appendChild(li);
+  });
+
+  wrap.innerHTML = '';
+  wrap.appendChild(ul);
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -228,33 +298,29 @@ function _calBuildColorPicker() {
   const wrap = document.getElementById('cal-color-picker');
   wrap.innerHTML = '';
 
-  // "No color" swatch
-  const none = document.createElement('button');
-  none.type = 'button';
-  none.className = 'cal-color-swatch cal-color-none' +
-    (_calSelectedColor === null ? ' active' : '');
-  none.title = 'No color';
-  none.textContent = '✕';
-  none.addEventListener('click', () => {
-    _calSelectedColor = null;
-    document.getElementById('cal-f-color').value = '';
-    _calBuildColorPicker();
-  });
-  wrap.appendChild(none);
+  const sel = document.createElement('select');
+  sel.id = 'cal-color-select';
+
+  const noneOpt = document.createElement('option');
+  noneOpt.value = '';
+  noneOpt.textContent = '— No color —';
+  if (_calSelectedColor === null) noneOpt.selected = true;
+  sel.appendChild(noneOpt);
 
   CAL_COLORS.forEach(c => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'cal-color-swatch' + (_calSelectedColor === c.hex ? ' active' : '');
-    btn.style.backgroundColor = c.hex;
-    btn.title = c.label;
-    btn.addEventListener('click', () => {
-      _calSelectedColor = c.hex;
-      document.getElementById('cal-f-color').value = c.hex;
-      _calBuildColorPicker();
-    });
-    wrap.appendChild(btn);
+    const opt = document.createElement('option');
+    opt.value = c.hex;
+    opt.textContent = c.label + '  (' + c.hex + ')';
+    if (_calSelectedColor === c.hex) opt.selected = true;
+    sel.appendChild(opt);
   });
+
+  sel.addEventListener('change', () => {
+    _calSelectedColor = sel.value || null;
+    document.getElementById('cal-f-color').value = sel.value;
+  });
+
+  wrap.appendChild(sel);
 }
 
 // ── Admin: add / edit event modal ──────────────────────────────────────────

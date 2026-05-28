@@ -322,3 +322,17 @@ body {
   #cal-month-label, #cal-month-label-user { min-width: 110px; font-size: .9rem; }
   .cal-form-row { grid-template-columns: 1fr; }
 }
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+.cal-tab-bar { border-bottom-color: #2a2a4a; }
+.cal-tab { color: #aaa; }
+.cal-tab:hover { color: #e85d04; }
+.cal-tab.active { color: #e85d04; border-bottom-color: #e85d04; }
+
+/* ── Upcoming list ───────────────────────────────────────────────────────── */
+.cal-upcoming-item { border-color: #2a2a4a; background: #1a1a2e; }
+.cal-upcoming-item:hover { background: #1e1e3f; box-shadow: 0 1px 4px rgba(232,93,4,.15); }
+.cal-upcoming-dot { background: #e85d04; }
+.cal-upcoming-title { color: #e8e8ee; }
+.cal-upcoming-meta { color: #888; }
+.cal-upcoming-empty { color: #666; }

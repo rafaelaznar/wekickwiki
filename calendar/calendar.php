@@ -50,44 +50,72 @@ $baseHref  = $scriptDir . '/';
   <!-- ── App screen ───────────────────────────────────────────────── -->
   <div id="cal-screen" style="display:none">
 
-    <!-- Admin panel -->
-    <div id="admin-panel" style="display:none">
-      <div class="cal-toolbar">
-        <div class="cal-nav">
-          <button class="btn btn-sm" onclick="calPrevMonth()" aria-label="Previous month">
-            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <span id="cal-month-label"></span>
-          <button class="btn btn-sm" onclick="calNextMonth()" aria-label="Next month">
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-          <button class="btn btn-sm" onclick="calGoToday()">Today</button>
-        </div>
-        <button class="btn btn-primary" onclick="calOpenAddModal()">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add event
-        </button>
-      </div>
-      <div id="cal-grid-admin" class="cal-grid-wrap">
-        <div class="cal-loading"><div class="cal-spinner"></div> Loading…</div>
-      </div>
+    <!-- Tab bar -->
+    <div class="cal-tab-bar" role="tablist">
+      <button class="cal-tab active" id="cal-tab-btn-calendar" role="tab"
+              aria-selected="true" aria-controls="cal-tab-calendar"
+              onclick="calSwitchTab('calendar')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Calendar
+      </button>
+      <button class="cal-tab" id="cal-tab-btn-upcoming" role="tab"
+              aria-selected="false" aria-controls="cal-tab-upcoming"
+              onclick="calSwitchTab('upcoming')">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r=".5" fill="currentColor"/><circle cx="3" cy="12" r=".5" fill="currentColor"/><circle cx="3" cy="18" r=".5" fill="currentColor"/></svg>
+        Upcoming
+      </button>
     </div>
 
-    <!-- User panel (read-only) -->
-    <div id="user-panel" style="display:none">
-      <div class="cal-toolbar">
-        <div class="cal-nav">
-          <button class="btn btn-sm" onclick="calPrevMonth()" aria-label="Previous month">
-            <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    <!-- Tab: Calendar -->
+    <div id="cal-tab-calendar" role="tabpanel" aria-labelledby="cal-tab-btn-calendar">
+
+      <!-- Admin toolbar -->
+      <div id="admin-toolbar" style="display:none">
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="btn btn-sm" onclick="calPrevMonth()" aria-label="Previous month">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span id="cal-month-label"></span>
+            <button class="btn btn-sm" onclick="calNextMonth()" aria-label="Next month">
+              <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button class="btn btn-sm" onclick="calGoToday()">Today</button>
+          </div>
+          <button class="btn btn-primary" onclick="calOpenAddModal()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add event
           </button>
-          <span id="cal-month-label-user"></span>
-          <button class="btn btn-sm" onclick="calNextMonth()" aria-label="Next month">
-            <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-          <button class="btn btn-sm" onclick="calGoToday()">Today</button>
+        </div>
+        <div id="cal-grid-admin" class="cal-grid-wrap">
+          <div class="cal-loading"><div class="cal-spinner"></div> Loading…</div>
         </div>
       </div>
-      <div id="cal-grid-user" class="cal-grid-wrap">
+
+      <!-- User toolbar (read-only) -->
+      <div id="user-toolbar" style="display:none">
+        <div class="cal-toolbar">
+          <div class="cal-nav">
+            <button class="btn btn-sm" onclick="calPrevMonth()" aria-label="Previous month">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span id="cal-month-label-user"></span>
+            <button class="btn btn-sm" onclick="calNextMonth()" aria-label="Next month">
+              <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <button class="btn btn-sm" onclick="calGoToday()">Today</button>
+          </div>
+        </div>
+        <div id="cal-grid-user" class="cal-grid-wrap">
+          <div class="cal-loading"><div class="cal-spinner"></div> Loading…</div>
+        </div>
+      </div>
+
+    </div><!-- #cal-tab-calendar -->
+
+    <!-- Tab: Upcoming (next 20 events) -->
+    <div id="cal-tab-upcoming" role="tabpanel" aria-labelledby="cal-tab-btn-upcoming" style="display:none">
+      <div id="cal-upcoming-list">
         <div class="cal-loading"><div class="cal-spinner"></div> Loading…</div>
       </div>
     </div>

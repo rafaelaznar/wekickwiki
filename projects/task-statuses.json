@@ -1,8 +1,32 @@
 [
-    {"key": "todo",        "name": "To Do",       "order": 0},
-    {"key": "in_progress", "name": "In Progress",  "order": 1},
-    {"key": "in_review",   "name": "In Review",    "order": 2},
-    {"key": "done",        "name": "Done",         "order": 3},
-    {"key": "blocked",     "name": "Blocked",      "order": 4},
-    {"key": "cancelled",   "name": "Cancelled",    "order": 5}
+    {
+        "key": "todo",
+        "name": "ToDo",
+        "order": 0
+    },
+    {
+        "key": "spec",
+        "name": "Spec",
+        "order": 1
+    },
+    {
+        "key": "review",
+        "name": "Review",
+        "order": 2
+    },
+    {
+        "key": "develop",
+        "name": "Develop",
+        "order": 3
+    },
+    {
+        "key": "testing",
+        "name": "Testing",
+        "order": 4
+    },
+    {
+        "key": "integration",
+        "name": "Integration",
+        "order": 5
+    }
 ]
