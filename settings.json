@@ -1,5 +1,6 @@
 {
     "wikiName": "WeKickWiki",
+    "hubTheme": "default.css",
     "theme": "default.css",
     "disabledPlugins": [],
     "hljsTheme": "atom-one-light.css",
@@ -12,5 +13,7 @@
     "tokenTtl": 3600,
     "pqTheme": "default.css",
     "feedbackTheme": "default.css",
-    "projectsTheme": "default.css"
+    "projectsTheme": "default.css",
+    "questsTheme": "default.css",
+    "calendarTheme": "default.css"
 }

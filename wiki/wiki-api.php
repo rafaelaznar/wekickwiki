@@ -260,7 +260,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'backup'
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-settings') {
   $claims = require_auth();
   if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
-  json_out(200, load_settings());
+  $validated = load_settings();
+  // Merge in module-theme keys that load_settings() doesn't validate
+  $raw = data_read(SETTINGS_FILE);
+  foreach (['hubTheme','pqTheme','questsTheme','feedbackTheme','projectsTheme','calendarTheme'] as $k) {
+    if (isset($raw[$k]) && is_string($raw[$k])) $validated[$k] = $raw[$k];
+  }
+  json_out(200, $validated);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -364,6 +370,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
     $existing['tokenTtl'] = $tokenTtl;
   } elseif (!isset($existing['tokenTtl'])) {
     $existing['tokenTtl'] = 3600;
+  }
+  // Module themes — optional; validate filename pattern, existence not required for other modules
+  $moduleThemes = [
+    'hubTheme'      => __DIR__ . '/../templates/',
+    'pqTheme'       => __DIR__ . '/../marks/templates-marks/',
+    'questsTheme'   => __DIR__ . '/../quests/templates-quests/',
+    'feedbackTheme' => __DIR__ . '/../feedback/templates-feedback/',
+    'projectsTheme' => __DIR__ . '/../projects/templates-projects/',
+    'calendarTheme' => __DIR__ . '/../calendar/templates-calendar/',
+  ];
+  foreach ($moduleThemes as $key => $dir) {
+    if (array_key_exists($key, $body)) {
+      $t = basename($body[$key] ?? '');
+      if (preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $t) && is_file($dir . $t)) {
+        $existing[$key] = $t;
+      }
+    }
   }
   data_write(SETTINGS_FILE, $existing);
   json_out(200, ['ok' => true]);
