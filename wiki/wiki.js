@@ -815,11 +815,9 @@
       document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
       document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
       document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
-      document.getElementById('settings-guest-login-enabled').checked = settings.guestLoginEnabled !== false;
       document.getElementById('settings-jwt-secret').value    = '';
       document.getElementById('settings-admin-pass').value     = '';
       document.getElementById('settings-admin-pass-label').style.display = 'none';
-      document.getElementById('settings-token-ttl').value      = settings.tokenTtl ?? 3600;
     }
 
     /**
@@ -841,10 +839,8 @@
       const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
       const guestToc         = document.getElementById('settings-guest-toc').checked;
       const guestIndex       = document.getElementById('settings-guest-index').checked;
-      const guestLoginEnabled = document.getElementById('settings-guest-login-enabled').checked;
       const jwtSecret = document.getElementById('settings-jwt-secret').value.trim();
       const adminPass = document.getElementById('settings-admin-pass').value;
-      const tokenTtl  = parseInt(document.getElementById('settings-token-ttl').value, 10) || 3600;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
@@ -862,7 +858,7 @@
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex, guestLoginEnabled, jwtSecret, tokenTtl, adminHash }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex, jwtSecret, adminHash }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {

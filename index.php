@@ -249,6 +249,21 @@ unset($_rawSettings);
       padding: 1.5rem 1.75rem 1.75rem;
       z-index: 101;
     }
+    #security-panel {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(460px, 94vw);
+      max-height: 90vh;
+      overflow-y: auto;
+      background: #fff;
+      box-shadow: 0 8px 40px rgba(0,0,0,.22);
+      border-radius: 8px;
+      padding: 1.5rem 1.75rem 1.75rem;
+      z-index: 105;
+    }
     #users-panel h3 {
       font-size: 1rem;
       font-weight: 700;
@@ -257,7 +272,23 @@ unset($_rawSettings);
       justify-content: space-between;
       align-items: center;
     }
+    #security-panel h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
     #users-panel button.close-btn {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      color: #666;
+      line-height: 1;
+    }
+    #security-panel button.close-btn {
       background: none;
       border: none;
       font-size: 1.2rem;
@@ -341,6 +372,67 @@ unset($_rawSettings);
       font-family: inherit;
     }
     #guest-add-form input:focus { border-color: #05c; }
+    #security-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 104;
+    }
+    #security-form label {
+      display: block;
+      font-size: .84rem;
+      font-weight: 600;
+      color: #333;
+      margin-top: .8rem;
+    }
+    #security-form label:first-of-type {
+      margin-top: 0;
+    }
+    #security-form .hint {
+      font-weight: 500;
+      color: #666;
+    }
+    #security-form input[type="number"] {
+      display: block;
+      width: 100%;
+      margin-top: .2rem;
+      padding: .45rem .65rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: .92rem;
+      outline: none;
+      font-family: inherit;
+    }
+    #security-form input[type="number"]:focus {
+      border-color: #05c;
+    }
+    #security-guest-login-row {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      margin-bottom: .75rem;
+    }
+    #security-guest-login-row label {
+      margin: 0;
+      font-size: .84rem;
+      font-weight: 600;
+      color: #333;
+      cursor: pointer;
+    }
+    #security-form-actions {
+      display: flex;
+      gap: .6rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    #security-save-status {
+      font-size: .8rem;
+      color: #c0392b;
+      flex: 1;
+      line-height: 1.4;
+    }
     .toggle-switch { position: relative; display: inline-block; width: 38px; height: 22px; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
     .toggle-slider {
@@ -515,6 +607,10 @@ unset($_rawSettings);
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="3" stroke-width="1.5"/><line x1="19" y1="11" x2="19" y2="14"/><line x1="17.5" y1="12.5" x2="20.5" y2="12.5"/></svg>
           Users
         </button>
+        <button class="btn btn-sm" id="hub-security-btn" title="Security" aria-label="Security" style="display:none" onclick="hubToggleSecurityPanel()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+          Security
+        </button>
         <button class="btn btn-sm" id="hub-change-pass-btn" title="Change my password" aria-label="Change my password" style="display:none" onclick="hubToggleChangePasswordPanel()">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           Password
@@ -615,6 +711,26 @@ unset($_rawSettings);
         </fieldset>
       </div>
       <button type="button" class="btn btn-sm" id="guest-add-btn" onclick="hubShowAddGuestForm()" style="margin-top:.75rem;width:100%">+ Add guest user</button>
+    </div>
+
+    <!-- Security panel (admin only) -->
+    <div id="security-overlay" onclick="hubToggleSecurityPanel()"></div>
+    <div id="security-panel">
+      <h3>Security <button class="close-btn" onclick="hubToggleSecurityPanel()">&times;</button></h3>
+      <form id="security-form" novalidate>
+        <div id="security-guest-login-row">
+          <input type="checkbox" id="security-guest-login-enabled" class="settings-check">
+          <label for="security-guest-login-enabled">Allow guest logins</label>
+        </div>
+        <label>Token TTL <span class="hint">(seconds, 60&#x2013;86400)</span>
+          <input type="number" id="security-token-ttl" min="60" max="86400" step="60">
+        </label>
+        <div id="security-form-actions">
+          <span id="security-save-status"></span>
+          <button type="button" class="btn btn-sm" onclick="hubToggleSecurityPanel()">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </div>
+      </form>
     </div>
 
     <!-- Change password panel (self-service) -->

@@ -201,10 +201,6 @@ $settings = load_settings();
         </div>
         <fieldset class="settings-fieldset">
           <legend class="settings-fieldset-legend">Security</legend>
-          <div class="settings-check-row">
-            <input type="checkbox" id="settings-guest-login-enabled" class="settings-check">
-            <label for="settings-guest-login-enabled" class="settings-check-label">Allow guest logins</label>
-          </div>
           <div id="settings-jwt-secret-row">
             <label>JWT Secret <span class="hint">(leave blank to keep)</span>
               <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep">
@@ -213,9 +209,6 @@ $settings = load_settings();
               <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
             </label>
           </div>
-          <label>Token TTL <span class="hint">(seconds, 60&#x2013;86400)</span>
-            <input type="number" id="settings-token-ttl" min="60" max="86400" step="60">
-          </label>
         </fieldset>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>

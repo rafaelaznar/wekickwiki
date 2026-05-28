@@ -285,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-hlj
 
 // ═══════════════════════════════════════════════════════════════════════════
 // API: Save settings  POST ?action=save-settings  (admin only)
-// Body: { wikiName: string, theme: string, hljsTheme: string, codeLineNumbers: bool, guestOdtDownload: bool, guestToc: bool, guestIndex: bool }
+// Body: { wikiName: string, theme: string, hljsTheme: string, codeLineNumbers: bool, guestOdtDownload: bool, guestToc: bool, guestIndex: bool, guestLoginEnabled?: bool, tokenTtl?: number }
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-settings') {
   $claims = require_auth();
@@ -298,7 +298,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $guestOdtDownload = isset($body['guestOdtDownload']) ? (bool)$body['guestOdtDownload'] : true;
   $guestToc         = isset($body['guestToc'])         ? (bool)$body['guestToc']         : true;
   $guestIndex       = isset($body['guestIndex'])       ? (bool)$body['guestIndex']       : true;
-  $guestLoginEnabled = isset($body['guestLoginEnabled']) ? (bool)$body['guestLoginEnabled'] : true;
+  $hasGuestLoginEnabled = array_key_exists('guestLoginEnabled', $body);
+  $guestLoginEnabled = $hasGuestLoginEnabled ? (bool)$body['guestLoginEnabled'] : null;
   // JWT Secret: blank = keep existing; non-blank requires admin password to re-hash with new secret
   $jwtSecret = trim($body['jwtSecret'] ?? '');
   $tokenTtl  = isset($body['tokenTtl']) ? (int)$body['tokenTtl'] : 0;
@@ -326,7 +327,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-s
   $existing['guestOdtDownload'] = $guestOdtDownload;
   $existing['guestToc']         = $guestToc;
   $existing['guestIndex']       = $guestIndex;
-  $existing['guestLoginEnabled'] = $guestLoginEnabled;
+  if ($hasGuestLoginEnabled) {
+    $existing['guestLoginEnabled'] = $guestLoginEnabled;
+  } elseif (!array_key_exists('guestLoginEnabled', $existing)) {
+    $existing['guestLoginEnabled'] = true;
+  }
   if ($jwtSecret !== '') {
     if (strlen($jwtSecret) < 16 || strlen($jwtSecret) > 128) {
       json_out(400, ['error' => 'JWT secret must be between 16 and 128 characters']);
