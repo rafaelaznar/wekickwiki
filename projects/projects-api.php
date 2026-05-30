@@ -52,6 +52,19 @@ function pt_status_keys(): array {
     return array_column(pt_load_statuses(), 'key');
 }
 
+// If the task has an integration_date in the past, force done = true.
+// Also sets completed_at to the integration_date if it wasn't already set.
+function pt_apply_auto_done(array &$task): void
+{
+    $intDate = $task['integration_date'] ?? '';
+    if ($intDate !== '' && $intDate <= date('Y-m-d')) {
+        if (empty($task['done'])) {
+            $task['done']         = true;
+            $task['completed_at'] = $task['completed_at'] ?? ($intDate . 'T00:00:00+00:00');
+        }
+    }
+}
+
 // Recursively collect all descendant task IDs for a given parent ID.
 function pt_descendant_ids(array $tasks, int $parentId): array
 {
@@ -129,6 +142,7 @@ function pt_sanitize_task(array $body): ?array
         'assigned_date'      => $assignedDate,
         'integration_date'   => $integrationDate,
         'integration_branch' => substr($branch, 0, 200),
+        'done'               => (bool)($body['done'] ?? false),
     ];
 }
 
@@ -225,6 +239,7 @@ if ($action === 'get-all-tasks') {
     if ($projectId > 0) {
         $tasks = array_values(array_filter($tasks, fn($t) => (int)($t['project_id'] ?? 0) === $projectId));
     }
+    array_walk($tasks, 'pt_apply_auto_done');
     json_out(200, $tasks);
 }
 
@@ -260,13 +275,20 @@ if ($action === 'save-task' && $_SERVER['REQUEST_METHOD'] === 'POST') {
             if ((int)$t['id'] === $id) {
                 $prevStatus = $t['status'] ?? 'todo';
                 $newStatus  = $clean['status'];
+                // Auto-done: integration_date in the past forces done = true
+                pt_apply_auto_done($clean);
+                $becomesDone = !empty($clean['done']) || $newStatus === 'done';
+                $wasDone     = !empty($t['done'])     || $prevStatus === 'done';
                 // Manage completed_at timestamp
-                if ($newStatus === 'done' && $prevStatus !== 'done') {
-                    $clean['completed_at'] = $now;
-                } elseif ($newStatus !== 'done' && $prevStatus === 'done') {
+                if ($becomesDone && !$wasDone) {
+                    // Task just became done
+                    $clean['completed_at'] = $clean['completed_at'] ?? $now;
+                } elseif (!$becomesDone && $wasDone) {
+                    // Task un-done
                     $clean['completed_at'] = null;
                 } else {
-                    $clean['completed_at'] = $t['completed_at'] ?? null;
+                    // No change in done state — preserve existing timestamp
+                    $clean['completed_at'] = $t['completed_at'] ?? ($becomesDone ? $now : null);
                 }
                 $t = array_merge($t, $clean, ['updated_at' => $now]);
                 $found = true;
@@ -277,7 +299,10 @@ if ($action === 'save-task' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$found) json_out(404, ['error' => 'Task not found']);
     } else {
         // Create new
-        $completedAt = $clean['status'] === 'done' ? $now : null;
+        pt_apply_auto_done($clean);
+        $completedAt = ($clean['status'] === 'done' || !empty($clean['done']))
+            ? ($clean['completed_at'] ?? $now)
+            : null;
         $new = array_merge([
             'id'           => data_next_id($tasks),
             'project_id'   => $projectId,
@@ -319,6 +344,7 @@ if ($action === 'get-project-tasks') {
     if ($projectId <= 0) json_out(400, ['error' => 'Missing project_id']);
 
     $tasks = array_values(array_filter(pt_load_tasks(), fn($t) => (int)($t['project_id'] ?? 0) === $projectId));
+    array_walk($tasks, 'pt_apply_auto_done');
     json_out(200, $tasks);
 }
 
@@ -335,6 +361,7 @@ if ($action === 'get-my-tasks') {
     $mine = array_values(array_filter($tasks, function ($t) use ($username) {
         return in_array($username, (array)($t['assignees'] ?? []), true);
     }));
+    array_walk($mine, 'pt_apply_auto_done');
     json_out(200, $mine);
 }
 

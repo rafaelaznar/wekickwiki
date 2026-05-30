@@ -271,6 +271,39 @@ body {
 .pt-status-blocked     { background: #fee2e2;  color: #991b1b; }
 .pt-status-cancelled   { background: #f3f4f6;  color: #9ca3af; text-decoration: line-through; }
 
+/* Done field */
+.pt-done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  background: #d1fae5;
+  color: #065f46;
+  font-size: .75rem;
+  font-weight: 700;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+}
+.pt-task-done > td {
+  opacity: .6;
+}
+.pt-task-done .pt-task-link {
+  text-decoration: line-through;
+}
+.pt-done-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: .5rem;
+  margin-top: .5rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pt-done-label input[type=checkbox] {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
 /* Priority badges */
 .pt-priority-low      { background: #f1f5f9; color: #64748b; }
 .pt-priority-medium   { background: #fef9c3; color: #78350f; }
@@ -327,6 +360,31 @@ body {
 .pt-board-assignees  { font-size: .76rem; color: var(--pt-muted); margin-top: .2rem; }
 .pt-board-branch     { font-family: monospace; font-size: .75rem; color: #666; margin-top: .15rem; }
 .pt-board-empty      { color: var(--pt-muted); font-size: .8rem; padding: .4rem .25rem; }
+
+/* Done column */
+.pt-board-col-done {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+.pt-board-col-done .pt-board-col-header {
+  background: #d1fae5;
+  border-bottom-color: #a7f3d0;
+}
+.pt-board-card-done {
+  opacity: .75;
+  background: #f0fdf4;
+  border-color: #a7f3d0;
+}
+.pt-board-card-done .pt-board-card-title a {
+  text-decoration: line-through;
+  color: var(--pt-muted);
+}
+.pt-board-done-date {
+  font-size: .75rem;
+  color: #059669;
+  margin-top: .2rem;
+  font-weight: 600;
+}
 
 /* ── Burndown chart ───────────────────────────────────────────────────── */
 .pt-burndown-header {

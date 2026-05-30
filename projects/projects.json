@@ -7,5 +7,14 @@
         "description": "My first project",
         "start_date": "2026-05-06",
         "end_date": "2026-06-28"
+    },
+    {
+        "id": 2,
+        "created_at": "2026-05-30T07:36:35+00:00",
+        "updated_at": "2026-05-30T07:36:35+00:00",
+        "name": "Second project",
+        "description": "Second test project",
+        "start_date": "2026-05-04",
+        "end_date": "2026-07-25"
     }
 ]

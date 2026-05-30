@@ -338,13 +338,16 @@ function ptRenderTasksTable(tasks) {
 
   let html = '<table class="pt-table pt-tasks-table"><thead><tr>'
     + '<th>Task</th><th>Status</th><th>Priority</th><th>Pts</th>'
-    + '<th>Assignees</th><th>Int. Date</th><th>Branch</th><th>Actions</th>'
+    + '<th>Assignees</th><th>Int. Date</th><th>Done</th><th>Branch</th><th>Actions</th>'
     + '</tr></thead><tbody>';
 
   sorted.forEach(t => {
     const d = depth(t);
     const indent = d * 1.4;
-    html += `<tr class="pt-task-row" data-status="${esc(t.status)}" data-priority="${esc(t.priority)}">
+    const doneHtml = t.done
+      ? '<span class="pt-done-badge" title="Done">✓</span>'
+      : '<span class="pt-muted">—</span>';
+    html += `<tr class="pt-task-row${t.done ? ' pt-task-done' : ''}" data-status="${esc(t.status)}" data-priority="${esc(t.priority)}">
       <td>
         <span class="pt-task-indent" style="padding-left:${indent}rem">
           ${d > 0 ? '<span class="pt-subtask-icon">↳</span>' : ''}
@@ -356,6 +359,7 @@ function ptRenderTasksTable(tasks) {
       <td class="pt-center">${t.points || 0}</td>
       <td class="pt-muted">${(t.assignees || []).map(esc).join(', ') || '—'}</td>
       <td class="pt-muted">${esc(t.integration_date || '—')}</td>
+      <td class="pt-center">${doneHtml}</td>
       <td class="pt-muted pt-branch">${esc(t.integration_branch || '—')}</td>
       <td class="pt-actions">
         <button class="btn btn-sm" onclick="ptOpenTaskModal(${t.id}, null)">Edit</button>
@@ -433,6 +437,7 @@ function ptOpenTaskModal(taskId, parentId) {
     document.getElementById('tm-assigned-date').value      = t.assigned_date      || '';
     document.getElementById('tm-integration-date').value   = t.integration_date   || '';
     document.getElementById('tm-integration-branch').value = t.integration_branch || '';
+    document.getElementById('tm-done').checked             = !!t.done;
     // Restore assignees
     const assignees = t.assignees || [];
     wrap.querySelectorAll('input[type=checkbox]').forEach(cb => {
@@ -448,6 +453,7 @@ function ptOpenTaskModal(taskId, parentId) {
     document.getElementById('tm-assigned-date').value      = '';
     document.getElementById('tm-integration-date').value   = '';
     document.getElementById('tm-integration-branch').value = '';
+    document.getElementById('tm-done').checked             = false;
   }
 
   // Reset spec tab to edit
@@ -506,6 +512,7 @@ async function ptSubmitTask() {
     assigned_date:      document.getElementById('tm-assigned-date').value,
     integration_date:   document.getElementById('tm-integration-date').value,
     integration_branch: document.getElementById('tm-integration-branch').value.trim(),
+    done:               document.getElementById('tm-done').checked,
   };
 
   try {
@@ -557,6 +564,7 @@ function ptShowTaskDetail(taskId) {
     <div class="pt-detail-row"><span class="pt-detail-label">Assignees</span><span>${(t.assignees || []).map(esc).join(', ') || '—'}</span></div>
     <div class="pt-detail-row"><span class="pt-detail-label">Assigned date</span><span>${esc(t.assigned_date || '—')}</span></div>
     <div class="pt-detail-row"><span class="pt-detail-label">Integration date</span><span>${esc(t.integration_date || '—')}</span></div>
+    <div class="pt-detail-row"><span class="pt-detail-label">Done</span><span>${t.done ? '<span class="pt-done-badge">✓ Done</span>' : '—'}</span></div>
     <div class="pt-detail-row"><span class="pt-detail-label">Branch</span><span class="pt-branch-text">${esc(t.integration_branch || '—')}</span></div>
   </div>`;
 
@@ -604,7 +612,8 @@ function ptRenderBoard() {
 
   let html = '<div class="pt-board">';
   ptStatusOrder().forEach(status => {
-    const tasks = _ptTasks.filter(t => t.status === status);
+    // Only show tasks that are NOT done in their status column
+    const tasks = _ptTasks.filter(t => t.status === status && !t.done);
     html += `<div class="pt-board-col">
       <div class="pt-board-col-header">
         ${ptStatusBadge(status)}
@@ -632,6 +641,37 @@ function ptRenderBoard() {
     });
     html += '</div></div>';
   });
+
+  // Done column — all tasks with done = true regardless of status
+  const doneTasks = _ptTasks.filter(t => t.done);
+  html += `<div class="pt-board-col pt-board-col-done">
+    <div class="pt-board-col-header">
+      <span class="pt-badge pt-status-done">\u2713 Done</span>
+      <span class="pt-board-count">${doneTasks.length}</span>
+    </div>
+    <div class="pt-board-cards">`;
+  if (!doneTasks.length) {
+    html += '<p class="pt-board-empty">—</p>';
+  }
+  doneTasks.sort((a, b) => {
+    // Sort by completion date descending (most recently done first)
+    const ca = a.completed_at || '', cb = b.completed_at || '';
+    return cb.localeCompare(ca);
+  }).forEach(t => {
+    html += `<div class="pt-board-card pt-board-card-done">
+      <div class="pt-board-card-title">
+        <a href="#" class="pt-task-link" onclick="ptShowTaskDetail(${t.id});return false">${esc(t.name)}</a>
+      </div>
+      <div class="pt-board-card-meta">
+        ${ptPriorityBadge(t.priority)}
+        <span class="pt-board-pts">${t.points || 0} pts</span>
+      </div>
+      ${t.integration_date ? `<div class="pt-board-done-date">\u2713 ${esc(t.integration_date)}</div>` : ''}
+      ${(t.assignees || []).length ? `<div class="pt-board-assignees">${(t.assignees || []).map(esc).join(', ')}</div>` : ''}
+    </div>`;
+  });
+  html += '</div></div>';
+
   html += '</div>';
   wrap.innerHTML = html;
 }
@@ -663,6 +703,7 @@ function ptRenderBurndown(wrapId) {
   const startDate = new Date(proj.start_date + 'T00:00:00');
   const endDate   = new Date(proj.end_date   + 'T00:00:00');
   const today     = new Date(); today.setHours(0, 0, 0, 0);
+  const todayIso  = today.toISOString();
 
   const MS_DAY   = 86400000;
   const totalMs  = endDate - startDate;
@@ -673,9 +714,13 @@ function ptRenderBurndown(wrapId) {
   const actualDays = [];
   for (let d = new Date(startDate); d <= chartEnd; d = new Date(d.getTime() + MS_DAY)) {
     const dIso = d.toISOString();
-    const remaining = activeTasks.filter(t =>
-      !t.completed_at || t.completed_at > dIso
-    ).reduce((s, t) => s + (t.points || 0), 0);
+    const remaining = activeTasks.filter(t => {
+      // A task is considered done on day D if:
+      // - it has completed_at ≤ dIso, OR
+      // - done = true but no completed_at (treat as done from today)
+      if (t.done && !t.completed_at) return dIso < todayIso; // still remaining before today
+      return !t.completed_at || t.completed_at > dIso;
+    }).reduce((s, t) => s + (t.points || 0), 0);
     actualDays.push({ date: new Date(d), pts: remaining });
   }
 

@@ -306,6 +306,10 @@ $baseHref  = $scriptDir . '/';
             <input type="text" id="tm-integration-branch" maxlength="200" placeholder="e.g. feature/login" autocomplete="off">
           </label>
         </div>
+        <label class="pt-done-label">
+          <input type="checkbox" id="tm-done">
+          Done <span class="pt-muted" style="font-weight:normal;font-size:.85em">(auto-checked when integration date is past)</span>
+        </label>
       </fieldset>
       <p id="tm-error" class="pt-form-error"></p>
     </div>
