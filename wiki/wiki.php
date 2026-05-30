@@ -54,13 +54,7 @@ $settings = load_settings();
             <line x1="14" y1="15" x2="3" y2="15" />
             <line x1="18" y1="20" x2="3" y2="20" />
           </svg></button>
-        <button class="btn" id="hub-btn" title="Back to hub" aria-label="Back to hub" style="display:none" onclick="window.location.href=WKW_AUTH_BASE"><svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-            <circle cx="19" cy="8" r="3" stroke-width="1.5" />
-            <line x1="19" y1="11" x2="19" y2="14" />
-            <line x1="17.5" y1="12.5" x2="20.5" y2="12.5" />
-          </svg></button>
+        <button class="btn" id="hub-btn" title="Go to main panel" aria-label="Go to main panel" style="display:none" onclick="window.location.href=WKW_AUTH_BASE"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
         <button class="btn" id="backup-btn" title="Download backup" aria-label="Download backup" style="display:none" onclick="downloadBackup()"><svg viewBox="0 0 24 24" aria-hidden="true">
             <polyline points="8 17 12 21 16 17" />
             <line x1="12" y1="12" x2="12" y2="21" />
@@ -199,17 +193,6 @@ $settings = load_settings();
           <input type="checkbox" id="settings-guest-index" class="settings-check">
           <label for="settings-guest-index" class="settings-check-label">Allow guest to view Index</label>
         </div>
-        <fieldset class="settings-fieldset">
-          <legend class="settings-fieldset-legend">Security</legend>
-          <div id="settings-jwt-secret-row">
-            <label>JWT Secret <span class="hint">(leave blank to keep)</span>
-              <input type="text" id="settings-jwt-secret" autocomplete="off" minlength="16" maxlength="128" placeholder="leave blank to keep">
-            </label>
-            <label id="settings-admin-pass-label" style="display:none">Admin password <span class="hint">(required when changing JWT secret)</span>
-              <input type="password" id="settings-admin-pass" autocomplete="new-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;">
-            </label>
-          </div>
-        </fieldset>
         <div id="settings-form-actions">
           <span id="settings-save-status"></span>
           <button type="button" class="btn" onclick="toggleSettingsPanel()">Cancel</button>

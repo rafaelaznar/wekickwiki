@@ -774,12 +774,11 @@
         document.getElementById('settings-save-status').textContent = '';
         return;
       }
-      // Load current settings, available templates, and users in parallel
-      const [sRes, tRes, hRes, uRes] = await Promise.all([
+      // Load current settings and available templates in parallel
+      const [sRes, tRes, hRes] = await Promise.all([
         apiFetch('?action=get-settings'),
         apiFetch('?action=get-templates'),
         apiFetch('?action=get-hljs-themes'),
-        apiFetch(WKW_AUTH_BASE + '?action=get-users'),
       ]);
       if (!sRes || !sRes.ok || !tRes || !tRes.ok || !hRes || !hRes.ok) {
         document.getElementById('settings-save-status').textContent = 'Could not load settings.';
@@ -788,9 +787,6 @@
       const settings   = await sRes.json();
       const templates  = await tRes.json();
       const hljsThemes = await hRes.json();
-      const usersData  = (uRes && uRes.ok) ? await uRes.json() : {};
-      const hasGuests  = Array.isArray(usersData.guests) && usersData.guests.length > 0;
-      document.getElementById('settings-jwt-secret-row').style.display = hasGuests ? 'none' : '';
       document.getElementById('settings-wiki-name').value = settings.wikiName || '';
       const sel = document.getElementById('settings-theme');
       sel.innerHTML = '';
@@ -815,9 +811,6 @@
       document.getElementById('settings-guest-odt-download').checked = settings.guestOdtDownload !== false;
       document.getElementById('settings-guest-toc').checked   = settings.guestToc   !== false;
       document.getElementById('settings-guest-index').checked = settings.guestIndex !== false;
-      document.getElementById('settings-jwt-secret').value    = '';
-      document.getElementById('settings-admin-pass').value     = '';
-      document.getElementById('settings-admin-pass-label').style.display = 'none';
     }
 
     /**
@@ -839,48 +832,27 @@
       const guestOdtDownload = document.getElementById('settings-guest-odt-download').checked;
       const guestToc         = document.getElementById('settings-guest-toc').checked;
       const guestIndex       = document.getElementById('settings-guest-index').checked;
-      const jwtSecret = document.getElementById('settings-jwt-secret').value.trim();
-      const adminPass = document.getElementById('settings-admin-pass').value;
       if (!wikiName) {
         statusEl.textContent = 'Wiki name cannot be empty.';
         return;
       }
-      if (jwtSecret !== '' && jwtSecret.length < 16) {
-        statusEl.textContent = 'JWT secret must be at least 16 characters.';
-        return;
-      }
-      if (jwtSecret !== '' && !adminPass) {
-        statusEl.textContent = 'When changing the JWT secret, a new admin password is required.';
-        return;
-      }
-      const adminHash = adminPass ? await sha256(adminPass) : null;
       try {
         const res = await apiFetch('?action=save-settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex, jwtSecret, adminHash }),
+          body: JSON.stringify({ wikiName, theme, hljsTheme, codeLineNumbers, guestOdtDownload, guestToc, guestIndex }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
           toggleSettingsPanel();
-          if (jwtSecret) {
-            showToast('JWT secret changed \u2014 please sign in again.', 'success', 3000);
-            setTimeout(logout, 2000);
-          } else {
-            showToast('Settings saved. Reloading\u2026', 'success', 2000);
-            setTimeout(() => location.reload(), 1500);
-          }
+          showToast('Settings saved. Reloading\u2026', 'success', 2000);
+          setTimeout(() => location.reload(), 1500);
         } else {
           statusEl.textContent = data.error || 'Error saving settings.';
         }
       } catch {
         statusEl.textContent = 'Connection error.';
       }
-    });
-
-    // Show/hide admin password field when JWT secret input changes
-    document.getElementById('settings-jwt-secret').addEventListener('input', function () {
-      document.getElementById('settings-admin-pass-label').style.display = this.value.trim() ? '' : 'none';
     });
 
     // ── Base & routing helpers ──────────────────────────────────────────────────
