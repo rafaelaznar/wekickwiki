@@ -1,11 +1,11 @@
 /* ── Projects App — Default Theme ──────────────────────────────────────────
-   Blue (#1a6fa8) accent. Self-contained: no external CSS dependencies.
+   Crimson (#8a0808) accent. Self-contained: no external CSS dependencies.
    ─────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --pt-accent:       #1a6fa8;
-  --pt-accent-dark:  #145a8a;
-  --pt-accent-light: #e3f0fb;
+  --pt-accent:       #8a0808;
+  --pt-accent-dark:  #6a0606;
+  --pt-accent-light: #fdecea;
   --pt-danger:       #c0392b;
   --pt-danger-dark:  #a93226;
   --pt-text:         #222;
@@ -444,7 +444,7 @@ body {
 .pt-modal-body select:focus,
 .pt-modal-body textarea:focus {
   border-color: var(--pt-accent);
-  box-shadow: 0 0 0 2px rgba(26,111,168,.12);
+  box-shadow: 0 0 0 2px rgba(138,8,8,.12);
 }
 
 .pt-form-row {
@@ -626,7 +626,7 @@ body {
 }
 .pt-user-task-card:hover {
   border-color: var(--pt-accent);
-  box-shadow: 0 2px 8px rgba(26,111,168,.1);
+  box-shadow: 0 2px 8px rgba(138,8,8,.1);
 }
 
 .pt-user-task-card-title {
