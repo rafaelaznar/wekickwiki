@@ -94,5 +94,389 @@
                 ]
             }
         ]
+    },
+    {
+        "name": "guest2",
+        "subitems": [
+            {
+                "name": "primera evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": 2
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": 2
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": 1
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": 4
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "mark": 5
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": 6
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": 1
+                    }
+                ]
+            },
+            {
+                "name": "segunda evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": 1
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": 3
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": 2
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": 3
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "subitems": [
+                                    {
+                                        "name": "Trabajo 2: nota",
+                                        "mark": 7
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": 9
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": 8
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "guest3",
+        "subitems": [
+            {
+                "name": "primera evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            },
+            {
+                "name": "segunda evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "subitems": [
+                                    {
+                                        "name": "Trabajo 2: nota",
+                                        "mark": null
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "guest4",
+        "subitems": [
+            {
+                "name": "primera evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            },
+            {
+                "name": "segunda evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "subitems": [
+                                    {
+                                        "name": "Trabajo 2: nota",
+                                        "mark": null
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "guest5",
+        "subitems": [
+            {
+                "name": "primera evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            },
+            {
+                "name": "segunda evaluación",
+                "subitems": [
+                    {
+                        "name": "primer examen",
+                        "mark": null
+                    },
+                    {
+                        "name": "trabajo1",
+                        "subitems": [
+                            {
+                                "name": "trabajo 1: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 1: criterio b",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trabajo2",
+                        "subitems": [
+                            {
+                                "name": "trabajo 2: criterio a",
+                                "mark": null
+                            },
+                            {
+                                "name": "trabajo 2: criterio b",
+                                "subitems": [
+                                    {
+                                        "name": "Trabajo 2: nota",
+                                        "mark": null
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trabajo 2: criterio c",
+                                "mark": null
+                            }
+                        ]
+                    },
+                    {
+                        "name": "segundo examen",
+                        "mark": null
+                    }
+                ]
+            }
+        ]
     }
 ]

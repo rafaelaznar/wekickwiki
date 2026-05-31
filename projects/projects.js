@@ -93,6 +93,7 @@ function ptToast(msg, type = 'success', ms = 3200) {
  * @param {string} name - Tab key: 'projects' | 'tasks' | 'board' | 'burndown' | 'statuses' | 'settings'
  */
 function ptShowTab(name) {
+  document.querySelectorAll('#admin-panel .pt-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
   document.querySelectorAll('#admin-panel .pt-tab-panel').forEach(p => {

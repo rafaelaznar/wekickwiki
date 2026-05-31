@@ -39,11 +39,13 @@
     el.style.display = msg ? '' : 'none';
   }
 
-  // ── HTML escaping ──────────────────────────────────────────────────────────  /**
+  // ── HTML escaping ──────────────────────────────────────────────────────────
+  /**
    * Escape a string for safe insertion into HTML.
    * @param {*} s
    * @returns {string}
-   */  function esc(s) {
+   */
+  function esc(s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')

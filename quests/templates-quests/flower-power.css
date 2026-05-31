@@ -168,7 +168,7 @@ body::after {
 .qs-matching-select:focus { border-color: #d4299a; }
 .qs-matching-select.correct { border-color: #065f46; background: #d1fae5; }
 .qs-matching-select.wrong   { border-color: #be185d; background: #fce7f3; }
-.qs-wizard-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 1.4rem; padding-top: 1rem; border-top: 2px solid #fce7f3; }
+.qs-wizard-nav { display: flex; align-items: center; justify-content: space-between; margin: 1.4rem 0; padding-top: 1rem; border-top: 2px solid #fce7f3; }
 .qs-review-correct { margin-top: .6rem; font-size: .83rem; font-weight: 600; color: #065f46; }
 
 /* ── Attempts ─────────────────────────────────────────────────────────── */

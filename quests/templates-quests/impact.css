@@ -138,7 +138,7 @@ body {
 .qs-matching-select:focus { border-color: #e85d04; }
 .qs-matching-select.correct { border-color: #4ade80; background: #14532d; color: #86efac; }
 .qs-matching-select.wrong   { border-color: #f87171; background: #450a0a; color: #fca5a5; }
-.qs-wizard-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 1.4rem; padding-top: 1rem; border-top: 1px solid #2a2a4a; }
+.qs-wizard-nav { display: flex; align-items: center; justify-content: space-between; margin: 1.4rem 0; padding-top: 1rem; border-top: 1px solid #2a2a4a; }
 .qs-review-correct { margin-top: .6rem; font-size: .83rem; font-weight: 700; color: #4ade80; }
 
 /* ── Attempts ─────────────────────────────────────────────────────────── */
