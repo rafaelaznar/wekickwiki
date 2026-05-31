@@ -11,6 +11,12 @@
   let _fbToastTimer;
 
   // ── Toast notification ─────────────────────────────────────────────────────
+  /**
+   * Show a temporary toast notification.
+   * @param {string} msg  - Message text
+   * @param {string} [type='success'] - CSS modifier ('success' | 'error')
+   * @param {number} [ms=3200]  - Duration before auto-dismiss
+   */
   function fbToast(msg, type = 'success', ms = 3200) {
     const el = document.getElementById('fb-toast');
     el.textContent = msg;
@@ -19,6 +25,12 @@
     _fbToastTimer = setTimeout(() => el.classList.remove('show'), ms);
   }
 
+  /**
+   * Set or clear an inline status message element.
+   * @param {string} id   - Element ID
+   * @param {string} msg  - Status text (empty to hide)
+   * @param {string} type - CSS class suffix ('ok' | 'error' | 'info')
+   */
   function fbSetStatus(id, msg, type) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -27,8 +39,11 @@
     el.style.display = msg ? '' : 'none';
   }
 
-  // ── HTML escaping ──────────────────────────────────────────────────────────
-  function esc(s) {
+  // ── HTML escaping ──────────────────────────────────────────────────────────  /**
+   * Escape a string for safe insertion into HTML.
+   * @param {*} s
+   * @returns {string}
+   */  function esc(s) {
     return String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -37,6 +52,11 @@
   }
 
   // ── Date formatting ────────────────────────────────────────────────────────
+  /**
+   * Format an ISO timestamp into a readable local date/time string.
+   * @param {string|null} d - ISO timestamp
+   * @returns {string}
+   */
   function fmtDate(d) {
     if (!d) return '—';
     try {
@@ -47,6 +67,11 @@
     } catch { return d; }
   }
 
+  /**
+   * Format a numeric score to one decimal place, or '—' if null.
+   * @param {number|null} v
+   * @returns {string}
+   */
   function fmtScore(v) {
     if (v === null || v === undefined) return '—';
     return parseFloat(v).toFixed(1);
@@ -57,17 +82,22 @@
   // ═══════════════════════════════════════════════════════════════════════════
   setOnUnauthorized(fbLogout);
 
+  /** Clear session storage and redirect to the hub. */
   function fbLogout() {
     sessionStorage.clear();
     window.location.href = '../index.php';
   }
 
+  /** Show the app chrome (header, screen) after successful auth. */
   function fbShowApp() {
     document.getElementById('fb-header').style.display = 'flex';
     document.getElementById('fb-screen').style.display = 'block';
     document.getElementById('fb-user-badge').textContent = getUser() + ' (' + getRole() + ')';
   }
 
+  /**
+   * Route to admin panel (Events/Settings tabs) or the guest response view.
+   */
   function fbRoute() {
     const role     = getRole();
     const themeBtn = document.getElementById('fb-theme-btn');
@@ -90,6 +120,10 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // Tab switching (admin)
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Switch the active admin tab and trigger its data load.
+   * @param {'events'|'settings'} name
+   */
   function fbShowTab(name) {
     document.querySelectorAll('.fb-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.tab === name);
@@ -104,6 +138,9 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ADMIN — Events tab
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Fetch the admin events list and re-render the table.
+   */
   async function fbLoadEventsAdmin() {
     const wrap = document.getElementById('events-table-wrap');
     wrap.innerHTML = '<div class="fb-loading"><div class="fb-spinner"></div> Loading…</div>';
@@ -117,6 +154,11 @@
     }
   }
 
+  /**
+   * Render the admin events table from _allEvents cache.
+   * Each row contains type/status/anonymity badges, response count,
+   * and action buttons (Responses, Open/Close, Edit, Delete).
+   */
   function fbRenderEventsTable() {
     const wrap = document.getElementById('events-table-wrap');
     if (!_allEvents.length) {
@@ -176,6 +218,12 @@
   }
 
   // ── Event modal (create / edit) ────────────────────────────────────────────
+  /**
+   * Open the add/edit event modal.
+   * Type field is disabled when the event already has responses
+   * (changing type would make existing responses inconsistent).
+   * @param {number|null} [id=null] - Event ID to edit, or null to add
+   */
   function fbOpenEventModal(id = null) {
     _editingEventId = id;
     document.getElementById('fb-event-modal-title').textContent = id ? 'Edit event' : 'Add event';
@@ -205,12 +253,16 @@
     document.getElementById('fb-ev-title').focus();
   }
 
+  /** Close the event creation/edit modal. */
   function fbCloseEventModal() {
     document.getElementById('fb-event-overlay').style.display = 'none';
     document.getElementById('fb-event-modal').style.display   = 'none';
     _editingEventId = null;
   }
 
+  /**
+   * Validate the event form and POST to save-event (create or update).
+   */
   async function fbSaveEvent() {
     const title = document.getElementById('fb-ev-title').value.trim();
     if (!title) {
@@ -243,6 +295,10 @@
   }
 
   // ── Toggle status ──────────────────────────────────────────────────────────
+  /**
+   * Toggle an event between open and closed status.
+   * @param {number} id - Event ID
+   */
   async function fbToggleEventStatus(id) {
     try {
       const res = await apiFetch('feedback.php?action=toggle-event-status', {
@@ -260,6 +316,10 @@
   }
 
   // ── Delete modal ───────────────────────────────────────────────────────────
+  /**
+   * Open the confirm-delete modal for an event, showing how many responses will be deleted.
+   * @param {number} id - Event ID
+   */
   function fbOpenDeleteModal(id) {
     _deleteEventId = id;
     const ev  = _allEvents.find(e => e.id === id);
@@ -270,12 +330,16 @@
     document.getElementById('fb-del-modal').style.display   = 'block';
   }
 
+  /** Close the delete confirmation modal without deleting. */
   function fbCloseDeleteModal() {
     document.getElementById('fb-del-overlay').style.display = 'none';
     document.getElementById('fb-del-modal').style.display   = 'none';
     _deleteEventId = null;
   }
 
+  /**
+   * Execute the pending event delete (and cascade to its responses).
+   */
   async function fbConfirmDelete() {
     const id = _deleteEventId;
     fbCloseDeleteModal();
@@ -295,6 +359,12 @@
   }
 
   // ── Responses modal ────────────────────────────────────────────────────────
+  /**
+   * Open the responses viewer modal for an event.
+   * Adapts the columns shown based on event type (open/closed/mixed)
+   * and whether the event is anonymous (username hidden when true).
+   * @param {number} id - Event ID
+   */
   async function fbOpenResponsesModal(id) {
     const ev = _allEvents.find(e => e.id === id);
     document.getElementById('fb-resp-modal-title').textContent = `Responses — ${esc(ev?.title ?? '')}`;
@@ -352,6 +422,7 @@
     }
   }
 
+  /** Close the responses viewer modal. */
   function fbCloseResponsesModal() {
     document.getElementById('fb-resp-overlay').style.display = 'none';
     document.getElementById('fb-resp-modal').style.display   = 'none';
@@ -360,6 +431,9 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ADMIN — Settings tab (theme picker)
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Fetch available CSS templates and render them as a radio list in the Settings tab.
+   */
   async function fbLoadTemplates() {
     const list = document.getElementById('fb-theme-list');
     list.innerHTML = '<div class="fb-loading"><div class="fb-spinner"></div> Loading…</div>';
@@ -379,6 +453,10 @@
     }
   }
 
+  /**
+   * Persist a theme choice to the server and update the page <link> live.
+   * @param {string} theme - CSS filename (e.g. 'impact.css')
+   */
   async function fbSaveTheme(theme) {
     fbSetStatus('settings-status', 'Saving…', '');
     try {
@@ -400,6 +478,10 @@
   }
 
   // ── Header theme panel (quick-switcher) ────────────────────────────────────
+  /**
+   * Toggle the quick-switcher theme panel in the header.
+   * Loads the panel contents lazily on first open.
+   */
   function fbToggleThemePanel() {
     const panel = document.getElementById('fb-theme-panel');
     if (!panel) return;
@@ -408,6 +490,9 @@
     panel.style.display = '';
   }
 
+  /**
+   * Fetch and populate the quick-switcher theme panel button list.
+   */
   async function fbLoadThemePanel() {
     const list = document.getElementById('fb-theme-panel-list');
     list.innerHTML = '<div class="fb-loading"><div class="fb-spinner"></div></div>';
@@ -437,6 +522,10 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // USER — Events view
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Fetch open events and the user's existing responses in parallel.
+   * Events with a prior response are shown as "Already responded".
+   */
   async function fbLoadUserEvents() {
     const wrap = document.getElementById('user-events-wrap');
     wrap.innerHTML = '<div class="fb-loading"><div class="fb-spinner"></div> Loading…</div>';
@@ -455,6 +544,12 @@
     }
   }
 
+  /**
+   * Render the user events view: pending events (respond button) followed by
+   * already-responded events (thank-you card).
+   * @param {Array}  events       - All open event objects
+   * @param {Set}    respondedIds - Set of event IDs the user has already responded to
+   */
   function fbRenderUserEvents(events, respondedIds) {
     const wrap    = document.getElementById('user-events-wrap');
     const pending = events.filter(e => !respondedIds.has(e.id));
@@ -505,6 +600,12 @@
   }
 
   // ── Respond modal ──────────────────────────────────────────────────────────
+  /**
+   * Open the response submission modal for the given event.
+   * Shows/hides the text and score fields based on event type
+   * (open = text only, closed = score only, mixed = both).
+   * @param {number} id - Event ID
+   */
   function fbOpenRespondModal(id) {
     const ev = _openEvents.find(e => e.id === id);
     if (!ev) return;
@@ -536,18 +637,28 @@
     if (showText) document.getElementById('fb-respond-text').focus();
   }
 
+  /** Close the response submission modal. */
   function fbCloseRespondModal() {
     document.getElementById('fb-respond-overlay').style.display = 'none';
     document.getElementById('fb-respond-modal').style.display   = 'none';
     _respondEventId = null;
   }
 
+  /**
+   * Keep the numeric score input and the range slider in sync.
+   * Clamps the value to [0, 10].
+   * @param {string|number} val - Raw input value from either input or range
+   */
   function fbSyncScore(val) {
     const v = Math.min(10, Math.max(0, parseInt(val, 10) || 0));
     document.getElementById('fb-respond-score-range').value = v;
     document.getElementById('fb-respond-score').value       = v;
   }
 
+  /**
+   * Validate and POST the user's response to submit-response.
+   * On success, replaces the event card inline with a thank-you message.
+   */
   async function fbSubmitResponse() {
     const id = _respondEventId;
     const ev = _openEvents.find(e => e.id === id);

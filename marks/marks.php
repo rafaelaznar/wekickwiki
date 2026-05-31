@@ -5,7 +5,6 @@ require_once __DIR__ . '/marks-api.php';
 // ═══════════════════════════════════════════════════════════════════════════
 // Render HTML — load settings for app name display
 // ═══════════════════════════════════════════════════════════════════════════
-$pq_settings = load_auth_settings();
 $pq_app_name = 'Qualifications';
 // Try to get the wikiName from settings if available (re-read raw settings.json)
 $pq_theme = 'default.css';

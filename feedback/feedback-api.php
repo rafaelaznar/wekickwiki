@@ -22,11 +22,23 @@ define('FB_RESPONSES_FILE', __DIR__ . '/feedback-responses.json');
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
+/** Load all feedback events from disk. */
 function fb_load_events(): array         { return data_read(FB_EVENTS_FILE);    }
+/** Persist the feedback events array. */
 function fb_save_events(array $d): void  { data_write(FB_EVENTS_FILE,    $d);   }
+/** Load all feedback responses from disk. */
 function fb_load_responses(): array      { return data_read(FB_RESPONSES_FILE); }
+/** Persist the feedback responses array. */
 function fb_save_responses(array $d): void { data_write(FB_RESPONSES_FILE, $d); }
 
+/**
+ * Sanitise and validate a raw feedback event payload from the client.
+ * Validates type ('open' | 'closed' | 'mixed') and status ('open' | 'closed'),
+ * truncates title and description, and casts anonymous to bool.
+ *
+ * @param mixed $raw  Decoded JSON body
+ * @return array|null  Sanitised event array, or null if $raw is not an array
+ */
 function fb_sanitize_event(mixed $raw): ?array
 {
     if (!is_array($raw)) return null;
@@ -46,6 +58,7 @@ function fb_sanitize_event(mixed $raw): ?array
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — get-events-admin
+// Returns all events with a computed response_count per event.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-events-admin') {
     $claims = require_auth();
@@ -69,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-eve
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — save-event (create id=0, update otherwise)
+// Block type change when responses already exist (would make them inconsistent).
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-event') {
     $claims = require_auth();
@@ -119,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-e
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — delete-event (cascades to responses)
+// Both the event and all its responses are removed atomically.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete-event') {
     $claims = require_auth();
@@ -167,6 +182,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'toggle
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — get-event-responses (strips username for anonymous events)
+// Username is always stored internally; stripped at presentation time when anonymous=true.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-event-responses') {
     $claims = require_auth();
@@ -213,6 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-eve
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — get-feedback-templates
+// Lists *.css filenames from templates-feedback/ for the theme picker.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-feedback-templates') {
     $claims = require_auth();
@@ -226,6 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-fee
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN — save-feedback-theme
+// Validates filename against regex + is_file() to prevent path traversal.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-feedback-theme') {
     $claims = require_auth();
@@ -246,6 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-f
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USER — get-open-events
+// Returns a safe subset of fields (no internal flags like created_by).
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-open-events') {
     $claims = require_auth();
@@ -268,6 +287,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USER — submit-response
+// Validates event is open, prevents duplicate responses (409 Conflict),
+// and enforces type-appropriate fields (text, score, or both).
+// Username always stored internally for duplicate-prevention tracking.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit-response') {
     $claims   = require_auth();
@@ -329,6 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
 
 // ═══════════════════════════════════════════════════════════════════════════
 // USER — get-my-responses (event_id list for "already responded" detection)
+// Returns only event_id fields — no response content is exposed.
 // ═══════════════════════════════════════════════════════════════════════════
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-my-responses') {
     $claims   = require_auth();

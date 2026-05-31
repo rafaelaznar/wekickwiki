@@ -69,22 +69,6 @@ function pq_validate_weights(array $node, string $parentPath = 'root'): array
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Get all leaf items as a flat list with their path (array of names)
-// ═══════════════════════════════════════════════════════════════════════════
-function pq_get_leaves(array $node, array $path = []): array
-{
-    $currentPath = array_merge($path, [$node['name']]);
-    if (!isset($node['subitems']) || !is_array($node['subitems']) || count($node['subitems']) === 0) {
-        return [['path' => $currentPath, 'name' => $node['name']]];
-    }
-    $leaves = [];
-    foreach ($node['subitems'] as $child) {
-        $leaves = array_merge($leaves, pq_get_leaves($child, $currentPath));
-    }
-    return $leaves;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Build an empty marks tree mirroring an items tree (null marks at leaves)
 // ═══════════════════════════════════════════════════════════════════════════
 function pq_build_empty_marks_tree(array $items_node): array
@@ -313,4 +297,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-m
     data_write(SETTINGS_FILE, $raw);
     json_out(200, ['ok' => true]);
 }
-
+

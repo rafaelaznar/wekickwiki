@@ -460,10 +460,6 @@
       return out;
     }
 
-    /** Stub retained for API completeness — not needed for the Flat ODT (FODT) format used here,
-     *  which embeds all content in a single XML file without a ZIP manifest. */
-    function buildOdtManifest() { /* not used in flat-ODT mode */ }
-
     /**
      * Assemble a complete Flat ODT (FODT) XML document from Markdown source.
      *

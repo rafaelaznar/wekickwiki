@@ -10,8 +10,12 @@ let calEditingId     = null; // null = adding new, integer = editing existing
 let _calSelectedColor = null;
 
 // ── Toast ──────────────────────────────────────────────────────────────────
-let _calToastTimer;
-function calToast(msg, type = 'success', ms = 3200) {
+let _calToastTimer;/**
+ * Show a temporary toast notification.
+ * @param {string} msg  - Message text
+ * @param {string} [type='success'] - CSS modifier ('success' | 'error')
+ * @param {number} [ms=3200]  - Duration in ms before auto-dismiss
+ */function calToast(msg, type = 'success', ms = 3200) {
   const el = document.getElementById('cal-toast');
   el.textContent = msg;
   el.className = 'show ' + type;
@@ -19,6 +23,12 @@ function calToast(msg, type = 'success', ms = 3200) {
   _calToastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
+/**
+ * Set or clear an inline status message element.
+ * @param {string} id   - Element ID
+ * @param {string} msg  - Message text (empty to hide)
+ * @param {string} type - CSS class suffix ('ok' | 'error' | 'info')
+ */
 function calSetStatus(id, msg, type) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -30,11 +40,13 @@ function calSetStatus(id, msg, type) {
 // ── Auth / routing ─────────────────────────────────────────────────────────
 setOnUnauthorized(calLogout);
 
+/** Clear session storage and redirect to the hub. */
 function calLogout() {
   sessionStorage.clear();
   window.location.href = '../index.php';
 }
 
+/** Show the app chrome (header, screen) after successful auth. */
 function calShowApp() {
   document.getElementById('cal-header').style.display = 'flex';
   document.getElementById('cal-screen').style.display = 'block';
@@ -42,6 +54,10 @@ function calShowApp() {
     getUser() + ' (' + getRole() + ')';
 }
 
+/**
+ * Set up role-specific toolbars and load events.
+ * Admin sees the add-event toolbar; guests see a read-only toolbar.
+ */
 function calRoute() {
   const role    = getRole();
   const themeBtn = document.getElementById('cal-theme-btn');
@@ -57,6 +73,10 @@ function calRoute() {
 }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
+/**
+ * Switch between the calendar grid tab and the upcoming events list tab.
+ * @param {'calendar'|'upcoming'} tab
+ */
 function calSwitchTab(tab) {
   const isCalendar = tab === 'calendar';
   document.getElementById('cal-tab-calendar').style.display  = isCalendar ? '' : 'none';
@@ -78,6 +98,9 @@ if (getToken()) {
 }
 
 // ── Load events ────────────────────────────────────────────────────────────
+/**
+ * Fetch events from the server and refresh both the grid and the upcoming list.
+ */
 async function calLoadEvents() {
   try {
     const res = await apiFetch('calendar.php?action=get-events');
@@ -93,6 +116,10 @@ async function calLoadEvents() {
 }
 
 // ── Upcoming events list ──────────────────────────────────────────────────
+/**
+ * Render the upcoming events list (next 20 events from today, sorted by date/time).
+ * Clicking an item opens its detail modal.
+ */
 function calRenderUpcoming() {
   const wrap = document.getElementById('cal-upcoming-list');
   if (!wrap) return;
@@ -149,18 +176,21 @@ function calRenderUpcoming() {
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
+/** Navigate the calendar grid to the previous month. */
 function calPrevMonth() {
   calMonth--;
   if (calMonth < 0) { calMonth = 11; calYear--; }
   calRender();
 }
 
+/** Navigate the calendar grid to the next month. */
 function calNextMonth() {
   calMonth++;
   if (calMonth > 11) { calMonth = 0; calYear++; }
   calRender();
 }
 
+/** Jump the calendar grid to the current month. */
 function calGoToday() {
   const now = new Date();
   calYear   = now.getFullYear();
@@ -175,6 +205,12 @@ const CAL_MONTH_NAMES = [
 ];
 const CAL_DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
+/**
+ * Build and insert the monthly calendar grid for calYear/calMonth.
+ * Builds an eventMap that maps each ISO date string to the events that
+ * appear on that day (multi-day events are expanded over every day they span).
+ * Leading/trailing blank cells are added so the grid always starts on Monday.
+ */
 function calRender() {
   const role    = getRole();
   const gridId  = role === 'admin' ? 'cal-grid-admin' : 'cal-grid-user';
@@ -272,6 +308,13 @@ function calRender() {
   wrap.appendChild(grid);
 }
 
+/**
+ * Return a zero-padded ISO date string for the given year/month/day.
+ * @param {number} y - Full year
+ * @param {number} m - 0-based month
+ * @param {number} d - Day of month
+ * @returns {string} YYYY-MM-DD
+ */
 function _calDateStr(y, m, d) {
   return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
 }
@@ -294,6 +337,10 @@ const CAL_COLORS = [
   { hex: '#00acc1', label: 'Teal'   },
 ];
 
+/**
+ * Populate the color picker <select> inside the event form.
+ * Updates _calSelectedColor and the hidden color text input on change.
+ */
 function _calBuildColorPicker() {
   const wrap = document.getElementById('cal-color-picker');
   wrap.innerHTML = '';
@@ -324,6 +371,9 @@ function _calBuildColorPicker() {
 }
 
 // ── Admin: add / edit event modal ──────────────────────────────────────────
+/**
+ * Open the event form modal in "add" mode with all fields reset.
+ */
 function calOpenAddModal() {
   calEditingId      = null;
   _calSelectedColor = null;
@@ -337,6 +387,10 @@ function calOpenAddModal() {
   document.getElementById('cal-f-title').focus();
 }
 
+/**
+ * Open the event form modal in "edit" mode, pre-filling fields from the event.
+ * @param {number} id - Event ID to edit
+ */
 function calOpenEditModal(id) {
   const ev = calEvents.find(e => e.id === id);
   if (!ev) return;
@@ -358,10 +412,15 @@ function calOpenEditModal(id) {
   document.getElementById('cal-f-title').focus();
 }
 
+/** Close the add/edit event form modal. */
 function calCloseFormModal() {
   _calHideModal('cal-form-overlay', 'cal-form-modal');
 }
 
+/**
+ * Read the event form and POST to add-event or edit-event.
+ * @param {Event} e - The form submit event (preventDefault is called)
+ */
 async function calSaveEvent(e) {
   e.preventDefault();
   const btn = document.getElementById('cal-form-save-btn');
@@ -401,6 +460,7 @@ async function calSaveEvent(e) {
   }
 }
 
+/** Prompt for delete confirmation and delete the event currently in the form modal. */
 async function calDeleteEventFromModal() {
   if (calEditingId === null) return;
   const ev = calEvents.find(e => e.id === calEditingId);
@@ -410,6 +470,10 @@ async function calDeleteEventFromModal() {
   calCloseFormModal();
 }
 
+/**
+ * Send the delete-event request for the given event ID and refresh.
+ * @param {number} id - Event ID
+ */
 async function _calDoDelete(id) {
   try {
     const res = await apiFetch('calendar.php?action=delete-event', {
@@ -426,6 +490,11 @@ async function _calDoDelete(id) {
 }
 
 // ── Detail modal (all users — read-only for guests, editable for admin) ────
+/**
+ * Open the read-only event detail modal.
+ * Admin users also see an Edit button.
+ * @param {number} id - Event ID
+ */
 function calOpenDetailModal(id) {
   const ev = calEvents.find(e => e.id === id);
   if (!ev) return;
@@ -462,27 +531,44 @@ function calOpenDetailModal(id) {
   _calShowModal('cal-detail-overlay', 'cal-detail-modal');
 }
 
+/** Close the detail modal and open the edit form for the displayed event. */
 function calEditFromDetail() {
   const id = parseInt(document.getElementById('cal-detail-edit-btn').dataset.id);
   calCloseDetailModal();
   calOpenEditModal(id);
 }
 
+/** Close the event detail modal. */
 function calCloseDetailModal() {
   _calHideModal('cal-detail-overlay', 'cal-detail-modal');
 }
 
+/**
+ * Format a date range for display, combining start and optional end date.
+ * @param {Object} ev - Event with date and optional end_date
+ * @returns {string}
+ */
 function _calFormatDateRange(ev) {
   const start = _calPrettyDate(ev.date);
   if (!ev.end_date || ev.end_date === ev.date) return start;
   return start + ' – ' + _calPrettyDate(ev.end_date);
 }
 
+/**
+ * Convert a YYYY-MM-DD string to a human-readable date like 'March 5, 2025'.
+ * @param {string} dateStr
+ * @returns {string}
+ */
 function _calPrettyDate(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
   return CAL_MONTH_NAMES[m - 1] + ' ' + d + ', ' + y;
 }
 
+/**
+ * Escape a string for safe insertion into HTML.
+ * @param {*} str
+ * @returns {string}
+ */
 function _calEscape(str) {
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -490,12 +576,22 @@ function _calEscape(str) {
 }
 
 // ── Modal helpers ──────────────────────────────────────────────────────────
+/**
+ * Show a modal overlay + modal panel (locks scroll).
+ * @param {string} overlayId - ID of the backdrop element
+ * @param {string} modalId   - ID of the modal panel element
+ */
 function _calShowModal(overlayId, modalId) {
   document.getElementById(overlayId).style.display = 'block';
   document.getElementById(modalId).style.display   = 'block';
   document.body.style.overflow = 'hidden';
 }
 
+/**
+ * Hide a modal overlay + modal panel (restores scroll).
+ * @param {string} overlayId - ID of the backdrop element
+ * @param {string} modalId   - ID of the modal panel element
+ */
 function _calHideModal(overlayId, modalId) {
   document.getElementById(overlayId).style.display = 'none';
   document.getElementById(modalId).style.display   = 'none';
@@ -503,6 +599,10 @@ function _calHideModal(overlayId, modalId) {
 }
 
 // ── Theme panel ────────────────────────────────────────────────────────────
+/**
+ * Toggle the theme selection panel open/closed.
+ * Fetches available templates when opening.
+ */
 async function calToggleThemePanel() {
   const panel   = document.getElementById('cal-theme-panel');
   const overlay = document.getElementById('cal-theme-overlay');
@@ -517,6 +617,10 @@ async function calToggleThemePanel() {
   }
 }
 
+/**
+ * Fetch theme template filenames and populate the theme <select>.
+ * Pre-selects the currently active theme.
+ */
 async function _calLoadThemes() {
   try {
     const res  = await apiFetch('calendar.php?action=get-calendar-templates');
@@ -530,6 +634,9 @@ async function _calLoadThemes() {
   } catch (_) {}
 }
 
+/**
+ * Persist the selected theme to the server and update the page <link>.
+ */
 async function calSaveTheme() {
   const theme = document.getElementById('cal-theme-select').value;
   try {

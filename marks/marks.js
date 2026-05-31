@@ -13,8 +13,12 @@
   let pqLeaves = [];
 
   // ── Toast ──────────────────────────────────────────────────────────────
-  let _pqToastTimer;
-  function pqToast(msg, type = 'success', ms = 3200) {
+  let _pqToastTimer;  /**
+   * Display a temporary toast notification.
+   * @param {string} msg  - Message text
+   * @param {string} [type='success'] - CSS modifier ('success' | 'error')
+   * @param {number} [ms=3200]  - Duration in ms before auto-dismiss
+   */  function pqToast(msg, type = 'success', ms = 3200) {
     const el = document.getElementById('pq-toast');
     el.textContent = msg;
     el.className = 'show ' + type;
@@ -34,11 +38,13 @@
   // ── Auth / routing ─────────────────────────────────────────────────────
   setOnUnauthorized(pqLogout);
 
+  /** Clear session storage and return to the hub login page. */
   function pqLogout() {
     sessionStorage.clear();
     window.location.href = '../index.php';
   }
 
+  /** Show the app header and main content area after successful auth. */
   function pqShowApp() {
     document.getElementById('pq-header').style.display = 'flex';
     document.getElementById('pq-screen').style.display = 'block';
@@ -87,6 +93,10 @@
   // ── STRUCTURE EDITOR ───────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
 
+  /**
+   * Fetch the qualification structure from the server and render the editor.
+   * Shows a loading spinner while the request is in flight and an error message on failure.
+   */
   async function pqLoadStructure() {
     pqSetStatus('structure-status', '', '');
     document.getElementById('structure-tree-wrap').innerHTML =
@@ -102,6 +112,10 @@
     }
   }
 
+  /**
+   * Re-render the entire structure editor from the current pqItems in-memory tree.
+   * Populates the root name input and rebuilds the nested <ul> tree UI.
+   */
   function pqRenderStructure() {
     if (!pqItems) return;
     document.getElementById('structure-root-name').value = pqItems.name || '';
@@ -278,6 +292,13 @@
 
   // ── Weight sum indicators ────────────────────────────────────────────────
 
+  /**
+   * Refresh the weight sum indicator for a single group.
+   * Sums the weights of all direct children of the node at parentPath and
+   * colours the indicator green (ok) when the total is within 0.01 of 100,
+   * red (bad) otherwise.
+   * @param {number[]} parentPath - Index path to the parent node (empty = root)
+   */
   function pqUpdateWeightSum(parentPath) {
     const parent = parentPath.length === 0 ? pqItems : pqGetNode(parentPath);
     const subs = parent.subitems || [];
@@ -290,6 +311,10 @@
     }
   }
 
+  /**
+   * Refresh weight sum indicators for every group in the entire tree.
+   * Walks all non-leaf nodes and calls pqUpdateWeightSum on each.
+   */
   function pqUpdateAllWeightSums() {
     pqWalkPaths(pqItems, [], path => pqUpdateWeightSum(path));
   }
@@ -303,6 +328,11 @@
 
   // ── Save structure ──────────────────────────────────────────────────────
 
+  /**
+   * Collect all current input values, sync them into pqItems, then POST the tree to the
+   * server.  Server-side weight validation (each sibling group must sum to 100) is enforced;
+   * validation errors are displayed inline without dismissing the editor.
+   */
   async function pqSaveStructure() {
     pqSyncRootName();
     // Sync all name inputs into pqItems (user may not have tabbed out)
@@ -350,6 +380,10 @@
   // ── MARKS EDITOR ───────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
 
+  /**
+   * Load users and marks in parallel, build the leaf path list, and render the marks grid.
+   * Attaches a live 'input' listener that recalculates subtotals on every mark change.
+   */
   async function pqLoadMarksTab() {
     pqSetStatus('marks-status', '', '');
     const wrap = document.getElementById('marks-table-wrap');
@@ -405,7 +439,11 @@
     return leaves;
   }
 
-  /** Recompute and display all subtotal cells in the marks table */
+  /**
+   * Recompute and update every subtotal cell in the marks table by walking the
+   * items tree and computing weighted averages from the current input values.
+   * Called after every mark input event.
+   */
   function pqUpdateSubtotals() {
     document.querySelectorAll('.marks-subtotal-cell').forEach(cell => {
       const path = JSON.parse(cell.dataset.subPath);
@@ -586,6 +624,10 @@
     }
   }
 
+  /**
+   * Collect all mark inputs from the DOM, rebuild a marks tree per student,
+   * and POST the whole array to save-all-marks in a single request.
+   */
   async function pqSaveAllMarks() {
     pqSetStatus('marks-status', '', '');
 
@@ -622,7 +664,12 @@
     }
   }
 
-  /** Build empty marks tree mirroring items tree */
+  /**
+   * Build an empty marks tree that mirrors the structure of an items tree.
+   * Non-leaf nodes get an empty subitems array; leaf nodes get mark = null.
+   * @param {Object} node - An items tree node
+   * @returns {Object} Empty marks tree node
+   */
   function pqBuildEmptyMarksTreeJS(node) {
     const result = { name: node.name };
     if (node.subitems && node.subitems.length > 0) {
@@ -633,7 +680,13 @@
     return result;
   }
 
-  /** Set a leaf mark value in a marks tree by path */
+  /**
+   * Set a numeric mark at a leaf node reached by the given path array.
+   * leafPath[0] is the root name (skipped), subsequent entries are child names.
+   * @param {Object}      marksNode - Root of a user's marks tree
+   * @param {string[]}    leafPath  - Path from root to the leaf
+   * @param {number|null} value     - Mark value (0–10) or null to clear
+   */
   function pqSetLeafMark(marksNode, leafPath, value) {
     // leafPath[0] = root name
     let node = marksNode;
@@ -651,6 +704,10 @@
   // ── STUDENT GRADE VIEW ─────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════
 
+  /**
+   * Fetch the current user's computed grade tree from the server and render
+   * the grade card view.  Shown only to guest users.
+   */
   async function pqLoadStudentView() {
     const view = document.getElementById('pq-grade-view');
     view.innerHTML = '<div class="pq-loading"><div class="pq-spinner"></div> Loading your grades…</div>';
@@ -699,7 +756,12 @@
     return frag;
   }
 
-  /** Render a section (depth 1 = h2 level) */
+  /**
+   * Render a top-level section card for a sub-item of the root.
+   * @param {Object} node  - Computed marks/averages tree node
+   * @param {number} depth - Nesting depth (1 = top section)
+   * @returns {HTMLElement}
+   */
   function pqRenderSection(node, depth) {
     const section = document.createElement('div');
     section.className = 'grade-section';
@@ -729,7 +791,14 @@
     return section;
   }
 
-  /** Render a subsection (depth > 1) */
+  /**
+   * Render a nested subsection or leaf row for the student grade card.
+   * Non-leaf nodes show a collapsible header with weighted average;
+   * leaf nodes delegate to pqLeafRow().
+   * @param {Object} node  - Computed marks tree node
+   * @param {number} depth - Nesting depth (2+)
+   * @returns {HTMLElement}
+   */
   function pqRenderSubsection(node, depth) {
     if (!node.subitems || node.subitems.length === 0) {
       // Pure leaf — render as a leaf row directly
@@ -770,7 +839,12 @@
     return wrap;
   }
 
-  /** Render a leaf row */
+  /**
+   * Render a single leaf mark row in the student grade card.
+   * @param {Object} node  - Leaf node with a mark value and weight
+   * @param {number} depth - Nesting depth (used for font size scaling)
+   * @returns {HTMLElement}
+   */
   function pqLeafRow(node, depth) {
     depth = depth || 2;
     const sz = pqDepthFontSize(depth);
@@ -790,8 +864,16 @@
   // ── Formatting helpers ──────────────────────────────────────────────────
 
   /**
-   * Continuous grade color: green (>=5, darker toward 10)
-   * or red (<5, darker toward 0). Returns CSS hsl string or null.
+   * Return the font size string for a given hierarchy depth.
+   * Smaller font sizes are used for deeper nesting levels.
+   * @param {number} depth - 1 = section, 2 = subsection, etc.
+   * @returns {string} CSS font-size value (e.g. '1.0rem')
+   */
+  /**
+   * Return the font size string for a given hierarchy depth.
+   * Smaller font sizes are used for deeper nesting levels.
+   * @param {number} depth - 1 = section, 2 = subsection, etc.
+   * @returns {string} CSS font-size value (e.g. '1.0rem')
    */
   function pqDepthFontSize(depth) {
     // Font size decreases with each hierarchy level
@@ -821,6 +903,12 @@
     return c ? ' style="color:' + c + ';font-weight:700"' : ' class="mark-none"';
   }
 
+  /**
+   * Return a simple CSS class name for colouring a mark badge.
+   * Used in the marks grid (not the student card).
+   * @param {number|null} val
+   * @returns {'mark-none'|'mark-red'|'mark-orange'|'mark-green'}
+   */
   function pqMarkClass(val) {
     if (val === null || val === undefined) return 'mark-none';
     if (val < 5)   return 'mark-red';
@@ -828,11 +916,21 @@
     return 'mark-green';
   }
 
+  /**
+   * Format a mark value as a 2-decimal-place string, or '–' if null.
+   * @param {number|null} val
+   * @returns {string}
+   */
   function pqFmtMark(val) {
     if (val === null || val === undefined) return '–';
     return parseFloat(val).toFixed(2);
   }
 
+  /**
+   * Escape a string for safe insertion into HTML.
+   * @param {*} str
+   * @returns {string}
+   */
   function pqEsc(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -842,6 +940,10 @@
   }
 
   // ── Theme panel ────────────────────────────────────────────────────────────────────
+  /**
+   * Toggle the theme selection panel open or closed.
+   * When opening, fetches the available CSS templates and pre-selects the active one.
+   */
   async function pqToggleThemePanel() {
     const panel   = document.getElementById('pq-theme-panel');
     const overlay = document.getElementById('pq-theme-overlay');
@@ -867,6 +969,9 @@
     overlay.classList.toggle('is-open');
   }
 
+  /**
+   * Persist the currently selected theme and reload the page to apply it.
+   */
   async function pqSaveTheme() {
     const theme = document.getElementById('pq-theme-select').value;
     try {

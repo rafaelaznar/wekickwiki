@@ -36,6 +36,7 @@ const PT_PRIORITY_LABELS = {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 setOnUnauthorized(ptLogout);
 
+/** Clear session storage and redirect to the hub login page. */
 function ptLogout() {
   sessionStorage.clear();
   window.location.href = '../index.php';
@@ -49,6 +50,11 @@ if (getToken()) {
   window.location.href = '../index.php';
 }
 
+/**
+ * Initialise the correct panel based on the logged-in user's role.
+ * Admin users see the full management panel with projects, tasks, board and burndown.
+ * Guest users see a filtered view showing only their own tasks and a read-only task list.
+ */
 function ptRoute() {
   const role = getRole();
   document.getElementById('pt-user-badge').textContent = getUser() + ' (' + role + ')';
@@ -65,6 +71,12 @@ function ptRoute() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Toast
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Show a temporary toast notification at the bottom of the screen.
+ * @param {string} msg  - Message to display
+ * @param {string} [type='success'] - CSS modifier class ('success' | 'error')
+ * @param {number} [ms=3200]  - Duration in milliseconds before auto-dismiss
+ */
 function ptToast(msg, type = 'success', ms = 3200) {
   const el = document.getElementById('pt-toast');
   el.textContent = msg;
@@ -76,8 +88,11 @@ function ptToast(msg, type = 'success', ms = 3200) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Tab navigation
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Switch the active admin tab and load the required data for it.
+ * @param {string} name - Tab key: 'projects' | 'tasks' | 'board' | 'burndown' | 'statuses' | 'settings'
+ */
 function ptShowTab(name) {
-  document.querySelectorAll('#admin-panel .pt-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
   document.querySelectorAll('#admin-panel .pt-tab-panel').forEach(p => {
@@ -89,6 +104,10 @@ function ptShowTab(name) {
   if (name === 'statuses')  ptLoadStatuses();
 }
 
+/**
+ * Switch the active user panel tab and render its content when needed.
+ * @param {string} name - Tab key: 'u-mytasks' | 'u-alltasks' | 'u-burndown'
+ */
 function ptShowUserTab(name) {
   document.querySelectorAll('#user-panel .pt-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.tab === name);
@@ -102,6 +121,12 @@ function ptShowUserTab(name) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Project selector
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Rebuild the project <select> dropdown with the given project list.
+ * Attempts to preserve the previously selected value if it still exists.
+ * Updates _ptCurrentProjId and shows/hides the project bar accordingly.
+ * @param {Array<{id:number,name:string}>} projects
+ */
 function ptPopulateProjectSelector(projects) {
   const sel = document.getElementById('pt-project-select');
   const cur = sel.value;
@@ -121,6 +146,12 @@ function ptPopulateProjectSelector(projects) {
   document.getElementById('pt-project-bar').style.display = projects.length ? '' : 'none';
 }
 
+/**
+ * Handle the project selector change event.
+ * Updates the current project state and loads the appropriate data for the
+ * current role.  Admin users get tasks, board and burndown; guest users get
+ * their assigned tasks and the full read-only task list.
+ */
 function ptOnProjectChange() {
   const sel = document.getElementById('pt-project-select');
   _ptCurrentProjId = sel.value ? parseInt(sel.value) : null;
@@ -146,6 +177,10 @@ function ptOnProjectChange() {
   }
 }
 
+/**
+ * Update the date range label shown below the project selector.
+ * Displays "start_date → end_date" for projects that have either date set.
+ */
 function ptUpdateProjectDates() {
   const el   = document.getElementById('pt-project-dates');
   const proj = _ptProjects.find(p => p.id === _ptCurrentProjId);
@@ -156,6 +191,13 @@ function ptUpdateProjectDates() {
   }
 }
 
+/**
+ * Set the innerHTML of a DOM element by ID.
+ * Used as a one-liner shorthand for replacing panel contents with loading
+ * spinners, empty-state messages, or rendered HTML.
+ * @param {string} id  - Element ID
+ * @param {string} html - HTML to inject
+ */
 function ptSetWrap(id, html) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = html;
@@ -164,6 +206,11 @@ function ptSetWrap(id, html) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: Load data
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Fetch all projects, users and statuses in parallel and populate the admin view.
+ * Renders the projects table and project selector.  Triggers an initial task load
+ * only if a project is already selected in the selector.
+ */
 async function ptLoadAdminData() {
   try {
     const [projRes, userRes, statusRes] = await Promise.all([
@@ -187,6 +234,12 @@ async function ptLoadAdminData() {
   }
 }
 
+/**
+ * Fetch all tasks for the given project and render the tasks table.
+ * Also refreshes the board and burndown tabs if one of them is currently active,
+ * so navigation between tabs stays in sync after editing tasks.
+ * @param {number} projectId
+ */
 async function ptLoadTasks(projectId) {
   ptSetWrap('tasks-table-wrap', '<div class="pt-loading"><div class="pt-spinner"></div> Loading…</div>');
   try {
@@ -209,6 +262,10 @@ async function ptLoadTasks(projectId) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: Projects CRUD
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Render the projects management table with edit and delete action buttons.
+ * Shows an empty-state message when no projects exist yet.
+ */
 function ptRenderProjectsTable() {
   const wrap = document.getElementById('projects-table-wrap');
   if (!_ptProjects.length) {
@@ -234,6 +291,10 @@ function ptRenderProjectsTable() {
   wrap.innerHTML = html;
 }
 
+/**
+ * Open the project create/edit modal and pre-fill fields from existing data.
+ * @param {number|null} id - Project ID to edit, or null/0 to create a new one
+ */
 function ptOpenProjectModal(id) {
   _ptEditingProjId = id || null;
   const modal = document.getElementById('pt-project-modal');
@@ -257,11 +318,17 @@ function ptOpenProjectModal(id) {
   document.getElementById('pm-name').focus();
 }
 
+/** Close the project modal overlay without saving. */
 function ptCloseProjectModal() {
   document.getElementById('pt-project-overlay').style.display = 'none';
   document.getElementById('pt-project-modal').style.display   = 'none';
 }
 
+/**
+ * Validate the project form and POST to save-project.
+ * Creates a new project when _ptEditingProjId is null, updates otherwise.
+ * Reloads admin data on success to refresh the project list and selector.
+ */
 async function ptSubmitProject() {
   const name  = document.getElementById('pm-name').value.trim();
   const start = document.getElementById('pm-start-date').value;
@@ -289,6 +356,10 @@ async function ptSubmitProject() {
   }
 }
 
+/**
+ * Show a confirmation dialog before permanently deleting a project and all its tasks.
+ * @param {number} id - Project ID to delete
+ */
 function ptConfirmDeleteProject(id) {
   const p = _ptProjects.find(x => x.id === id);
   ptShowConfirm(
@@ -308,6 +379,12 @@ function ptConfirmDeleteProject(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // ADMIN: Tasks CRUD
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Render the tasks table for the given task list.
+ * Tasks are displayed in depth-first tree order (parents before children).
+ * Each row's indentation and subtask arrows reflect its nesting depth.
+ * @param {Array} tasks - Subset of _ptTasks to display (filtered or full)
+ */
 function ptRenderTasksTable(tasks) {
   const wrap = document.getElementById('tasks-table-wrap');
   if (!_ptCurrentProjId) {
@@ -372,7 +449,14 @@ function ptRenderTasksTable(tasks) {
   wrap.innerHTML = html;
 }
 
-// Return tasks sorted depth-first (parents before children, preserving creation order)
+/**
+ * Sort a flat task array into depth-first tree order.
+ * Parents appear before their children; siblings are ordered by ascending id.
+ * Recurses to handle unlimited nesting depth.
+ * @param {Array}      tasks    - Flat array of all tasks
+ * @param {number|null} parentId - Parent ID to collect children for (null = root)
+ * @returns {Array} Ordered flat array in tree traversal order
+ */
 function ptSortTasksTree(tasks, parentId) {
   const children = tasks
     .filter(t => (t.parent_id === parentId) || (parentId === null && (t.parent_id === null || t.parent_id === undefined)))
@@ -385,6 +469,10 @@ function ptSortTasksTree(tasks, parentId) {
   return result;
 }
 
+/**
+ * Read the task filter controls and re-render the tasks table with matching tasks.
+ * Filters are AND-combined: status, priority, and free-text search across name and description.
+ */
 function ptApplyTaskFilters() {
   const statusF   = document.getElementById('tf-status').value;
   const priorityF = document.getElementById('tf-priority').value;
@@ -400,6 +488,7 @@ function ptApplyTaskFilters() {
   ptRenderTasksTable(_ptFilteredTasks);
 }
 
+/** Clear all task filter controls and restore the full task list. */
 function ptResetTaskFilters() {
   document.getElementById('tf-status').value   = '';
   document.getElementById('tf-priority').value = '';
@@ -408,6 +497,14 @@ function ptResetTaskFilters() {
   ptRenderTasksTable(_ptFilteredTasks);
 }
 
+/**
+ * Open the task create/edit modal.
+ * When taskId is provided, pre-fills all fields from the existing task.
+ * When parentId is provided (subtask creation), the parent relationship is set
+ * automatically and the title changes to 'New Subtask'.
+ * @param {number|null} taskId   - Task to edit, or null to create
+ * @param {number|null} parentId - Parent task for a new subtask
+ */
 function ptOpenTaskModal(taskId, parentId) {
   _ptEditingTaskId = taskId || null;
   _ptTaskParentId  = parentId || null;
@@ -463,11 +560,17 @@ function ptOpenTaskModal(taskId, parentId) {
   document.getElementById('tm-name').focus();
 }
 
+/** Close the task modal overlay without saving. */
 function ptCloseTaskModal() {
   document.getElementById('pt-task-overlay').style.display = 'none';
   document.getElementById('pt-task-modal').style.display   = 'none';
 }
 
+/**
+ * Switch between 'edit' and 'preview' modes for the task specification textarea.
+ * Preview renders the Markdown content using the global `marked` library.
+ * @param {string} tab - 'edit' | 'preview'
+ */
 function ptSpecTab(tab) {
   const editEl    = document.getElementById('tm-specification');
   const previewEl = document.getElementById('tm-spec-preview');
@@ -486,6 +589,11 @@ function ptSpecTab(tab) {
   }
 }
 
+/**
+ * Validate the task form and POST to save-task.
+ * Collects assignees from checked checkboxes and all other field values.
+ * Calls ptLoadTasks() on success to refresh the tasks table.
+ */
 async function ptSubmitTask() {
   const name  = document.getElementById('tm-name').value.trim();
   const errEl = document.getElementById('tm-error');
@@ -526,6 +634,11 @@ async function ptSubmitTask() {
   }
 }
 
+/**
+ * Show a confirmation dialog before deleting a task.
+ * Warns the user if the task has subtasks that will also be deleted (cascade).
+ * @param {number} id - Task ID to delete
+ */
 function ptConfirmDeleteTask(id) {
   const t = _ptTasks.find(x => x.id === id);
   const childCount = _ptTasks.filter(x => x.parent_id === id).length;
@@ -546,6 +659,12 @@ function ptConfirmDeleteTask(id) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Task detail (read-only view for both admin and users)
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Open the read-only task detail modal for any user (admin or guest).
+ * Renders metadata, description, and specification (Markdown-rendered).
+ * Admin users get an 'Edit' button in the footer; guests see nothing there.
+ * @param {number} taskId
+ */
 function ptShowTaskDetail(taskId) {
   const t = _ptTasks.find(x => x.id === taskId);
   if (!t) return;
@@ -591,6 +710,7 @@ function ptShowTaskDetail(taskId) {
   document.getElementById('pt-detail-modal').style.display   = '';
 }
 
+/** Close the task detail modal. */
 function ptCloseDetail() {
   document.getElementById('pt-detail-overlay').style.display = 'none';
   document.getElementById('pt-detail-modal').style.display   = 'none';
@@ -599,6 +719,12 @@ function ptCloseDetail() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Status Board
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Render the kanban status board.
+ * Each configured status gets its own column showing undone tasks sorted by
+ * descending priority.  A separate 'Done' column on the far right collects all
+ * tasks whose `done` flag is true, sorted by completion date (newest first).
+ */
 function ptRenderBoard() {
   const wrap = document.getElementById('board-wrap');
   if (!_ptCurrentProjId) {
@@ -679,6 +805,17 @@ function ptRenderBoard() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Burndown chart (SVG)
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Render a burndown chart as an inline SVG.
+ * The chart plots story-point remaining over time against the ideal (linear)
+ * burndown line computed from the project's start/end dates and total points.
+ *
+ * Actual remaining points are computed day by day from each task's completed_at
+ * timestamp.  Tasks marked done but without a timestamp are treated as completed
+ * today, making historical lines accurate as data accumulates.
+ *
+ * @param {string} wrapId - ID of the container element to render the SVG into
+ */
 function ptRenderBurndown(wrapId) {
   const wrap = document.getElementById(wrapId);
   const proj = _ptProjects.find(p => p.id === _ptCurrentProjId);
@@ -807,7 +944,11 @@ function ptRenderBurndown(wrapId) {
 // Statuses CRUD (admin)
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Populate the status <select> elements from _ptStatuses
+/**
+ * Rebuild all status <select> elements from the current _ptStatuses array.
+ * Called whenever statuses are loaded or changed so the task modal and
+ * filter bar always reflect the up-to-date status list.
+ */
 function ptPopulateStatusSelects() {
   const sorted = [..._ptStatuses].sort((a, b) => a.order - b.order);
 
@@ -832,6 +973,10 @@ function ptPopulateStatusSelects() {
   }
 }
 
+/**
+ * Fetch the current status list from the server and re-render the
+ * statuses management tab and all status selects.
+ */
 async function ptLoadStatuses() {
   try {
     const res = await apiFetch('projects.php?action=get-statuses');
@@ -844,6 +989,10 @@ async function ptLoadStatuses() {
   }
 }
 
+/**
+ * Render the statuses management table with rename and (conditional) delete buttons.
+ * Delete is disabled for statuses that have tasks assigned (shown as 'In use').
+ */
 function ptRenderStatusesTab() {
   const wrap = document.getElementById('statuses-table-wrap');
   if (!wrap) return;
@@ -874,6 +1023,10 @@ function ptRenderStatusesTab() {
   wrap.innerHTML = html;
 }
 
+/**
+ * Open the status create/rename modal.
+ * @param {string|null} key - Status key to rename, or null to create a new status
+ */
 function ptOpenStatusModal(key) {
   _ptEditingStatusKey = key || null;
   document.getElementById('status-modal-title').textContent = key ? 'Rename Status' : 'New Status';
@@ -889,11 +1042,15 @@ function ptOpenStatusModal(key) {
   document.getElementById('sm-name').focus();
 }
 
+/** Close the status modal overlay without saving. */
 function ptCloseStatusModal() {
   document.getElementById('pt-status-overlay').style.display = 'none';
   document.getElementById('pt-status-modal').style.display   = 'none';
 }
 
+/**
+ * Save the status name.  Sends an empty key to create, an existing key to rename.
+ */
 async function ptSubmitStatus() {
   const name  = document.getElementById('sm-name').value.trim();
   const errEl = document.getElementById('sm-error');
@@ -912,6 +1069,11 @@ async function ptSubmitStatus() {
   }
 }
 
+/**
+ * Show a confirmation dialog before permanently deleting a status.
+ * Only callable on statuses with no tasks assigned (enforced by the server too).
+ * @param {string} key - Status key to delete
+ */
 function ptConfirmDeleteStatus(key) {
   const s = _ptStatuses.find(x => x.key === key);
   ptShowConfirm(
@@ -930,6 +1092,10 @@ function ptConfirmDeleteStatus(key) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Settings: theme
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Fetch the list of available CSS theme files for the Projects module
+ * and render the theme picker buttons in the settings tab.
+ */
 async function ptLoadTemplates() {
   try {
     const res  = await apiFetch('projects.php?action=get-projects-templates');
@@ -943,6 +1109,11 @@ async function ptLoadTemplates() {
   } catch (e) { /* silent */ }
 }
 
+/**
+ * Apply a selected CSS theme live (without page reload) and persist the choice.
+ * Updates the <link> href and marks the chosen button as active.
+ * @param {string} theme - CSS filename (e.g. 'impact.css')
+ */
 async function ptApplyTheme(theme) {
   document.getElementById('pt-theme-link').href = 'templates-projects/' + encodeURIComponent(theme);
   document.querySelectorAll('.pt-theme-option').forEach(b => {
@@ -955,6 +1126,7 @@ async function ptApplyTheme(theme) {
   } catch (e) { ptToast(e.message, 'error'); }
 }
 
+/** Navigate to the settings tab (which contains the theme picker). */
 function ptToggleThemePanel() {
   ptShowTab('settings');
 }
@@ -962,6 +1134,10 @@ function ptToggleThemePanel() {
 // ═══════════════════════════════════════════════════════════════════════════
 // USER: Load data
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Fetch projects and statuses in parallel for the guest user view.
+ * Guest users see the same project selector but a read-only task view.
+ */
 async function ptLoadUserData() {
   try {
     const [projRes, statusRes] = await Promise.all([
@@ -978,6 +1154,11 @@ async function ptLoadUserData() {
   }
 }
 
+/**
+ * Load both the user's own tasks and all project tasks in parallel.
+ * After loading, renders both panels and refreshes the burndown tab if active.
+ * @param {number} projectId
+ */
 async function ptLoadUserTasks(projectId) {
   ptSetWrap('u-mytasks-wrap', '<div class="pt-loading"><div class="pt-spinner"></div> Loading…</div>');
   ptSetWrap('u-alltasks-wrap', '<div class="pt-loading"><div class="pt-spinner"></div> Loading…</div>');
@@ -1001,10 +1182,19 @@ async function ptLoadUserTasks(projectId) {
   }
 }
 
+/**
+ * No-op stub kept for call-site compatibility.
+ * All tasks are already fetched by ptLoadUserTasks() in the same request batch.
+ * @param {number} projectId - Unused
+ */
 async function ptLoadAllTasksUser(projectId) {
   // Already loaded by ptLoadUserTasks — no-op here
 }
 
+/**
+ * Render the guest's personal task list, grouped by status in configured order.
+ * @param {Array} tasks - Tasks assigned to the current user
+ */
 function ptRenderUserMyTasks(tasks) {
   const wrap = document.getElementById('u-mytasks-wrap');
   if (!tasks.length) {
@@ -1025,6 +1215,11 @@ function ptRenderUserMyTasks(tasks) {
   wrap.innerHTML = html;
 }
 
+/**
+ * Render the full project task list in tree order for the guest 'All Tasks' tab.
+ * Tasks are indented according to their depth in the parent-child hierarchy.
+ * @param {Array} tasks - All tasks in the project
+ */
 function ptRenderUserAllTasks(tasks) {
   const wrap = document.getElementById('u-alltasks-wrap');
   if (!tasks.length) {
@@ -1058,6 +1253,12 @@ function ptRenderUserAllTasks(tasks) {
   wrap.innerHTML = html;
 }
 
+/**
+ * Return the HTML for a single task card in the guest 'My Tasks' tab.
+ * Clicking the card opens the read-only task detail modal.
+ * @param {Object} t - Task object
+ * @returns {string} HTML string
+ */
 function ptUserTaskCard(t) {
   return `<div class="pt-user-task-card" onclick="ptShowTaskDetail(${t.id})">
     <div class="pt-user-task-card-title">${esc(t.name)}</div>
@@ -1073,6 +1274,13 @@ function ptUserTaskCard(t) {
 // ═══════════════════════════════════════════════════════════════════════════
 // Confirm dialog
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Show the global confirmation dialog with a custom message and callback.
+ * The callback is stored in _ptConfirmFn and executed only when the user
+ * clicks the confirm button (via ptDoConfirm).
+ * @param {string}   msg - Confirmation message to display
+ * @param {Function} fn  - Async function to call on confirmation
+ */
 function ptShowConfirm(msg, fn) {
   _ptConfirmFn = fn;
   document.getElementById('pt-confirm-msg').textContent = msg;
@@ -1080,25 +1288,38 @@ function ptShowConfirm(msg, fn) {
   document.getElementById('pt-confirm-dialog').style.display  = '';
 }
 
+/** Dismiss the confirm dialog and discard the pending callback. */
 function ptCancelConfirm() {
   _ptConfirmFn = null;
   document.getElementById('pt-confirm-overlay').style.display = 'none';
   document.getElementById('pt-confirm-dialog').style.display  = 'none';
 }
 
+/** Execute the pending confirm callback and close the dialog. */
 function ptDoConfirm() {
+  const fn = _ptConfirmFn;
   ptCancelConfirm();
-  if (typeof _ptConfirmFn === 'function') _ptConfirmFn();
+  if (typeof fn === 'function') fn();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Badge helpers
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Return a status badge <span> with a CSS class derived from the status key.
+ * @param {string} status - Status key (e.g. 'todo', 'in_progress')
+ * @returns {string} HTML string
+ */
 function ptStatusBadge(status) {
   const label = ptStatusLabels()[status] || status;
   return `<span class="pt-badge pt-status-${esc(status)}">${esc(label)}</span>`;
 }
 
+/**
+ * Return a priority badge <span> with a CSS class derived from the priority value.
+ * @param {string} priority - Priority key: 'low' | 'medium' | 'high' | 'critical'
+ * @returns {string} HTML string
+ */
 function ptPriorityBadge(priority) {
   const label = PT_PRIORITY_LABELS[priority] || priority;
   return `<span class="pt-badge pt-priority-${priority}">${label}</span>`;

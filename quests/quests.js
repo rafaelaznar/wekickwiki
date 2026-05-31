@@ -12,6 +12,12 @@
 
   // ── Toast ──────────────────────────────────────────────────────────────────
   let _qsToastTimer;
+  /**
+   * Show a temporary toast notification.
+   * @param {string} msg  - Message to display
+   * @param {string} [type='success'] - CSS modifier ('success' | 'error')
+   * @param {number} [ms=3200]  - Duration before auto-dismiss
+   */
   function qsToast(msg, type = 'success', ms = 3200) {
     const el = document.getElementById('qs-toast');
     el.textContent = msg;
@@ -20,6 +26,12 @@
     _qsToastTimer = setTimeout(() => el.classList.remove('show'), ms);
   }
 
+  /**
+   * Set or clear an inline status element.
+   * @param {string} id   - Element ID
+   * @param {string} msg  - Message text (empty to hide)
+   * @param {string} type - CSS class suffix ('ok' | 'err' | 'info' | 'success')
+   */
   function qsSetStatus(id, msg, type) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -31,17 +43,23 @@
   // ── Auth & routing ─────────────────────────────────────────────────────────
   setOnUnauthorized(qsLogout);
 
+  /** Clear session storage and redirect to the hub. */
   function qsLogout() {
     sessionStorage.clear();
     window.location.href = '../index.php';
   }
 
+  /** Show the app chrome (header, screen) after successful auth. */
   function qsShowApp() {
     document.getElementById('qs-header').style.display = 'flex';
     document.getElementById('qs-screen').style.display = 'block';
     document.getElementById('qs-user-badge').textContent = getUser() + ' (' + getRole() + ')';
   }
 
+  /**
+   * Dispatch the user to either the admin panel (Questions/Quests/Results tabs)
+   * or the guest panel (quest list + wizard) based on their role.
+   */
   function qsRoute() {
     const role    = getRole();
     const themeBtn = document.getElementById('qs-theme-btn');
@@ -63,8 +81,11 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — Tab switching ───────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Switch the active admin tab and trigger data loading for it.
+   * @param {string} name - 'questions' | 'quests' | 'results'
+   */
   function qsShowTab(name) {
-    document.querySelectorAll('.qs-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.tab === name);
     });
     document.querySelectorAll('.qs-tab-panel').forEach(p => p.classList.remove('active'));
@@ -76,16 +97,32 @@
   }
 
   // ── Score color helper ─────────────────────────────────────────────────────
+  /**
+   * Return a CSS class for colouring a score value.
+   * @param {number|null} v - Score (0–10)
+   * @returns {'score-high'|'score-mid'|'score-low'|''}
+   */
   function scoreClass(v) {
     if (v === null || v === undefined) return '';
     if (v >= 5) return 'score-high';
     if (v >= 3) return 'score-mid';
     return 'score-low';
   }
+  /**
+   * Format a score as a 2-decimal string, or '—' if null.
+   * @param {number|null} v
+   * @returns {string}
+   */
   function fmtScore(v) {
     if (v === null || v === undefined) return '—';
     return parseFloat(v).toFixed(2);
   }
+  /**
+   * Format an ISO timestamp string into a readable local date/time.
+   * Falls back to the raw string if Date parsing fails.
+   * @param {string|null} d - ISO timestamp
+   * @returns {string}
+   */
   function fmtDate(d) {
     if (!d) return '—';
     try { return new Date(d).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}); }
@@ -95,6 +132,9 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — QUESTIONS tab ───────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Fetch all questions from the server, populate the label datalist, and apply filters.
+   */
   async function qsLoadQueries() {
     const wrap = document.getElementById('queries-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
@@ -116,6 +156,10 @@
     }
   }
 
+  /**
+   * Filter the cached questions array using the current search/type/label inputs
+   * and re-render the table.
+   */
   function qsApplyQueryFilters() {
     const search = (document.getElementById('qf-search')?.value ?? '').toLowerCase().trim();
     const type   =  document.getElementById('qf-type')?.value  ?? '';
@@ -137,8 +181,8 @@
     qsRenderQueriesTable(filtered);
   }
 
+  /** Reset all question filter controls and re-render the full table. */
   function qsResetQueryFilters() {
-    const search = document.getElementById('qf-search');
     const type = document.getElementById('qf-type');
     const label = document.getElementById('qf-label');
     if (search) search.value = '';
@@ -147,6 +191,7 @@
     qsApplyQueryFilters();
   }
 
+  /** Programmatically click the hidden file input to open the Moodle XML picker. */
   function qsPickMoodleXmlFile() {
     const input = document.getElementById('qm-xml-file');
     if (!input) return;
@@ -154,6 +199,11 @@
     input.click();
   }
 
+  /**
+   * Read the selected Moodle XML file and upload it to the server for import.
+   * Reports counts of imported and skipped questions via toast.
+   * @param {HTMLInputElement} input - The file input element
+   */
   async function qsHandleMoodleXmlFile(input) {
     const file = input?.files?.[0];
     if (!file) return;
@@ -189,6 +239,11 @@
     }
   }
 
+  /**
+   * Render the questions table with hit% and frequency% statistics badges.
+   * Shows empty-state messages when the full cache or filtered set is empty.
+   * @param {Array} queries - Filtered question objects to render
+   */
   function qsRenderQueriesTable(queries) {
     const wrap = document.getElementById('queries-table-wrap');
     wrap.innerHTML = '';
@@ -241,6 +296,10 @@
   // ── Query modal ────────────────────────────────────────────────────────────
   let _allQueriesCache = [];
 
+  /**
+   * Open the add/edit question modal, pre-filling fields from queryData.
+   * @param {Object|null} queryData - Existing question to edit, or null to create
+   */
   function qsOpenQueryModal(queryData = null) {
     _editingQueryId = queryData ? queryData.id : null;
     document.getElementById('query-modal-title').textContent = queryData ? 'Edit question' : 'Add question';
@@ -251,10 +310,15 @@
     document.getElementById('query-modal-overlay').classList.add('open');
   }
 
+  /** Close the question creation/edit modal. */
   function qsCloseQueryModal() {
     document.getElementById('query-modal-overlay').classList.remove('open');
   }
 
+  /**
+   * Fetch the latest question data for the given ID and open the edit modal.
+   * @param {number} id - Question ID to edit
+   */
   async function qsEditQuery(id) {
     // Reload fresh data
     const res = await apiFetch('quests.php?action=get-queries');
@@ -265,6 +329,11 @@
     qsOpenQueryModal(q);
   }
 
+  /**
+   * Render type-specific form fields inside the question modal.
+   * Branches on the current <select> value: multiple_choice, binary, gap_filling, matching.
+   * @param {Object|null} data - Existing question data for pre-fill, or null
+   */
   function qsRenderQueryTypeFields(data = null) {
     const type   = document.getElementById('qm-type').value;
     const wrap   = document.getElementById('qm-type-fields');
@@ -319,6 +388,7 @@
     }
   }
 
+  /** Append a new blank option row to the multiple-choice options list. */
   function qsAddMcOption() {
     const list = document.getElementById('mc-options-list');
     const idx  = list.querySelectorAll('li').length;
@@ -329,6 +399,10 @@
     list.appendChild(li);
   }
 
+  /**
+   * Remove an option row from the multiple-choice list and re-index radio values.
+   * @param {HTMLButtonElement} btn - The remove button clicked
+   */
   function qsRemoveMcOption(btn) {
     const li   = btn.closest('li');
     const list = li.closest('ul');
@@ -340,6 +414,7 @@
     });
   }
 
+  /** Append a new blank accepted-answer row to the gap-filling list. */
   function qsAddGfOption() {
     const list = document.getElementById('gf-options-list');
     const li   = document.createElement('li');
@@ -348,6 +423,7 @@
     list.appendChild(li);
   }
 
+  /** Append a new blank key→value pair row to the matching pairs list. */
   function qsAddMtPair() {
     const list = document.getElementById('mt-pairs-list');
     const li   = document.createElement('li');
@@ -358,6 +434,10 @@
     list.appendChild(li);
   }
 
+  /**
+   * Validate and POST the current question modal form as a create or update request.
+   * Collects type-specific answer data before sending.
+   */
   async function qsSaveQuery() {
     const type   = document.getElementById('qm-type').value;
     const query  = document.getElementById('qm-query').value.trim();
@@ -400,6 +480,10 @@
     }
   }
 
+  /**
+   * Set up the generic confirm-delete modal and hook it to the delete-query endpoint.
+   * @param {number} id - Question ID to delete
+   */
   function qsConfirmDeleteQuery(id) {
     _deleteCallback = async () => {
       const res  = await apiFetch('quests.php?action=delete-query', {
@@ -421,11 +505,21 @@
   // ═══════════════════════════════════════════════════════════════════════════
   let _questsAllItems = [];
 
+  /**
+   * Return the abbreviated month name for a 1-based month number.
+   * @param {number} monthNum - Month (1–12)
+   * @returns {string}
+   */
   function qsMonthName(monthNum) {
     const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return names[monthNum - 1] || String(monthNum);
   }
 
+  /**
+   * Populate the month/year filter <select> elements from the full quests list,
+   * preserving the currently selected values where possible.
+   * @param {Array} items - All quest objects
+   */
   function qsPopulateQuestFilters(items) {
     const monthSel = document.getElementById('qsf-month');
     const yearSel  = document.getElementById('qsf-year');
@@ -457,6 +551,11 @@
     yearSel.value  = years.includes(keepYear) ? keepYear : '';
   }
 
+  /**
+   * Render the quests admin table for the given (filtered) quests.
+   * Edit/Delete buttons are hidden for quests that already have attempts.
+   * @param {Array} quests - Quest objects to render
+   */
   function qsRenderQuestsAdminTable(quests) {
     const wrap = document.getElementById('quests-admin-table-wrap');
     if (!wrap) return;
@@ -502,6 +601,10 @@
     wrap.appendChild(table);
   }
 
+  /**
+   * Filter the cached quests list using the current status/attempts/score/date controls
+   * and re-render. Shows count and grouped results.
+   */
   function qsApplyQuestFilters() {
     const status = document.getElementById('qsf-status')?.value ?? '';
     const attemptsFilter = document.getElementById('qsf-attempts')?.value ?? '';
@@ -535,8 +638,8 @@
     qsRenderQuestsAdminTable(filtered);
   }
 
+  /** Reset all quest filter controls and re-render the full list. */
   function qsResetQuestFilters() {
-    const status = document.getElementById('qsf-status');
     const attempts = document.getElementById('qsf-attempts');
     const avgscore = document.getElementById('qsf-avgscore');
     const month = document.getElementById('qsf-month');
@@ -549,6 +652,9 @@
     qsApplyQuestFilters();
   }
 
+  /**
+   * Fetch all quests with attempt counts from the server, populate filters, and render.
+   */
   async function qsLoadQuestsAdmin() {
     const wrap = document.getElementById('quests-admin-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
@@ -567,6 +673,11 @@
   }
 
   // ── Quest modal ────────────────────────────────────────────────────────────
+  /**
+   * Open the add/edit quest modal, pre-filling all fields from questData.
+   * Renders label groups and the allowed-users field.
+   * @param {Object|null} questData - Existing quest to edit, or null to create
+   */
   async function qsOpenQuestModal(questData = null) {
     _editingQuestId = questData ? questData.id : null;
     document.getElementById('quest-modal-title').textContent  = questData ? 'Edit quest' : 'Add quest';
@@ -588,10 +699,15 @@
     document.getElementById('quest-modal-overlay').classList.add('open');
   }
 
+  /** Close the quest creation/edit modal. */
   function qsCloseQuestModal() {
     document.getElementById('quest-modal-overlay').classList.remove('open');
   }
 
+  /**
+   * Fetch fresh quest data for the given ID and open the edit modal.
+   * @param {number} id - Quest ID
+   */
   async function qsEditQuest(id) {
     const res = await apiFetch('quests.php?action=get-quests-admin');
     if (!res.ok) { qsToast('Failed to load quest', 'error'); return; }
@@ -601,6 +717,10 @@
     qsOpenQuestModal(q);
   }
 
+  /**
+   * Append a new label-group row to the quest modal label groups container.
+   * @param {Object|null} data - Existing group data to pre-fill ({labels, queries}), or null
+   */
   function qsAddLabelGroup(data = null) {
     const wrap = document.getElementById('qst-label-groups');
     const div  = document.createElement('div');
@@ -615,6 +735,10 @@
     wrap.appendChild(div);
   }
 
+  /**
+   * Validate and POST the quest form as a create or update request.
+   * Collects label groups and the allowed-users configuration.
+   */
   async function qsSaveQuest() {
     const name     = document.getElementById('qst-name').value.trim();
     const date     = document.getElementById('qst-date').value;
@@ -658,6 +782,10 @@
     }
   }
 
+  /**
+   * Open the confirm-delete modal targeting the delete-quest endpoint.
+   * @param {number} id - Quest ID
+   */
   function qsConfirmDeleteQuest(id) {
     _deleteCallback = async () => {
       const res  = await apiFetch('quests.php?action=delete-quest', {
@@ -674,6 +802,10 @@
     document.getElementById('delete-modal-overlay').classList.add('open');
   }
 
+  /**
+   * Open the confirm-delete modal targeting the delete-attempt endpoint.
+   * @param {number} id - Attempt ID
+   */
   function qsConfirmDeleteAttempt(id) {
     _deleteCallback = async () => {
       const res  = await apiFetch('quests.php?action=delete-attempt', {
@@ -690,6 +822,11 @@
     document.getElementById('delete-modal-overlay').classList.add('open');
   }
 
+  /**
+   * Load an attempt for admin review and switch to the review step-through UI.
+   * Replaces the back-button target with the Results tab.
+   * @param {number} attemptId
+   */
   async function qsAdminReviewAttempt(attemptId) {
     const res  = await apiFetch(`quests.php?action=review-attempt&id=${attemptId}`);
     const data = await res.json().catch(() => ({}));
@@ -712,8 +849,17 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── ADMIN — Allowed users helpers ───────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Cached enabled guest users for the allowed-users checkboxes.
+   * Lazy-loaded by qsGetQuestUsers().
+   */
   let _questUsersCache = null;
 
+  /**
+   * Return the list of eligible guest users for quest access control.
+   * Results are cached in _questUsersCache after the first request.
+   * @returns {Promise<Array>}
+   */
   async function qsGetQuestUsers() {
     if (_questUsersCache) return _questUsersCache;
     const res = await apiFetch('quests.php?action=get-quest-users');
@@ -755,6 +901,10 @@
     wrap.innerHTML = html;
   }
 
+  /**
+   * Show or hide the specific-users checkbox list based on the selected radio.
+   * @param {string} prefix - 'qst' or 'acc'
+   */
   function qsToggleAllowedUsers(prefix) {
     const mode = document.querySelector(`input[name="${prefix}-allowed-mode"]:checked`)?.value;
     const usersDiv = document.getElementById(prefix + '-allowed-users');
@@ -764,6 +914,11 @@
   // ── Access modal (for managing allowed on quests with attempts) ─────────────
   let _accessModalQuestId = null;
 
+  /**
+   * Open the access modal for a quest that already has attempts (edit/delete disabled).
+   * @param {number}   id             - Quest ID
+   * @param {string[]} currentAllowed - Current allowed value (['all'] or username list)
+   */
   async function qsOpenAccessModal(id, currentAllowed) {
     _accessModalQuestId = id;
     document.getElementById('access-modal-title').textContent = 'Manage access — quest #' + id;
@@ -773,11 +928,15 @@
     await qsRenderAllowedField('acc', currentAllowed);
   }
 
+  /** Close the quest access modal and reset the stored quest ID. */
   function qsCloseAccessModal() {
     document.getElementById('access-modal-overlay').classList.remove('open');
     _accessModalQuestId = null;
   }
 
+  /**
+   * Persist the allowed-users selection from the access modal to the server.
+   */
   async function qsSaveAccess() {
     const mode = document.querySelector('input[name="acc-allowed-mode"]:checked')?.value;
     let allowed;
@@ -810,6 +969,11 @@
   // ═══════════════════════════════════════════════════════════════════════════
   let _resultsAllItems = [];
 
+  /**
+   * Populate the results filter <select> elements from all attempt data,
+   * preserving current selections.
+   * @param {Array} items - All attempt objects
+   */
   function qsPopulateResultsFilters(items) {
     const questSel = document.getElementById('rf-quest');
     const userSel  = document.getElementById('rf-user');
@@ -853,6 +1017,10 @@
     yearSel.value  = years.includes(keepYear) ? keepYear : '';
   }
 
+  /**
+   * Filter and render the results table, grouping rows by quest and displaying
+   * aggregate average score in the counter.
+   */
   function qsApplyResultsFilters() {
     const wrap = document.getElementById('results-table-wrap');
     const countEl = document.getElementById('rf-count');
@@ -931,8 +1099,8 @@
     }
   }
 
+  /** Reset all results filter controls and re-render. */
   function qsResetResultsFilters() {
-    const quest = document.getElementById('rf-quest');
     const user = document.getElementById('rf-user');
     const month = document.getElementById('rf-month');
     const year = document.getElementById('rf-year');
@@ -945,6 +1113,9 @@
     qsApplyResultsFilters();
   }
 
+  /**
+   * Fetch all attempt records from the server, populate filters, and render grouped.
+   */
   async function qsLoadResults() {
     const wrap = document.getElementById('results-table-wrap');
     wrap.innerHTML = '<div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>';
@@ -966,6 +1137,7 @@
   }
 
   // ── Delete modal helpers ───────────────────────────────────────────────────
+  /** Close the confirm-delete modal. */
   function qsCloseDeleteModal() {
     document.getElementById('delete-modal-overlay').classList.remove('open');
   }
@@ -976,6 +1148,10 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── USER — Home (quest list + my attempts) ──────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Load the user home view: open quests grid and past attempts list in parallel.
+   * Only quests the current user is allowed to take are shown.
+   */
   async function qsLoadUserHome() {
     qsUserShowView('quest-list');
     // Open quests
@@ -1043,6 +1219,10 @@
     }
   }
 
+  /**
+   * Switch between the four user-facing sub-views.
+   * @param {'quest-list'|'wizard'|'review'|'result'} view
+   */
   function qsUserShowView(view) {
     document.getElementById('user-quest-list').style.display = view === 'quest-list' ? '' : 'none';
     document.getElementById('user-wizard').style.display     = view === 'wizard'     ? '' : 'none';
@@ -1053,6 +1233,11 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── USER — Wizard ──────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Start a quest wizard: POST to start-quest, store server-returned data
+   * (attempt_id, questions, penalty) and render the first step.
+   * @param {number} questId
+   */
   async function qsStartQuest(questId) {
     const res  = await apiFetch('quests.php?action=start-quest', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({quest_id: questId})
@@ -1068,6 +1253,10 @@
     qsRenderWizardStep();
   }
 
+  /**
+   * Re-render the current wizard question and navigation controls.
+   * Restores any previously saved answer for the question via qsRenderAnswerArea().
+   */
   function qsRenderWizardStep() {
     const wrap     = document.getElementById('user-wizard');
     const questions = _wizardData.questions;
@@ -1104,6 +1293,14 @@
     qsRenderAnswerArea(q, _wizardAnswers[q.id] ?? null, false);
   }
 
+  /**
+   * Render the answer input area for a single question.
+   * Handles all four question types: multiple_choice, binary, gap_filling, matching.
+   * When readonly=true, disables inputs (used in review mode).
+   * @param {Object}       q          - Question object from the server
+   * @param {*}            savedAnswer - Previously chosen answer (or null)
+   * @param {boolean}      readonly   - True for review, false for active quiz
+   */
   function qsRenderAnswerArea(q, savedAnswer, readonly) {
     const wrap = document.getElementById('wizard-answer-area');
     if (!wrap) return;
@@ -1192,14 +1389,17 @@
     }
   }
 
+  /** Move back one question step without clearing the saved answer. */
   function qsWizardPrev() {
     if (_wizardStep > 0) { _wizardStep--; qsRenderWizardStep(); }
   }
 
+  /** Move forward one question step without clearing the saved answer. */
   function qsWizardNext() {
     if (_wizardStep < _wizardData.questions.length - 1) { _wizardStep++; qsRenderWizardStep(); }
   }
 
+  /** Prompt the user for confirmation before discarding wizard progress. */
   function qsAbortWizard() {
     if (!confirm('Are you sure you want to leave? Your progress will be lost.')) return;
     _wizardData    = null;
@@ -1207,6 +1407,10 @@
     qsLoadUserHome();
   }
 
+  /**
+   * Collect all wizard answers and POST them to submit-attempt.
+   * On success, shows the score result screen.
+   */
   async function qsSubmitWizard() {
     if (!confirm('Submit this quest? You cannot change your answers afterwards.')) return;
 
@@ -1244,6 +1448,10 @@
   let _reviewIsAdmin = false;
   let _reviewBackFn  = () => qsLoadUserHome();
 
+  /**
+   * Load a past attempt for step-through review (user-facing).
+   * @param {number} attemptId
+   */
   async function qsReviewAttempt(attemptId) {
     const res  = await apiFetch(`quests.php?action=review-attempt&id=${attemptId}`);
     const data = await res.json().catch(() => ({}));
@@ -1257,6 +1465,10 @@
     qsRenderReviewStep();
   }
 
+  /**
+   * Render the review screen for the current step, showing correctness indicators.
+   * Used by both guest review and admin review (distinguished by _reviewIsAdmin).
+   */
   function qsRenderReviewStep() {
     const wrap      = document.getElementById('user-review');
     const questions = _reviewData.questions;
@@ -1310,6 +1522,10 @@
     qsRenderReviewAnswerArea(q);
   }
 
+  /**
+   * Render the review answer area for a single question, highlighting correct/wrong answers.
+   * @param {Object} q - Question object from review-attempt response
+   */
   function qsRenderReviewAnswerArea(q) {
     const wrap    = document.getElementById('review-answer-area');
     const userAns = q.user_answer;
@@ -1404,12 +1620,18 @@
     }
   }
 
+  /** Move back one step in the review. */
   function qsReviewPrev() { if (_reviewStep > 0) { _reviewStep--; qsRenderReviewStep(); } }
+  /** Move forward one step in the review. */
   function qsReviewNext() { if (_reviewStep < _reviewData.questions.length - 1) { _reviewStep++; qsRenderReviewStep(); } }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ── THEME PANEL ────────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Toggle the theme selection panel open or closed.
+   * When opening, fetches available templates and pre-selects the current one.
+   */
   async function qsToggleThemePanel() {
     const panel   = document.getElementById('qs-theme-panel');
     const overlay = document.getElementById('qs-theme-overlay');
@@ -1431,15 +1653,20 @@
     }
   }
 
+  /**
+   * Apply a theme CSS file immediately (live preview before saving).
+   * @param {string} theme - Filename, e.g. 'impact.css'
+   */
   function qsPreviewTheme(theme) {
     document.getElementById('qs-theme-link').href = 'templates-quests/' + theme;
   }
 
   document.getElementById('qs-theme-select')?.addEventListener('change', e => qsPreviewTheme(e.target.value));
 
-  async function qsSaveTheme() {
-    const theme = document.getElementById('qs-theme-select').value;
-    const res   = await apiFetch('quests.php?action=save-quests-theme', {
+  /**
+   * Persist the selected theme to the server.
+   */
+  async function qsSaveTheme() { {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({theme})
     });
     const data  = await res.json().catch(() => ({}));
@@ -1450,6 +1677,11 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // ── Utility ────────────────────────────────────────────────────────────────
   // ═══════════════════════════════════════════════════════════════════════════
+  /**
+   * Escape a string for safe insertion into HTML.
+   * @param {*} str
+   * @returns {string} HTML-escaped string
+   */
   function esc(str) {
     if (str === null || str === undefined) return '';
     return String(str)

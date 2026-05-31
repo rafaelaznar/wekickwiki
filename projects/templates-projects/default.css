@@ -312,10 +312,9 @@ body {
 
 /* ── Status Board ─────────────────────────────────────────────────────── */
 .pt-board {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
-  align-items: start;
 }
 
 .pt-board-col {
@@ -343,15 +342,21 @@ body {
   padding: .05rem .4rem;
 }
 
-.pt-board-cards { padding: .5rem; }
+.pt-board-cards {
+  padding: .5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
 
 .pt-board-card {
   background: var(--pt-surface);
   border: 1px solid var(--pt-border);
   border-radius: 5px;
   padding: .5rem .65rem;
-  margin-bottom: .4rem;
   cursor: default;
+  width: 180px;
+  flex-shrink: 0;
 }
 
 .pt-board-card-title { font-weight: 600; font-size: .85rem; margin-bottom: .3rem; }

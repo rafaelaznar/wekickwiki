@@ -24,14 +24,24 @@ define('QS_ATTEMPTS_FILE', __DIR__ . '/attempts.json');
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
+/** Load all questions from disk. */
 function qs_load_queries(): array { return data_read(QS_QUERIES_FILE); }
+/** Load all quests from disk. */
 function qs_load_quests():  array { return data_read(QS_QUESTS_FILE);  }
+/** Load all attempts from disk. */
 function qs_load_attempts():array { return data_read(QS_ATTEMPTS_FILE); }
 
+/** Persist the questions array. */
 function qs_save_queries(array $d): void  { data_write(QS_QUERIES_FILE,  $d); }
+/** Persist the quests array. */
 function qs_save_quests(array $d):  void  { data_write(QS_QUESTS_FILE,   $d); }
+/** Persist the attempts array. */
 function qs_save_attempts(array $d): void { data_write(QS_ATTEMPTS_FILE, $d); }
 
+/**
+ * Return a lookup map of all enabled guest usernames (username => true).
+ * Used to validate the 'allowed' field on quests.
+ */
 function qs_guest_usernames_lookup(): array
 {
   $lookup = [];
@@ -44,6 +54,13 @@ function qs_guest_usernames_lookup(): array
   return $lookup;
 }
 
+/**
+ * Remove any non-guest or non-existent usernames from an 'allowed' array.
+ * Returns ['all'] when the input is ['all'] or the filtered list is empty.
+ *
+ * @param string[] $allowed  Raw allowed list from the client
+ * @return string[]          Validated allowed list
+ */
 function qs_filter_allowed_to_guests(array $allowed): array
 {
   if (in_array('all', $allowed, true)) return ['all'];
@@ -57,6 +74,13 @@ function qs_filter_allowed_to_guests(array $allowed): array
   return empty($filtered) ? ['all'] : $filtered;
 }
 
+/**
+ * Strip HTML tags and decode entities from Moodle XML inner text.
+ * Converts block-level tags to newlines before stripping.
+ *
+ * @param mixed $raw  Raw XML text content (may be a SimpleXMLElement)
+ * @return string     Cleaned plain text
+ */
   function qs_moodle_inner_text($raw): string
   {
     $text = trim((string)$raw);
@@ -72,6 +96,13 @@ function qs_filter_allowed_to_guests(array $allowed): array
     return trim($text);
   }
 
+/**
+ * Derive label array from a Moodle category path string.
+ * Strips the leading '$course$/top/' segment and splits on '/'.
+ *
+ * @param string $path  Raw category path from the XML
+ * @return string[]     Cleaned label array
+ */
   function qs_moodle_labels_from_category(string $path): array
   {
     $path = trim($path);
@@ -81,6 +112,16 @@ function qs_filter_allowed_to_guests(array $allowed): array
     return array_values(array_unique($parts));
   }
 
+/**
+ * Parse a single Moodle <question> XML node into an internal query array.
+ * Supports multichoice, truefalse, shortanswer, and matching types.
+ * Returns null for unsupported types, multi-answer multiple-choice questions,
+ * or questions with insufficient data.
+ *
+ * @param SimpleXMLElement $qNode  The <question> XML element
+ * @param string[]         $labels Labels inherited from the last <category> node
+ * @return array|null              Internal query array or null to skip
+ */
   function qs_moodle_parse_question(SimpleXMLElement $qNode, array $labels): ?array
   {
     $type = strtolower(trim((string)($qNode['type'] ?? '')));
@@ -188,6 +229,14 @@ function qs_filter_allowed_to_guests(array $allowed): array
     return null;
   }
 
+/**
+ * Parse a Moodle XML string into an array of internal query objects.
+ * Category nodes update the running label list; unsupported question types are skipped.
+ *
+ * @param string $xmlRaw  Raw Moodle XML document
+ * @return array          ['items' => [...], 'stats' => [...]] 
+ * @throws RuntimeException  When SimpleXML is unavailable or XML is malformed
+ */
   function qs_parse_moodle_xml_to_queries(string $xmlRaw): array
   {
     if (!function_exists('simplexml_load_string')) {
@@ -340,6 +389,13 @@ function qs_score_attempt(array $question_ids, array $answers_raw, array $all_qu
 // ═══════════════════════════════════════════════════════════════════════════
 // Sanitise incoming query (question) object
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Sanitise a raw client-supplied question payload into a safe internal array.
+ * Validates type, truncates strings, and normalises answer fields per type.
+ *
+ * @param array $b  Raw decoded JSON body
+ * @return array    Sanitised query array (without id)
+ */
 function qs_sanitize_query(array $b): array
 {
     $type  = in_array($b['type'] ?? '', ['multiple_choice','binary','gap_filling','matching'], true) ? $b['type'] : 'multiple_choice';
@@ -380,6 +436,14 @@ function qs_sanitize_query(array $b): array
 // ═══════════════════════════════════════════════════════════════════════════
 // Sanitise incoming quest object
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Sanitise a raw client-supplied quest payload into a safe internal array.
+ * Validates name, date, status, wrong penalty, label groups, and allowed list.
+ * The allowed list is cross-checked against actual guest accounts.
+ *
+ * @param array $b  Raw decoded JSON body
+ * @return array    Sanitised quest array (without id)
+ */
 function qs_sanitize_quest(array $b): array
 {
     $name   = trim(substr($b['name'] ?? '', 0, 256));
@@ -1130,4 +1194,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
         'questions'    => $questions_out,
     ]);
 }
-
+
