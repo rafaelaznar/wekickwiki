@@ -190,9 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-c
     if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
     $body  = json_decode(file_get_contents('php://input'), true);
     $theme = $body['theme'] ?? '';
-    if (!is_string($theme) ||
+    if (
+        !is_string($theme) ||
         !preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
-        !is_file(__DIR__ . '/templates-calendar/' . $theme)) {
+        !is_file(__DIR__ . '/templates-calendar/' . $theme)
+    ) {
         json_out(400, ['error' => 'Invalid theme']);
     }
     $raw                    = data_read(SETTINGS_FILE);

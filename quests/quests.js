@@ -10,6 +10,79 @@ let _wizardData = null; // {attempt_id, quest_name, wrong, questions}
 let _wizardStep = 0;
 let _wizardAnswers = {}; // {question_id: answer}
 
+// ── Draft persistence (localStorage) ──────────────────────────────────────
+function _qsDraftKey(attemptId) {
+  return "wkw_quest_draft_" + attemptId;
+}
+/** Persist current wizard state to localStorage. */
+function qsSaveDraft() {
+  if (!_wizardData) return;
+  try {
+    localStorage.setItem(
+      _qsDraftKey(_wizardData.attempt_id),
+      JSON.stringify({
+        attempt_id: _wizardData.attempt_id,
+        step: _wizardStep,
+        answers: _wizardAnswers,
+      }),
+    );
+  } catch (_) {}
+}
+/** Remove the draft for the current wizard attempt from localStorage. */
+function qsClearDraft() {
+  if (!_wizardData) return;
+  try {
+    localStorage.removeItem(_qsDraftKey(_wizardData.attempt_id));
+  } catch (_) {}
+}
+/** Restore wizard state from localStorage draft for the given attempt_id, if any. */
+function qsRestoreDraft(attemptId) {
+  try {
+    const raw = localStorage.getItem(_qsDraftKey(attemptId));
+    if (!raw) return false;
+    const draft = JSON.parse(raw);
+    if (!draft || draft.attempt_id !== attemptId) return false;
+    _wizardAnswers = draft.answers || {};
+    const total = _wizardData ? _wizardData.questions.length : 0;
+    _wizardStep =
+      typeof draft.step === "number" && draft.step >= 0 && draft.step < total
+        ? draft.step
+        : 0;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+/**
+ * Read a saved draft for an attempt (without loading it into wizard state).
+ * Returns the draft object or null.
+ * @param {number|null} attemptId
+ */
+function qsReadDraft(attemptId) {
+  if (!attemptId) return null;
+  try {
+    const raw = localStorage.getItem(_qsDraftKey(attemptId));
+    if (!raw) return null;
+    return JSON.parse(raw) || null;
+  } catch (_) {
+    return null;
+  }
+}
+/**
+ * Count how many answers in a draft.answers map are non-empty.
+ * @param {Object} answers
+ * @returns {number}
+ */
+function qsDraftAnsweredCount(answers) {
+  if (!answers || typeof answers !== "object") return 0;
+  return Object.values(answers).filter((v) => {
+    if (v === null || v === undefined || v === "") return false;
+    if (typeof v === "object")
+      return Object.values(v).some((s) => s !== "" && s !== null);
+    return true;
+  }).length;
+}
+
 // ── Toast ──────────────────────────────────────────────────────────────────
 let _qsToastTimer;
 /**
@@ -1387,13 +1460,33 @@ async function qsLoadUserHome() {
         for (const q of quests) {
           const card = document.createElement("div");
           card.className = "qs-quest-card";
+
+          // Check for a saved draft for this quest
+          const draft = qsReadDraft(q.pending_attempt_id);
+          const answeredCount = draft ? qsDraftAnsweredCount(draft.answers) : 0;
+          const totalQ = q.total_q || 0;
+          const pct =
+            totalQ > 0 ? Math.round((answeredCount / totalQ) * 100) : 0;
+          const hasDraft = draft && answeredCount > 0;
+
+          const progressHtml = hasDraft
+            ? `
+              <div class="qs-card-progress">
+                <div class="qs-card-progress-bar-wrap">
+                  <div class="qs-card-progress-bar" style="width:${pct}%"></div>
+                </div>
+                <span class="qs-card-progress-label">${answeredCount} / ${totalQ} answered (${pct}%)</span>
+              </div>`
+            : "";
+
           card.innerHTML = `
               <div class="qs-card-name">${esc(q.name)}</div>
               <div class="qs-card-meta">
                 <span>📅 ${esc(q.date || "—")}</span>
                 <span>❓ ${q.total_q} questions</span>
               </div>
-              <button class="btn btn-primary" onclick="qsStartQuest(${q.id})">Start quest</button>`;
+              ${progressHtml}
+              <button class="btn btn-primary" onclick="qsStartQuest(${q.id})">${hasDraft ? "Continue quest" : "Start quest"}</button>`;
           grid.appendChild(card);
         }
         wrap.appendChild(grid);
@@ -1475,6 +1568,7 @@ async function qsStartQuest(questId) {
   _wizardData = data; // {attempt_id, quest_name, wrong, questions}
   _wizardStep = 0;
   _wizardAnswers = {};
+  qsRestoreDraft(data.attempt_id);
 
   qsUserShowView("wizard");
   qsRenderWizardStep();
@@ -1550,6 +1644,7 @@ function qsRenderAnswerArea(q, savedAnswer, readonly) {
           li.classList.add("selected");
           li.querySelector("input").checked = true;
           _wizardAnswers[q.id] = String(i);
+          qsSaveDraft();
         });
       }
       ul.appendChild(li);
@@ -1573,6 +1668,7 @@ function qsRenderAnswerArea(q, savedAnswer, readonly) {
           li.classList.add("selected");
           li.querySelector("input").checked = true;
           _wizardAnswers[q.id] = val;
+          qsSaveDraft();
         });
       }
       ul.appendChild(li);
@@ -1587,6 +1683,7 @@ function qsRenderAnswerArea(q, savedAnswer, readonly) {
     input.disabled = readonly;
     input.addEventListener("input", () => {
       _wizardAnswers[q.id] = input.value;
+      qsSaveDraft();
     });
     wrap.appendChild(input);
   } else if (q.type === "matching") {
@@ -1616,6 +1713,7 @@ function qsRenderAnswerArea(q, savedAnswer, readonly) {
         if (!_wizardAnswers[q.id] || typeof _wizardAnswers[q.id] !== "object")
           _wizardAnswers[q.id] = {};
         _wizardAnswers[q.id][key] = sel.value;
+        qsSaveDraft();
       });
       li.innerHTML = `<span class="qs-matching-key">${esc(key)}</span><span class="qs-matching-arrow">→</span>`;
       li.appendChild(sel);
@@ -1629,6 +1727,7 @@ function qsRenderAnswerArea(q, savedAnswer, readonly) {
 function qsWizardPrev() {
   if (_wizardStep > 0) {
     _wizardStep--;
+    qsSaveDraft();
     qsRenderWizardStep();
   }
 }
@@ -1637,14 +1736,13 @@ function qsWizardPrev() {
 function qsWizardNext() {
   if (_wizardStep < _wizardData.questions.length - 1) {
     _wizardStep++;
+    qsSaveDraft();
     qsRenderWizardStep();
   }
 }
 
-/** Prompt the user for confirmation before discarding wizard progress. */
+/** Discard wizard progress and return to the quest list. */
 function qsAbortWizard() {
-  if (!confirm("Are you sure you want to leave? Your progress will be lost."))
-    return;
   _wizardData = null;
   _wizardAnswers = {};
   qsLoadUserHome();
@@ -1674,6 +1772,7 @@ async function qsSubmitWizard() {
     return;
   }
 
+  qsClearDraft();
   qsUserShowView("result");
   const wrap = document.getElementById("user-result");
   wrap.innerHTML = `

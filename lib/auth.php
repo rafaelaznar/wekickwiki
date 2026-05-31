@@ -21,7 +21,7 @@ if (!defined('SETTINGS_FILE')) define('SETTINGS_FILE', dirname(__DIR__) . '/sett
 // Values are read once at startup; PHP constants cannot be redefined later.
 $_auth_cfg = is_file(SETTINGS_FILE) ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? []) : [];
 define('JWT_SECRET', (is_string($_auth_cfg['jwtSecret'] ?? null) && $_auth_cfg['jwtSecret'] !== '') ? $_auth_cfg['jwtSecret'] : 'wkw_2026_S3cur3!K3y#R4nd0m$Phr4s3_xQz7');
-define('TOKEN_TTL',  (isset($_auth_cfg['tokenTtl']) && is_int($_auth_cfg['tokenTtl']) && $_auth_cfg['tokenTtl'] > 0) ? (int)$_auth_cfg['tokenTtl'] : 3600);
+define('TOKEN_TTL', (isset($_auth_cfg['tokenTtl']) && is_int($_auth_cfg['tokenTtl']) && $_auth_cfg['tokenTtl'] > 0) ? (int)$_auth_cfg['tokenTtl'] : 3600);
 unset($_auth_cfg);
 
 // ═══════════════════════════════════════════════════════════════════════════

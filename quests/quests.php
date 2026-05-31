@@ -9,10 +9,12 @@ $qs_theme    = 'default.css';
 $qs_app_name = 'Quests';
 $_raw = data_read(SETTINGS_FILE);
 if (!empty($_raw['wikiName'])) $qs_app_name = $_raw['wikiName'] . ' — Quests';
-if (!empty($_raw['questsTheme']) &&
-    preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['questsTheme']) &&
-    is_file(__DIR__ . '/templates-quests/' . $_raw['questsTheme'])) {
-    $qs_theme = $_raw['questsTheme'];
+if (
+  !empty($_raw['questsTheme']) &&
+  preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['questsTheme']) &&
+  is_file(__DIR__ . '/templates-quests/' . $_raw['questsTheme'])
+) {
+  $qs_theme = $_raw['questsTheme'];
 }
 unset($_raw);
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
@@ -20,6 +22,7 @@ $baseHref  = $scriptDir . '/';
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -28,6 +31,7 @@ $baseHref  = $scriptDir . '/';
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link id="qs-theme-link" rel="stylesheet" href="templates-quests/<?= htmlspecialchars($qs_theme, ENT_QUOTES) ?>">
 </head>
+
 <body>
 
   <!-- ── App header ───────────────────────────────────────────────────── -->
@@ -38,12 +42,21 @@ $baseHref  = $scriptDir . '/';
     </a>
     <div id="qs-header-right">
       <span id="qs-user-badge"></span>
-      <button class="btn" id="qs-home-btn" title="Go to main panel" aria-label="Go to main panel" onclick="window.location.href='../index.php'"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+      <button class="btn" id="qs-home-btn" title="Go to main panel" aria-label="Go to main panel" onclick="window.location.href='../index.php'"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg></button>
       <button class="btn" id="qs-theme-btn" title="Theme" aria-label="Theme" style="display:none" onclick="qsToggleThemePanel()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+        </svg>
       </button>
       <button class="btn" id="qs-logout-btn" title="Sign out" aria-label="Sign out" onclick="qsLogout()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
       </button>
     </div>
   </div>
@@ -55,15 +68,28 @@ $baseHref  = $scriptDir . '/';
     <div id="admin-panel" style="display:none">
       <div class="qs-tabs">
         <div class="qs-tab active" data-tab="questions" onclick="qsShowTab('questions')">
-          <svg class="qs-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
           Questions
         </div>
         <div class="qs-tab" data-tab="quests" onclick="qsShowTab('quests')">
-          <svg class="qs-tab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+          </svg>
           Quests
         </div>
         <div class="qs-tab" data-tab="results" onclick="qsShowTab('results')">
-          <svg class="qs-tab-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <svg class="qs-tab-icon" viewBox="0 0 24 24">
+            <line x1="18" y1="20" x2="18" y2="10" />
+            <line x1="12" y1="20" x2="12" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="14" />
+          </svg>
           Results
         </div>
       </div>
@@ -72,11 +98,18 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-questions" class="qs-tab-panel active">
         <div class="qs-tab-toolbar qs-tab-toolbar-sm">
           <button class="btn btn-primary" onclick="qsOpenQueryModal()">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             Add question
           </button>
           <button class="btn" type="button" onclick="qsPickMoodleXmlFile()">
-            <svg viewBox="0 0 24 24"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3v12" />
+              <polyline points="7 10 12 15 17 10" />
+              <path d="M5 21h14" />
+            </svg>
             Import Moodle XML
           </button>
           <input id="qm-xml-file" type="file" accept=".xml,text/xml,application/xml" onchange="qsHandleMoodleXmlFile(this)" style="display:none">
@@ -103,7 +136,9 @@ $baseHref  = $scriptDir . '/';
           <span id="qf-count" class="qs-filter-count"></span>
         </div>
         <div id="queries-table-wrap" class="qs-table-wrap">
-          <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading…
+          </div>
         </div>
       </div>
 
@@ -111,7 +146,10 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-quests" class="qs-tab-panel">
         <div class="qs-tab-toolbar">
           <button class="btn btn-primary" onclick="qsOpenQuestModal()">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             Add quest
           </button>
           <span id="quests-admin-status" class="qs-status" style="display:none"></span>
@@ -142,7 +180,9 @@ $baseHref  = $scriptDir . '/';
           <span id="qsf-count" class="qs-filter-count"></span>
         </div>
         <div id="quests-admin-table-wrap" class="qs-table-wrap">
-          <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading…
+          </div>
         </div>
       </div>
 
@@ -150,7 +190,10 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-results" class="qs-tab-panel">
         <div class="qs-tab-toolbar">
           <button class="btn" onclick="qsLoadResults()">
-            <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.36"/></svg>
+            <svg viewBox="0 0 24 24">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 .49-3.36" />
+            </svg>
             Reload
           </button>
         </div>
@@ -176,7 +219,9 @@ $baseHref  = $scriptDir . '/';
           <span id="rf-count" class="qs-filter-count"></span>
         </div>
         <div id="results-table-wrap" class="qs-table-wrap">
-          <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading…
+          </div>
         </div>
       </div>
     </div><!-- #admin-panel -->
@@ -187,11 +232,15 @@ $baseHref  = $scriptDir . '/';
       <div id="user-quest-list">
         <h2>Available quests</h2>
         <div id="open-quests-wrap">
-          <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading…
+          </div>
         </div>
         <h2>My completed quests</h2>
         <div id="my-attempts-wrap">
-          <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading…
+          </div>
         </div>
       </div>
 
@@ -280,13 +329,20 @@ $baseHref  = $scriptDir . '/';
         <label>Question groups <span class="qs-label-hint">(labels AND-matched, random pick)</span></label>
         <div id="qst-label-groups" class="qs-label-groups"></div>
         <button class="btn btn-sm qs-add-group-btn" onclick="qsAddLabelGroup()">
-          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <svg viewBox="0 0 24 24">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
           Add group
         </button>
       </div>
       <div class="qs-field">
         <label>Allowed users</label>
-        <div id="qst-allowed-wrap"><div class="qs-loading"><div class="qs-spinner"></div> Loading users…</div></div>
+        <div id="qst-allowed-wrap">
+          <div class="qs-loading">
+            <div class="qs-spinner"></div> Loading users…
+          </div>
+        </div>
       </div>
       <div class="qs-modal-actions">
         <button class="btn" onclick="qsCloseQuestModal()">Cancel</button>
@@ -301,7 +357,9 @@ $baseHref  = $scriptDir . '/';
       <button class="qs-modal-close" onclick="qsCloseAccessModal()" aria-label="Close">&times;</button>
       <h3 id="access-modal-title">Manage access</h3>
       <div id="access-modal-content">
-        <div class="qs-loading"><div class="qs-spinner"></div> Loading…</div>
+        <div class="qs-loading">
+          <div class="qs-spinner"></div> Loading…
+        </div>
       </div>
       <div class="qs-modal-actions">
         <button class="btn" onclick="qsCloseAccessModal()">Cancel</button>
@@ -341,4 +399,5 @@ $baseHref  = $scriptDir . '/';
   <script src="../lib/auth-client.js?v=<?= filemtime(__DIR__ . '/../lib/auth-client.js') ?>"></script>
   <script src="quests.js?v=<?= filemtime(__DIR__ . '/quests.js') ?>"></script>
 </body>
+
 </html>

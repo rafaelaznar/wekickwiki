@@ -2,59 +2,130 @@
    Purple/magenta (#7c3aed) accent. Playful, rounded style.
    ─────────────────────────────────────────────────────────────────────── */
 
-@import url('default.css');
+@import url("default.css");
 
 :root {
-  --pt-accent:       #7c3aed;
-  --pt-accent-dark:  #6028c8;
+  --pt-accent: #7c3aed;
+  --pt-accent-dark: #6028c8;
   --pt-accent-light: #f3eeff;
-  --pt-bg:           #faf8ff;
+  --pt-bg: #faf8ff;
 }
 
-#pt-header { border-bottom-color: var(--pt-accent); }
+#pt-header {
+  border-bottom-color: var(--pt-accent);
+}
 
-.pt-tab.active        { background: var(--pt-accent); border-color: var(--pt-accent); }
-.pt-tab:hover:not(.active) { background: var(--pt-accent-light); color: var(--pt-accent); }
-.pt-tabs              { border-bottom-color: var(--pt-accent); }
+.pt-tab.active {
+  background: var(--pt-accent);
+  border-color: var(--pt-accent);
+}
+.pt-tab:hover:not(.active) {
+  background: var(--pt-accent-light);
+  color: var(--pt-accent);
+}
+.pt-tabs {
+  border-bottom-color: var(--pt-accent);
+}
 
-.pt-table thead th    { background: var(--pt-accent); }
-.pt-table tbody tr:hover td { background: var(--pt-accent-light); }
+.pt-table thead th {
+  background: var(--pt-accent);
+}
+.pt-table tbody tr:hover td {
+  background: var(--pt-accent-light);
+}
 
-.pt-task-link         { color: var(--pt-accent); }
+.pt-task-link {
+  color: var(--pt-accent);
+}
 
-.pt-badge.pt-status-in_progress { background: #ede9fe; color: #5b21b6; }
-.pt-badge.pt-status-done        { background: #ecfdf5; color: #065f46; }
-.pt-badge.pt-status-in_review   { background: #faf5ff; color: #6b21a8; }
-.pt-badge.pt-status-blocked     { background: #fce7f3; color: #9d174d; }
+.pt-badge.pt-status-in_progress {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+.pt-badge.pt-status-done {
+  background: #ecfdf5;
+  color: #065f46;
+}
+.pt-badge.pt-status-in_review {
+  background: #faf5ff;
+  color: #6b21a8;
+}
+.pt-badge.pt-status-blocked {
+  background: #fce7f3;
+  color: #9d174d;
+}
 
-.pt-burndown-val      { color: var(--pt-accent); }
-.pt-burndown-svg polyline[stroke="#1a6fa8"] { stroke: var(--pt-accent); }
+.pt-burndown-val {
+  color: var(--pt-accent);
+}
+.pt-burndown-svg polyline[stroke="#1a6fa8"] {
+  stroke: var(--pt-accent);
+}
 
-.pt-board-col-header  { border-bottom-color: var(--pt-accent); }
-.pt-user-task-card-title { color: var(--pt-accent); }
-.pt-user-task-card:hover { border-color: var(--pt-accent); }
-.pt-theme-option.active  { background: var(--pt-accent); border-color: var(--pt-accent); }
-.pt-theme-option:hover   { border-color: var(--pt-accent); background: var(--pt-accent-light); }
+.pt-board-col-header {
+  border-bottom-color: var(--pt-accent);
+}
+.pt-user-task-card-title {
+  color: var(--pt-accent);
+}
+.pt-user-task-card:hover {
+  border-color: var(--pt-accent);
+}
+.pt-theme-option.active {
+  background: var(--pt-accent);
+  border-color: var(--pt-accent);
+}
+.pt-theme-option:hover {
+  border-color: var(--pt-accent);
+  background: var(--pt-accent-light);
+}
 
-.pt-section-title     { color: var(--pt-accent); }
-.pt-detail-section h4 { color: var(--pt-accent); }
-.pt-spec-tab.active   { color: var(--pt-accent); }
-.pt-spec-preview blockquote { border-left-color: var(--pt-accent); }
-.pt-spec-preview h1, .pt-spec-preview h2, .pt-spec-preview h3 { color: var(--pt-accent); }
+.pt-section-title {
+  color: var(--pt-accent);
+}
+.pt-detail-section h4 {
+  color: var(--pt-accent);
+}
+.pt-spec-tab.active {
+  color: var(--pt-accent);
+}
+.pt-spec-preview blockquote {
+  border-left-color: var(--pt-accent);
+}
+.pt-spec-preview h1,
+.pt-spec-preview h2,
+.pt-spec-preview h3 {
+  color: var(--pt-accent);
+}
 
-.btn-primary  { background: var(--pt-accent); border-color: var(--pt-accent); }
-.btn-primary:hover { background: var(--pt-accent-dark); border-color: var(--pt-accent-dark); }
+.btn-primary {
+  background: var(--pt-accent);
+  border-color: var(--pt-accent);
+}
+.btn-primary:hover {
+  background: var(--pt-accent-dark);
+  border-color: var(--pt-accent-dark);
+}
 
 .pt-modal-body input:focus,
 .pt-modal-body select:focus,
 .pt-modal-body textarea:focus {
   border-color: var(--pt-accent);
-  box-shadow: 0 0 0 2px rgba(124,58,237,.12);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
 }
 
-.pt-spinner { border-top-color: var(--pt-accent); }
-#pt-project-select:focus { border-color: var(--pt-accent); }
+.pt-spinner {
+  border-top-color: var(--pt-accent);
+}
+#pt-project-select:focus {
+  border-color: var(--pt-accent);
+}
 
 /* Rounded corners / softer feel */
-.pt-board-col, .pt-board-card, .pt-user-task-card,
-.pt-modal, .pt-table-wrap { border-radius: 10px; }
+.pt-board-col,
+.pt-board-card,
+.pt-user-task-card,
+.pt-modal,
+.pt-table-wrap {
+  border-radius: 10px;
+}

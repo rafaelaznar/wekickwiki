@@ -263,7 +263,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-set
   $validated = load_settings();
   // Merge in module-theme keys that load_settings() doesn't validate
   $raw = data_read(SETTINGS_FILE);
-  foreach (['hubTheme','pqTheme','questsTheme','feedbackTheme','projectsTheme','calendarTheme'] as $k) {
+  foreach (['hubTheme', 'pqTheme', 'questsTheme', 'feedbackTheme', 'projectsTheme', 'calendarTheme'] as $k) {
     if (isset($raw[$k]) && is_string($raw[$k])) $validated[$k] = $raw[$k];
   }
   json_out(200, $validated);

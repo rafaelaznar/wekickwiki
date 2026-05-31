@@ -30,7 +30,10 @@ function pq_load_items(): array
     return $default;
 }
 
-function pq_save_items(array $data): void { data_write(PQ_ITEMS_FILE, $data); }
+function pq_save_items(array $data): void
+{
+    data_write(PQ_ITEMS_FILE, $data);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // marks.json helpers
@@ -43,7 +46,10 @@ function pq_load_marks(): array
     return $raw;
 }
 
-function pq_save_marks(array $data): void { data_write(PQ_MARKS_FILE, $data); }
+function pq_save_marks(array $data): void
+{
+    data_write(PQ_MARKS_FILE, $data);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Weight validation: every sibling group must sum to 100
@@ -287,9 +293,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-m
     if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
     $body  = json_decode(file_get_contents('php://input'), true);
     $theme = $body['theme'] ?? '';
-    if (!is_string($theme) ||
+    if (
+        !is_string($theme) ||
         !preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
-        !is_file(__DIR__ . '/templates-marks/' . $theme)) {
+        !is_file(__DIR__ . '/templates-marks/' . $theme)
+    ) {
         json_out(400, ['error' => 'Invalid theme']);
     }
     $raw = data_read(SETTINGS_FILE);
@@ -297,4 +305,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-m
     data_write(SETTINGS_FILE, $raw);
     json_out(200, ['ok' => true]);
 }
-

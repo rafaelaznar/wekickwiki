@@ -23,13 +23,25 @@ define('FB_RESPONSES_FILE', __DIR__ . '/feedback-responses.json');
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 /** Load all feedback events from disk. */
-function fb_load_events(): array         { return data_read(FB_EVENTS_FILE);    }
+function fb_load_events(): array
+{
+    return data_read(FB_EVENTS_FILE);
+}
 /** Persist the feedback events array. */
-function fb_save_events(array $d): void  { data_write(FB_EVENTS_FILE,    $d);   }
+function fb_save_events(array $d): void
+{
+    data_write(FB_EVENTS_FILE,    $d);
+}
 /** Load all feedback responses from disk. */
-function fb_load_responses(): array      { return data_read(FB_RESPONSES_FILE); }
+function fb_load_responses(): array
+{
+    return data_read(FB_RESPONSES_FILE);
+}
 /** Persist the feedback responses array. */
-function fb_save_responses(array $d): void { data_write(FB_RESPONSES_FILE, $d); }
+function fb_save_responses(array $d): void
+{
+    data_write(FB_RESPONSES_FILE, $d);
+}
 
 /**
  * Sanitise and validate a raw feedback event payload from the client.
@@ -194,7 +206,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-eve
     $events = fb_load_events();
     $event  = null;
     foreach ($events as $ev) {
-        if ((int)$ev['id'] === $id) { $event = $ev; break; }
+        if ((int)$ev['id'] === $id) {
+            $event = $ev;
+            break;
+        }
     }
     if (!$event) json_out(404, ['error' => 'Event not found']);
 
@@ -251,9 +266,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-f
 
     $body  = json_decode(file_get_contents('php://input'), true);
     $theme = $body['theme'] ?? '';
-    if (!is_string($theme) ||
+    if (
+        !is_string($theme) ||
         !preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
-        !is_file(__DIR__ . '/templates-feedback/' . $theme)) {
+        !is_file(__DIR__ . '/templates-feedback/' . $theme)
+    ) {
         json_out(400, ['error' => 'Invalid theme']);
     }
     $raw = data_read(SETTINGS_FILE);
@@ -305,7 +322,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
     $events = fb_load_events();
     $event  = null;
     foreach ($events as $ev) {
-        if ((int)$ev['id'] === $event_id) { $event = $ev; break; }
+        if ((int)$ev['id'] === $event_id) {
+            $event = $ev;
+            break;
+        }
     }
     if (!$event)                              json_out(404, ['error' => 'Event not found']);
     if (($event['status'] ?? '') !== 'open') json_out(400, ['error' => 'Event is not open']);

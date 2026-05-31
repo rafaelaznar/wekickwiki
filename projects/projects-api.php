@@ -27,9 +27,16 @@ define('PT_PRIORITIES',  ['low', 'medium', 'high', 'critical']);
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 
-function pt_load_projects(): array { return data_read(PT_PROJECTS_FILE); }
-function pt_load_tasks():    array { return data_read(PT_TASKS_FILE); }
-function pt_load_statuses(): array {
+function pt_load_projects(): array
+{
+    return data_read(PT_PROJECTS_FILE);
+}
+function pt_load_tasks(): array
+{
+    return data_read(PT_TASKS_FILE);
+}
+function pt_load_statuses(): array
+{
     $data = data_read(PT_STATUSES_FILE);
     if (!empty($data) && is_array($data)) return $data;
     // Fall back to built-in defaults if the file is missing/empty
@@ -43,12 +50,22 @@ function pt_load_statuses(): array {
     ];
 }
 
-function pt_save_projects(array $d): void { data_write(PT_PROJECTS_FILE, $d); }
-function pt_save_tasks(array $d):    void { data_write(PT_TASKS_FILE,    $d); }
-function pt_save_statuses(array $d): void { data_write(PT_STATUSES_FILE, $d); }
+function pt_save_projects(array $d): void
+{
+    data_write(PT_PROJECTS_FILE, $d);
+}
+function pt_save_tasks(array $d): void
+{
+    data_write(PT_TASKS_FILE,    $d);
+}
+function pt_save_statuses(array $d): void
+{
+    data_write(PT_STATUSES_FILE, $d);
+}
 
 // Returns the list of valid status keys from the JSON file.
-function pt_status_keys(): array {
+function pt_status_keys(): array
+{
     return array_column(pt_load_statuses(), 'key');
 }
 
@@ -259,7 +276,10 @@ if ($action === 'save-task' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $projects = pt_load_projects();
     $projectExists = false;
     foreach ($projects as $p) {
-        if ((int)$p['id'] === $projectId) { $projectExists = true; break; }
+        if ((int)$p['id'] === $projectId) {
+            $projectExists = true;
+            break;
+        }
     }
     if (!$projectExists) json_out(404, ['error' => 'Project not found']);
 
@@ -407,8 +427,10 @@ if ($action === 'save-projects-theme' && $_SERVER['REQUEST_METHOD'] === 'POST') 
     $body  = json_decode(file_get_contents('php://input'), true) ?? [];
     $theme = trim((string)($body['theme'] ?? ''));
 
-    if (!preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
-        !is_file(__DIR__ . '/templates-projects/' . $theme)) {
+    if (
+        !preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
+        !is_file(__DIR__ . '/templates-projects/' . $theme)
+    ) {
         json_out(400, ['error' => 'Invalid theme']);
     }
 
@@ -471,8 +493,11 @@ if ($action === 'save-status' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $newKey  = trim($newKey, '_');
         if ($newKey === '') $newKey = 'status_' . count($statuses);
         $existing = array_column($statuses, 'key');
-        $base = $newKey; $i = 2;
-        while (in_array($newKey, $existing, true)) { $newKey = $base . '_' . $i++; }
+        $base = $newKey;
+        $i = 2;
+        while (in_array($newKey, $existing, true)) {
+            $newKey = $base . '_' . $i++;
+        }
         $maxOrder   = $statuses ? max(array_column($statuses, 'order')) : -1;
         $statuses[] = ['key' => $newKey, 'name' => substr($name, 0, 100), 'order' => $maxOrder + 1];
         $key        = $newKey;

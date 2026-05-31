@@ -125,7 +125,7 @@
         "id": 4,
         "username": "guest2",
         "quest_id": 1,
-        "status": "pending",
+        "status": "completed",
         "question_ids": [
             30,
             24,
@@ -137,9 +137,54 @@
             20,
             28
         ],
-        "queries": [],
-        "score": null,
+        "queries": [
+            {
+                "id": 30,
+                "answer": {
+                    "2": "Smallest prime number",
+                    "3": "Second prime number"
+                }
+            },
+            {
+                "id": 24,
+                "answer": "1"
+            },
+            {
+                "id": 14,
+                "answer": null
+            },
+            {
+                "id": 22,
+                "answer": "1"
+            },
+            {
+                "id": 9,
+                "answer": "2"
+            },
+            {
+                "id": 21,
+                "answer": "1"
+            },
+            {
+                "id": 5,
+                "answer": "3"
+            },
+            {
+                "id": 20,
+                "answer": "0"
+            },
+            {
+                "id": 28,
+                "answer": {
+                    "Mark Twain": "'To Kill a Mockingbird'",
+                    "Ernest Hemingway": "'To Kill a Mockingbird'",
+                    "Harper Lee": "'The Great Gatsby'",
+                    "F. Scott Fitzgerald": "'The Adventures of Tom Sawyer'"
+                }
+            }
+        ],
+        "score": 3.33,
         "started_at": "2026-05-31T08:05:15+00:00",
-        "submitted_at": null
+        "submitted_at": "2026-05-31T08:32:33+00:00"
     }
 ]

@@ -7,10 +7,12 @@ $pt_theme    = 'default.css';
 $pt_app_name = 'Projects';
 $_raw = data_read(SETTINGS_FILE);
 if (!empty($_raw['wikiName'])) $pt_app_name = $_raw['wikiName'] . ' — Projects';
-if (!empty($_raw['projectsTheme']) &&
-    preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['projectsTheme']) &&
-    is_file(__DIR__ . '/templates-projects/' . $_raw['projectsTheme'])) {
-    $pt_theme = $_raw['projectsTheme'];
+if (
+  !empty($_raw['projectsTheme']) &&
+  preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_raw['projectsTheme']) &&
+  is_file(__DIR__ . '/templates-projects/' . $_raw['projectsTheme'])
+) {
+  $pt_theme = $_raw['projectsTheme'];
 }
 unset($_raw);
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/');
@@ -18,6 +20,7 @@ $baseHref  = $scriptDir . '/';
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -26,6 +29,7 @@ $baseHref  = $scriptDir . '/';
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link id="pt-theme-link" rel="stylesheet" href="templates-projects/<?= htmlspecialchars($pt_theme, ENT_QUOTES) ?>">
 </head>
+
 <body>
 
   <!-- ── App header ───────────────────────────────────────────────────── -->
@@ -36,12 +40,21 @@ $baseHref  = $scriptDir . '/';
     </a>
     <div id="pt-header-right">
       <span id="pt-user-badge"></span>
-      <button class="btn" id="pt-home-btn" title="Go to main panel" aria-label="Go to main panel" onclick="window.location.href='../index.php'"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+      <button class="btn" id="pt-home-btn" title="Go to main panel" aria-label="Go to main panel" onclick="window.location.href='../index.php'"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg></button>
       <button class="btn" id="pt-theme-btn" title="Theme" aria-label="Theme" style="display:none" onclick="ptToggleThemePanel()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+        </svg>
       </button>
       <button class="btn" id="pt-logout-btn" title="Sign out" aria-label="Sign out" onclick="ptLogout()">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
       </button>
     </div>
   </div>
@@ -64,27 +77,45 @@ $baseHref  = $scriptDir . '/';
     <div id="admin-panel" style="display:none">
       <div class="pt-tabs">
         <div class="pt-tab active" data-tab="projects" onclick="ptShowTab('projects')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+          </svg>
           Projects
         </div>
         <div class="pt-tab" data-tab="tasks" onclick="ptShowTab('tasks')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <polyline points="9 11 12 14 22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
           Tasks
         </div>
         <div class="pt-tab" data-tab="board" onclick="ptShowTab('board')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="10" rx="1"/><rect x="14" y="17" width="7" height="4" rx="1"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="18" rx="1" />
+            <rect x="14" y="3" width="7" height="10" rx="1" />
+            <rect x="14" y="17" width="7" height="4" rx="1" />
+          </svg>
           Status Board
         </div>
         <div class="pt-tab" data-tab="burndown" onclick="ptShowTab('burndown')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
           Burndown
         </div>
         <div class="pt-tab" data-tab="statuses" onclick="ptShowTab('statuses')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" />
+          </svg>
           Statuses
         </div>
         <div class="pt-tab" data-tab="settings" onclick="ptShowTab('settings')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
           Settings
         </div>
       </div>
@@ -93,13 +124,18 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-projects" class="pt-tab-panel active">
         <div class="pt-tab-toolbar">
           <button class="btn btn-primary" onclick="ptOpenProjectModal()">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             New project
           </button>
           <span id="projects-status" class="pt-status" style="display:none"></span>
         </div>
         <div id="projects-table-wrap" class="pt-table-wrap">
-          <div class="pt-loading"><div class="pt-spinner"></div> Loading…</div>
+          <div class="pt-loading">
+            <div class="pt-spinner"></div> Loading…
+          </div>
         </div>
       </div>
 
@@ -107,7 +143,10 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-tasks" class="pt-tab-panel">
         <div class="pt-tab-toolbar">
           <button class="btn btn-primary" id="btn-add-root-task" onclick="ptOpenTaskModal(null, null)" disabled>
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             New task
           </button>
           <div class="pt-filter-bar">
@@ -148,13 +187,18 @@ $baseHref  = $scriptDir . '/';
       <div id="tab-statuses" class="pt-tab-panel">
         <div class="pt-tab-toolbar">
           <button class="btn btn-primary" onclick="ptOpenStatusModal()">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <svg viewBox="0 0 24 24">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
             New status
           </button>
           <span id="statuses-status" class="pt-status" style="display:none"></span>
         </div>
         <div id="statuses-table-wrap" class="pt-table-wrap">
-          <div class="pt-loading"><div class="pt-spinner"></div> Loading…</div>
+          <div class="pt-loading">
+            <div class="pt-spinner"></div> Loading…
+          </div>
         </div>
       </div>
       <!-- ── Settings tab ────────────────────────────────────────────── -->
@@ -174,15 +218,23 @@ $baseHref  = $scriptDir . '/';
     <div id="user-panel" style="display:none">
       <div class="pt-tabs">
         <div class="pt-tab active" data-tab="u-mytasks" onclick="ptShowUserTab('u-mytasks')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+          </svg>
           My Tasks
         </div>
         <div class="pt-tab" data-tab="u-alltasks" onclick="ptShowUserTab('u-alltasks')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <polyline points="9 11 12 14 22 4" />
+            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+          </svg>
           All Tasks
         </div>
         <div class="pt-tab" data-tab="u-burndown" onclick="ptShowUserTab('u-burndown')">
-          <svg class="pt-tab-icon" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <svg class="pt-tab-icon" viewBox="0 0 24 24">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
           Burndown
         </div>
       </div>
@@ -368,4 +420,5 @@ $baseHref  = $scriptDir . '/';
   <script src="../vendor/marked.min.js?v=<?= filemtime(__DIR__ . '/../vendor/marked.min.js') ?>"></script>
   <script src="projects.js?v=<?= filemtime(__DIR__ . '/projects.js') ?>"></script>
 </body>
+
 </html>

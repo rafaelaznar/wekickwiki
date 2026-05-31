@@ -20,21 +20,24 @@ $baseHref  = $scriptDir . '/';
 
 // ── Read app name and hub theme from settings ─────────────────────────────────
 $_rawSettings = is_file(SETTINGS_FILE)
-    ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? [])
-    : [];
+  ? (json_decode(file_get_contents(SETTINGS_FILE), true) ?? [])
+  : [];
 $hubName = (!empty($_rawSettings['wikiName']) && is_string($_rawSettings['wikiName']))
-    ? $_rawSettings['wikiName']
-    : 'WeKickWiki';
+  ? $_rawSettings['wikiName']
+  : 'WeKickWiki';
 $hubTheme = 'default.css';
-if (!empty($_rawSettings['hubTheme']) &&
-    preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_rawSettings['hubTheme']) &&
-    is_file(__DIR__ . '/templates/' . $_rawSettings['hubTheme'])) {
-    $hubTheme = $_rawSettings['hubTheme'];
+if (
+  !empty($_rawSettings['hubTheme']) &&
+  preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $_rawSettings['hubTheme']) &&
+  is_file(__DIR__ . '/templates/' . $_rawSettings['hubTheme'])
+) {
+  $hubTheme = $_rawSettings['hubTheme'];
 }
 unset($_rawSettings);
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -43,6 +46,7 @@ unset($_rawSettings);
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link id="hub-theme-link" rel="stylesheet" href="templates/<?= htmlspecialchars($hubTheme, ENT_QUOTES) ?>">
 </head>
+
 <body>
 
   <!-- ── Login screen ──────────────────────────────────────────────── -->
@@ -61,9 +65,9 @@ unset($_rawSettings);
         </label>
         <button type="submit" title="Sign in" aria-label="Sign in">
           <svg viewBox="0 0 24 24" aria-hidden="true" style="width:1.2rem;height:1.2rem;fill:none;stroke:currentColor;stroke-width:2;margin-right:.4rem">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-            <polyline points="10 17 15 12 10 7"/>
-            <line x1="15" y1="12" x2="3" y2="12"/>
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" y1="12" x2="3" y2="12" />
           </svg>
           Sign in
         </button>
@@ -82,23 +86,41 @@ unset($_rawSettings);
       <div id="hub-header-right">
         <span id="hub-user-badge"></span>
         <button class="btn btn-sm" id="hub-users-btn" title="Manage users" aria-label="Manage users" style="display:none" onclick="hubToggleUsersPanel()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/><circle cx="19" cy="8" r="3" stroke-width="1.5"/><line x1="19" y1="11" x2="19" y2="14"/><line x1="17.5" y1="12.5" x2="20.5" y2="12.5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+            <circle cx="19" cy="8" r="3" stroke-width="1.5" />
+            <line x1="19" y1="11" x2="19" y2="14" />
+            <line x1="17.5" y1="12.5" x2="20.5" y2="12.5" />
+          </svg>
           Users
         </button>
         <button class="btn btn-sm" id="hub-themes-btn" title="Themes" aria-label="Themes" style="display:none" onclick="hubToggleThemesPanel()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2a10 10 0 0 0 0 20c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+          </svg>
           Themes
         </button>
         <button class="btn btn-sm" id="hub-security-btn" title="Security" aria-label="Security" style="display:none" onclick="hubToggleSecurityPanel()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 2l8 4v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6l8-4z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
           Security
         </button>
         <button class="btn btn-sm" id="hub-change-pass-btn" title="Change my password" aria-label="Change my password" style="display:none" onclick="hubToggleChangePasswordPanel()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
           Password
         </button>
         <button class="btn btn-sm" onclick="hubLogout()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
           Sign out
         </button>
       </div>
@@ -109,55 +131,55 @@ unset($_rawSettings);
       <div id="hub-cards">
         <a href="wiki/wiki.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
           </svg>
           <h3>Wiki</h3>
           <p>Document and share knowledge</p>
         </a>
         <a href="marks/marks.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
           </svg>
           <h3>Qualifications</h3>
           <p>Track and review student grades</p>
         </a>
         <a href="quests/quests.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <h3>Quests</h3>
           <p>Create and take interactive quizzes</p>
         </a>
         <a href="feedback/feedback.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
           <h3>Feedback</h3>
           <p>Collect and review event feedback</p>
         </a>
         <a href="projects/projects.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="2" y="7" width="20" height="14" rx="2"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-            <line x1="12" y1="12" x2="12" y2="17"/>
-            <line x1="9.5" y1="14.5" x2="14.5" y2="14.5"/>
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+            <line x1="12" y1="12" x2="12" y2="17" />
+            <line x1="9.5" y1="14.5" x2="14.5" y2="14.5" />
           </svg>
           <h3>Projects</h3>
           <p>Manage software project tasks and sprints</p>
         </a>
         <a href="calendar/calendar.php" class="hub-card">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <h3>Calendar</h3>
           <p>View upcoming events and schedule</p>
@@ -223,31 +245,59 @@ unset($_rawSettings);
         <div class="themes-grid">
           <div>
             <label for="th-hub">Hub</label>
-            <select id="th-hub"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-hub">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-wiki">Wiki</label>
-            <select id="th-wiki"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-wiki">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-marks">Qualifications</label>
-            <select id="th-marks"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-marks">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-quests">Quests</label>
-            <select id="th-quests"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-quests">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-feedback">Feedback</label>
-            <select id="th-feedback"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-feedback">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-projects">Projects</label>
-            <select id="th-projects"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-projects">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
           <div>
             <label for="th-calendar">Calendar</label>
-            <select id="th-calendar"><option>default.css</option><option>flower-power.css</option><option>impact.css</option></select>
+            <select id="th-calendar">
+              <option>default.css</option>
+              <option>flower-power.css</option>
+              <option>impact.css</option>
+            </select>
           </div>
         </div>
         <div id="themes-form-actions">
@@ -305,4 +355,5 @@ unset($_rawSettings);
   <script src="lib/auth-client.js?v=<?= filemtime(__DIR__ . '/lib/auth-client.js') ?>"></script>
   <script src="lib/hub.js?v=<?= filemtime(__DIR__ . '/lib/hub.js') ?>"></script>
 </body>
+
 </html>

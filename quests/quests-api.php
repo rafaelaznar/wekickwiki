@@ -25,18 +25,36 @@ define('QS_ATTEMPTS_FILE', __DIR__ . '/attempts.json');
 // Helpers
 // ═══════════════════════════════════════════════════════════════════════════
 /** Load all questions from disk. */
-function qs_load_queries(): array { return data_read(QS_QUERIES_FILE); }
+function qs_load_queries(): array
+{
+    return data_read(QS_QUERIES_FILE);
+}
 /** Load all quests from disk. */
-function qs_load_quests():  array { return data_read(QS_QUESTS_FILE);  }
+function qs_load_quests(): array
+{
+    return data_read(QS_QUESTS_FILE);
+}
 /** Load all attempts from disk. */
-function qs_load_attempts():array { return data_read(QS_ATTEMPTS_FILE); }
+function qs_load_attempts(): array
+{
+    return data_read(QS_ATTEMPTS_FILE);
+}
 
 /** Persist the questions array. */
-function qs_save_queries(array $d): void  { data_write(QS_QUERIES_FILE,  $d); }
+function qs_save_queries(array $d): void
+{
+    data_write(QS_QUERIES_FILE,  $d);
+}
 /** Persist the quests array. */
-function qs_save_quests(array $d):  void  { data_write(QS_QUESTS_FILE,   $d); }
+function qs_save_quests(array $d): void
+{
+    data_write(QS_QUESTS_FILE,   $d);
+}
 /** Persist the attempts array. */
-function qs_save_attempts(array $d): void { data_write(QS_ATTEMPTS_FILE, $d); }
+function qs_save_attempts(array $d): void
+{
+    data_write(QS_ATTEMPTS_FILE, $d);
+}
 
 /**
  * Return a lookup map of all enabled guest usernames (username => true).
@@ -44,14 +62,14 @@ function qs_save_attempts(array $d): void { data_write(QS_ATTEMPTS_FILE, $d); }
  */
 function qs_guest_usernames_lookup(): array
 {
-  $lookup = [];
-  foreach (load_users() as $u) {
-    if (!is_array($u)) continue;
-    if (($u['role'] ?? 'guest') !== 'guest') continue;
-    $username = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($u['username'] ?? ''))));
-    if ($username !== '') $lookup[$username] = true;
-  }
-  return $lookup;
+    $lookup = [];
+    foreach (load_users() as $u) {
+        if (!is_array($u)) continue;
+        if (($u['role'] ?? 'guest') !== 'guest') continue;
+        $username = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($u['username'] ?? ''))));
+        if ($username !== '') $lookup[$username] = true;
+    }
+    return $lookup;
 }
 
 /**
@@ -63,15 +81,15 @@ function qs_guest_usernames_lookup(): array
  */
 function qs_filter_allowed_to_guests(array $allowed): array
 {
-  if (in_array('all', $allowed, true)) return ['all'];
+    if (in_array('all', $allowed, true)) return ['all'];
 
-  $guest_lookup = qs_guest_usernames_lookup();
-  $filtered = [];
-  foreach ($allowed as $u) {
-    if (isset($guest_lookup[$u])) $filtered[] = $u;
-  }
-  $filtered = array_values(array_unique($filtered));
-  return empty($filtered) ? ['all'] : $filtered;
+    $guest_lookup = qs_guest_usernames_lookup();
+    $filtered = [];
+    foreach ($allowed as $u) {
+        if (isset($guest_lookup[$u])) $filtered[] = $u;
+    }
+    $filtered = array_values(array_unique($filtered));
+    return empty($filtered) ? ['all'] : $filtered;
 }
 
 /**
@@ -81,8 +99,8 @@ function qs_filter_allowed_to_guests(array $allowed): array
  * @param mixed $raw  Raw XML text content (may be a SimpleXMLElement)
  * @return string     Cleaned plain text
  */
-  function qs_moodle_inner_text($raw): string
-  {
+function qs_moodle_inner_text($raw): string
+{
     $text = trim((string)$raw);
     if ($text === '') return '';
 
@@ -94,7 +112,7 @@ function qs_filter_allowed_to_guests(array $allowed): array
     $text = preg_replace('/[ \t]+/u', ' ', $text);
     $text = preg_replace('/\n{2,}/u', "\n", $text);
     return trim($text);
-  }
+}
 
 /**
  * Derive label array from a Moodle category path string.
@@ -103,14 +121,14 @@ function qs_filter_allowed_to_guests(array $allowed): array
  * @param string $path  Raw category path from the XML
  * @return string[]     Cleaned label array
  */
-  function qs_moodle_labels_from_category(string $path): array
-  {
+function qs_moodle_labels_from_category(string $path): array
+{
     $path = trim($path);
     if ($path === '') return [];
     $path = preg_replace('#^\$course\$/top/?#i', '', $path);
     $parts = array_filter(array_map('trim', explode('/', (string)$path)), fn($p) => $p !== '');
     return array_values(array_unique($parts));
-  }
+}
 
 /**
  * Parse a single Moodle <question> XML node into an internal query array.
@@ -122,112 +140,112 @@ function qs_filter_allowed_to_guests(array $allowed): array
  * @param string[]         $labels Labels inherited from the last <category> node
  * @return array|null              Internal query array or null to skip
  */
-  function qs_moodle_parse_question(SimpleXMLElement $qNode, array $labels): ?array
-  {
+function qs_moodle_parse_question(SimpleXMLElement $qNode, array $labels): ?array
+{
     $type = strtolower(trim((string)($qNode['type'] ?? '')));
     $query = qs_moodle_inner_text($qNode->questiontext->text ?? '');
     if ($query === '') $query = qs_moodle_inner_text($qNode->name->text ?? '');
     if ($query === '') return null;
 
     if ($type === 'multichoice') {
-      if (strtolower(trim((string)($qNode->single ?? 'true'))) === 'false') {
-        return null; // This app only supports one correct option.
-      }
-      $options = [];
-      $bestIdx = 0;
-      $bestFraction = -INF;
-      foreach ($qNode->answer as $ansNode) {
-        $opt = qs_moodle_inner_text($ansNode->text ?? '');
-        if ($opt === '') continue;
-        $fraction = (float)($ansNode['fraction'] ?? 0);
-        $idx = count($options);
-        $options[] = $opt;
-        if ($fraction > $bestFraction) {
-          $bestFraction = $fraction;
-          $bestIdx = $idx;
+        if (strtolower(trim((string)($qNode->single ?? 'true'))) === 'false') {
+            return null; // This app only supports one correct option.
         }
-      }
-      if (empty($options)) return null;
-      return [
-        'type' => 'multiple_choice',
-        'query' => $query,
-        'labels' => $labels,
-        'options' => $options,
-        'answer' => (string)$bestIdx,
-      ];
+        $options = [];
+        $bestIdx = 0;
+        $bestFraction = -INF;
+        foreach ($qNode->answer as $ansNode) {
+            $opt = qs_moodle_inner_text($ansNode->text ?? '');
+            if ($opt === '') continue;
+            $fraction = (float)($ansNode['fraction'] ?? 0);
+            $idx = count($options);
+            $options[] = $opt;
+            if ($fraction > $bestFraction) {
+                $bestFraction = $fraction;
+                $bestIdx = $idx;
+            }
+        }
+        if (empty($options)) return null;
+        return [
+            'type' => 'multiple_choice',
+            'query' => $query,
+            'labels' => $labels,
+            'options' => $options,
+            'answer' => (string)$bestIdx,
+        ];
     }
 
     if ($type === 'truefalse') {
-      $answer = null;
-      foreach ($qNode->answer as $ansNode) {
-        $fraction = (float)($ansNode['fraction'] ?? 0);
-        if ($fraction <= 0) continue;
-        $txt = strtolower(qs_moodle_inner_text($ansNode->text ?? ''));
-        if (in_array($txt, ['true', 'verdadero', 'yes', 'si', 'sí', '1'], true)) {
-          $answer = '1';
-          break;
+        $answer = null;
+        foreach ($qNode->answer as $ansNode) {
+            $fraction = (float)($ansNode['fraction'] ?? 0);
+            if ($fraction <= 0) continue;
+            $txt = strtolower(qs_moodle_inner_text($ansNode->text ?? ''));
+            if (in_array($txt, ['true', 'verdadero', 'yes', 'si', 'sí', '1'], true)) {
+                $answer = '1';
+                break;
+            }
+            if (in_array($txt, ['false', 'falso', 'no', '0'], true)) {
+                $answer = '0';
+                break;
+            }
         }
-        if (in_array($txt, ['false', 'falso', 'no', '0'], true)) {
-          $answer = '0';
-          break;
+        if ($answer === null) {
+            foreach ($qNode->answer as $i => $ansNode) {
+                $fraction = (float)($ansNode['fraction'] ?? 0);
+                if ($fraction > 0) {
+                    $answer = ((int)$i === 0) ? '1' : '0';
+                    break;
+                }
+            }
         }
-      }
-      if ($answer === null) {
-        foreach ($qNode->answer as $i => $ansNode) {
-          $fraction = (float)($ansNode['fraction'] ?? 0);
-          if ($fraction > 0) {
-            $answer = ((int)$i === 0) ? '1' : '0';
-            break;
-          }
-        }
-      }
-      if ($answer === null) return null;
-      return [
-        'type' => 'binary',
-        'query' => $query,
-        'labels' => $labels,
-        'answer' => $answer,
-      ];
+        if ($answer === null) return null;
+        return [
+            'type' => 'binary',
+            'query' => $query,
+            'labels' => $labels,
+            'answer' => $answer,
+        ];
     }
 
     if ($type === 'shortanswer') {
-      $options = [];
-      foreach ($qNode->answer as $ansNode) {
-        $fraction = (float)($ansNode['fraction'] ?? 0);
-        if ($fraction <= 0) continue;
-        $opt = qs_moodle_inner_text($ansNode->text ?? '');
-        if ($opt === '' || strpos($opt, '*') !== false) continue;
-        $options[] = $opt;
-      }
-      $options = array_values(array_unique($options));
-      if (empty($options)) return null;
-      return [
-        'type' => 'gap_filling',
-        'query' => $query,
-        'labels' => $labels,
-        'options' => $options,
-      ];
+        $options = [];
+        foreach ($qNode->answer as $ansNode) {
+            $fraction = (float)($ansNode['fraction'] ?? 0);
+            if ($fraction <= 0) continue;
+            $opt = qs_moodle_inner_text($ansNode->text ?? '');
+            if ($opt === '' || strpos($opt, '*') !== false) continue;
+            $options[] = $opt;
+        }
+        $options = array_values(array_unique($options));
+        if (empty($options)) return null;
+        return [
+            'type' => 'gap_filling',
+            'query' => $query,
+            'labels' => $labels,
+            'options' => $options,
+        ];
     }
 
     if ($type === 'matching') {
-      $pairs = [];
-      foreach ($qNode->subquestion as $subNode) {
-        $left = qs_moodle_inner_text($subNode->text ?? '');
-        $right = qs_moodle_inner_text($subNode->answer->text ?? '');
-        if ($left === '' || $right === '') continue;
-        $pairs[$left] = $right;
-      }
-      if (empty($pairs)) return null;
-      return [
-        'type' => 'matching',
-        'query' => $query,
-        'labels' => $labels,
-        'options' => $pairs,
-      ];
+        $pairs = [];
+        foreach ($qNode->subquestion as $subNode) {
+            $left = qs_moodle_inner_text($subNode->text ?? '');
+            $right = qs_moodle_inner_text($subNode->answer->text ?? '');
+            if ($left === '' || $right === '') continue;
+            $pairs[$left] = $right;
+        }
+        if (empty($pairs)) return null;
+        return [
+            'type' => 'matching',
+            'query' => $query,
+            'labels' => $labels,
+            'options' => $pairs,
+        ];
     }
 
     return null;
-  }
+}
 
 /**
  * Parse a Moodle XML string into an array of internal query objects.
@@ -237,53 +255,53 @@ function qs_filter_allowed_to_guests(array $allowed): array
  * @return array          ['items' => [...], 'stats' => [...]] 
  * @throws RuntimeException  When SimpleXML is unavailable or XML is malformed
  */
-  function qs_parse_moodle_xml_to_queries(string $xmlRaw): array
-  {
+function qs_parse_moodle_xml_to_queries(string $xmlRaw): array
+{
     if (!function_exists('simplexml_load_string')) {
-      throw new RuntimeException('SimpleXML extension is not enabled on this server');
+        throw new RuntimeException('SimpleXML extension is not enabled on this server');
     }
 
     libxml_use_internal_errors(true);
     $xml = simplexml_load_string($xmlRaw, 'SimpleXMLElement', LIBXML_NOCDATA | LIBXML_NONET);
     if (!$xml) {
-      $errs = libxml_get_errors();
-      $msg = !empty($errs) ? trim($errs[0]->message) : 'Malformed XML';
-      libxml_clear_errors();
-      throw new RuntimeException($msg);
+        $errs = libxml_get_errors();
+        $msg = !empty($errs) ? trim($errs[0]->message) : 'Malformed XML';
+        libxml_clear_errors();
+        throw new RuntimeException($msg);
     }
     libxml_clear_errors();
 
     $items = [];
     $labels = [];
     $stats = [
-      'total' => 0,
-      'categories' => 0,
-      'imported' => 0,
-      'skipped' => 0,
-      'by_type' => ['multiple_choice' => 0, 'binary' => 0, 'gap_filling' => 0, 'matching' => 0],
+        'total' => 0,
+        'categories' => 0,
+        'imported' => 0,
+        'skipped' => 0,
+        'by_type' => ['multiple_choice' => 0, 'binary' => 0, 'gap_filling' => 0, 'matching' => 0],
     ];
 
     foreach (($xml->question ?? []) as $qNode) {
-      $stats['total']++;
-      $srcType = strtolower(trim((string)($qNode['type'] ?? '')));
+        $stats['total']++;
+        $srcType = strtolower(trim((string)($qNode['type'] ?? '')));
 
-      if ($srcType === 'category') {
-        $stats['categories']++;
-        $labels = qs_moodle_labels_from_category(qs_moodle_inner_text($qNode->category->text ?? ''));
-        continue;
-      }
+        if ($srcType === 'category') {
+            $stats['categories']++;
+            $labels = qs_moodle_labels_from_category(qs_moodle_inner_text($qNode->category->text ?? ''));
+            continue;
+        }
 
-      $parsed = qs_moodle_parse_question($qNode, $labels);
-      if (!$parsed) continue;
+        $parsed = qs_moodle_parse_question($qNode, $labels);
+        if (!$parsed) continue;
 
-      $items[] = $parsed;
-      $stats['imported']++;
-      $stats['by_type'][$parsed['type']] = ($stats['by_type'][$parsed['type']] ?? 0) + 1;
+        $items[] = $parsed;
+        $stats['imported']++;
+        $stats['by_type'][$parsed['type']] = ($stats['by_type'][$parsed['type']] ?? 0) + 1;
     }
 
     $stats['skipped'] = max(0, $stats['total'] - $stats['categories'] - $stats['imported']);
     return ['items' => $items, 'stats' => $stats];
-  }
+}
 
 /**
  * Randomly select questions from $all_queries matching the quest's label groups.
@@ -342,7 +360,10 @@ function qs_score_attempt(array $question_ids, array $answers_raw, array $all_qu
 
     foreach ($question_ids as $qid) {
         $q   = $q_map[$qid] ?? null;
-        if (!$q) { $skipped++; continue; }
+        if (!$q) {
+            $skipped++;
+            continue;
+        }
         $user_ans = $ans_map[$qid] ?? null;
 
         if ($user_ans === null || $user_ans === '' || $user_ans === []) {
@@ -366,7 +387,10 @@ function qs_score_attempt(array $question_ids, array $answers_raw, array $all_qu
             $user_pairs    = (array)$user_ans;
             $is_correct = true;
             foreach ($correct_pairs as $k => $v) {
-                if (($user_pairs[$k] ?? '') !== $v) { $is_correct = false; break; }
+                if (($user_pairs[$k] ?? '') !== $v) {
+                    $is_correct = false;
+                    break;
+                }
             }
         } else {
             $is_correct = false;
@@ -398,7 +422,7 @@ function qs_score_attempt(array $question_ids, array $answers_raw, array $all_qu
  */
 function qs_sanitize_query(array $b): array
 {
-    $type  = in_array($b['type'] ?? '', ['multiple_choice','binary','gap_filling','matching'], true) ? $b['type'] : 'multiple_choice';
+    $type  = in_array($b['type'] ?? '', ['multiple_choice', 'binary', 'gap_filling', 'matching'], true) ? $b['type'] : 'multiple_choice';
     $query = trim(substr($b['query'] ?? '', 0, 1024));
     $labels = [];
     foreach ((array)($b['labels'] ?? []) as $l) {
@@ -448,7 +472,7 @@ function qs_sanitize_quest(array $b): array
 {
     $name   = trim(substr($b['name'] ?? '', 0, 256));
     $date   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $b['date'] ?? '') ? $b['date'] : date('Y-m-d');
-    $status = in_array($b['status'] ?? '', ['open','closed'], true) ? $b['status'] : 'closed';
+    $status = in_array($b['status'] ?? '', ['open', 'closed'], true) ? $b['status'] : 'closed';
     $revisable = !empty($b['revisable']);
     $wrong  = isset($b['wrong']) ? max(-1.0, min(0.0, (float)$b['wrong'])) : 0.0;
 
@@ -526,7 +550,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-que
                 $ok = true;
                 $user_pairs = (array)$user_ans;
                 foreach ((array)($dq['options'] ?? []) as $k => $v) {
-                    if (($user_pairs[$k] ?? '') !== $v) { $ok = false; break; }
+                    if (($user_pairs[$k] ?? '') !== $v) {
+                        $ok = false;
+                        break;
+                    }
                 }
             } else {
                 $ok = false;
@@ -571,7 +598,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
         // Update
         $id  = (int)$body['id'];
         $idx = -1;
-        foreach ($queries as $i => $q) { if ((int)($q['id'] ?? 0) === $id) { $idx = $i; break; } }
+        foreach ($queries as $i => $q) {
+            if ((int)($q['id'] ?? 0) === $id) {
+                $idx = $i;
+                break;
+            }
+        }
         if ($idx === -1) json_out(404, ['error' => 'Query not found']);
         $clean['id'] = $id;
         $queries[$idx] = $clean;
@@ -584,8 +616,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     json_out(200, ['ok' => true, 'id' => $clean['id']]);
 }
 
-  // POST ?action=import-moodle-xml  — multipart/form-data with file field "file"
-  if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'import-moodle-xml') {
+// POST ?action=import-moodle-xml  — multipart/form-data with file field "file"
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'import-moodle-xml') {
     $claims = require_auth();
     if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
 
@@ -594,7 +626,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
 
     $uploadErr = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
     if ($uploadErr !== UPLOAD_ERR_OK) {
-      json_out(400, ['error' => 'Upload failed (code ' . $uploadErr . ')']);
+        json_out(400, ['error' => 'Upload failed (code ' . $uploadErr . ')']);
     }
 
     $tmp = (string)($f['tmp_name'] ?? '');
@@ -604,9 +636,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     if (!is_string($xmlRaw) || trim($xmlRaw) === '') json_out(400, ['error' => 'Uploaded file is empty']);
 
     try {
-      $parsed = qs_parse_moodle_xml_to_queries($xmlRaw);
+        $parsed = qs_parse_moodle_xml_to_queries($xmlRaw);
     } catch (Throwable $e) {
-      json_out(400, ['error' => 'Invalid Moodle XML: ' . $e->getMessage()]);
+        json_out(400, ['error' => 'Invalid Moodle XML: ' . $e->getMessage()]);
     }
 
     $items = (array)($parsed['items'] ?? []);
@@ -617,11 +649,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     $added = 0;
 
     foreach ($items as $item) {
-      $clean = qs_sanitize_query((array)$item);
-      if ($clean['query'] === '') continue;
-      $clean['id'] = $nextId++;
-      $queries[] = $clean;
-      $added++;
+        $clean = qs_sanitize_query((array)$item);
+        if ($clean['query'] === '') continue;
+        $clean['id'] = $nextId++;
+        $queries[] = $clean;
+        $added++;
     }
 
     if ($added === 0) json_out(400, ['error' => 'No valid questions could be imported']);
@@ -630,14 +662,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     $stats = (array)($parsed['stats'] ?? []);
     $skipped = max(0, ((int)($stats['total'] ?? 0)) - ((int)($stats['categories'] ?? 0)) - $added);
     json_out(200, [
-      'ok' => true,
-      'imported' => $added,
-      'total_xml_questions' => (int)($stats['total'] ?? 0),
-      'categories' => (int)($stats['categories'] ?? 0),
-      'skipped' => $skipped,
-      'by_type' => $stats['by_type'] ?? [],
+        'ok' => true,
+        'imported' => $added,
+        'total_xml_questions' => (int)($stats['total'] ?? 0),
+        'categories' => (int)($stats['categories'] ?? 0),
+        'skipped' => $skipped,
+        'by_type' => $stats['by_type'] ?? [],
     ]);
-  }
+}
 
 // POST ?action=delete-query  — body: {id}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete-query') {
@@ -690,11 +722,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-que
 
     // Sort by quest date descending (newest first), then by id descending.
     usort($result, function ($a, $b) {
-      $da = (string)($a['date'] ?? '');
-      $db = (string)($b['date'] ?? '');
-      $cmp = strcmp($db, $da);
-      if ($cmp !== 0) return $cmp;
-      return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0);
+        $da = (string)($a['date'] ?? '');
+        $db = (string)($b['date'] ?? '');
+        $cmp = strcmp($db, $da);
+        if ($cmp !== 0) return $cmp;
+        return (int)($b['id'] ?? 0) <=> (int)($a['id'] ?? 0);
     });
 
     json_out(200, $result);
@@ -715,16 +747,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     if (isset($body['id'])) {
         $id  = (int)$body['id'];
 
-      // Quests with attempts are immutable.
-      $attempts = qs_load_attempts();
-      foreach ($attempts as $a) {
-        if ((int)($a['quest_id'] ?? 0) === $id) {
-          json_out(409, ['error' => 'Quest has attempts and cannot be changed']);
+        // Quests with attempts are immutable.
+        $attempts = qs_load_attempts();
+        foreach ($attempts as $a) {
+            if ((int)($a['quest_id'] ?? 0) === $id) {
+                json_out(409, ['error' => 'Quest has attempts and cannot be changed']);
+            }
         }
-      }
 
         $idx = -1;
-        foreach ($quests as $i => $q) { if ((int)($q['id'] ?? 0) === $id) { $idx = $i; break; } }
+        foreach ($quests as $i => $q) {
+            if ((int)($q['id'] ?? 0) === $id) {
+                $idx = $i;
+                break;
+            }
+        }
         if ($idx === -1) json_out(404, ['error' => 'Quest not found']);
         $clean['id'] = $id;
         $quests[$idx] = $clean;
@@ -768,7 +805,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'delete
     $attempts = qs_load_attempts();
     $found = false;
     foreach ($attempts as $a) {
-        if ((int)($a['id'] ?? 0) === $id) { $found = true; break; }
+        if ((int)($a['id'] ?? 0) === $id) {
+            $found = true;
+            break;
+        }
     }
     if (!$found) json_out(404, ['error' => 'Attempt not found']);
 
@@ -820,9 +860,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     if (($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'Forbidden']);
     $body  = json_decode(file_get_contents('php://input'), true);
     $theme = $body['theme'] ?? '';
-    if (!is_string($theme) ||
+    if (
+        !is_string($theme) ||
         !preg_match('/^[a-zA-Z0-9_\-]+\.css$/', $theme) ||
-        !is_file(__DIR__ . '/templates-quests/' . $theme)) {
+        !is_file(__DIR__ . '/templates-quests/' . $theme)
+    ) {
         json_out(400, ['error' => 'Invalid theme']);
     }
     $raw = data_read(SETTINGS_FILE);
@@ -839,7 +881,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-que
     $list  = [];
     foreach ($users as $u) {
         if (!is_array($u)) continue;
-      if (($u['role'] ?? 'guest') !== 'guest') continue;
+        if (($u['role'] ?? 'guest') !== 'guest') continue;
         $list[] = [
             'username' => $u['username'] ?? '',
             'name'     => $u['name']     ?? '',
@@ -871,12 +913,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
         $allowed = array_values(array_unique($allowed));
         if (empty($allowed)) $allowed = ['all'];
     }
-      $allowed = qs_filter_allowed_to_guests($allowed);
+    $allowed = qs_filter_allowed_to_guests($allowed);
 
     $quests = qs_load_quests();
     $idx = -1;
     foreach ($quests as $i => $q) {
-      if ((int)($q['id'] ?? 0) === $id) { $idx = $i; break; }
+        if ((int)($q['id'] ?? 0) === $id) {
+            $idx = $i;
+            break;
+        }
     }
     if ($idx === -1) json_out(404, ['error' => 'Quest not found']);
 
@@ -885,21 +930,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
     $guest_lookup = qs_guest_usernames_lookup();
     $completed_users = [];
     foreach ($attempts as $a) {
-      if ((int)($a['quest_id'] ?? 0) === $id && ($a['status'] ?? '') === 'completed') {
-        $u = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($a['username'] ?? ($a['usename'] ?? '')))));
-        if (!isset($guest_lookup[$u])) continue;
-        if ($u !== '') $completed_users[$u] = true;
-      }
+        if ((int)($a['quest_id'] ?? 0) === $id && ($a['status'] ?? '') === 'completed') {
+            $u = preg_replace('/[^a-z0-9_]/', '', strtolower(trim((string)($a['username'] ?? ($a['usename'] ?? '')))));
+            if (!isset($guest_lookup[$u])) continue;
+            if ($u !== '') $completed_users[$u] = true;
+        }
     }
     // Si algún usuario con intento completado no está en la nueva lista allowed (y no es 'all'), error
     if (!in_array('all', $allowed, true)) {
-      $missing = [];
-      foreach (array_keys($completed_users) as $u) {
-        if (!in_array($u, $allowed, true)) $missing[] = $u;
-      }
-      if ($missing) {
-        json_out(409, ['error' => 'No se puede retirar el permiso a usuarios que ya han completado el cuestionario: ' . implode(', ', $missing)]);
-      }
+        $missing = [];
+        foreach (array_keys($completed_users) as $u) {
+            if (!in_array($u, $allowed, true)) $missing[] = $u;
+        }
+        if ($missing) {
+            json_out(409, ['error' => 'No se puede retirar el permiso a usuarios que ya han completado el cuestionario: ' . implode(', ', $missing)]);
+        }
     }
 
     $quests[$idx]['allowed'] = $allowed;
@@ -914,7 +959,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'save-q
 // GET ?action=get-open-quests  — quests open and not yet completed by this user
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-open-quests') {
     $claims   = require_auth();
-  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
+    if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $quests   = qs_load_quests();
@@ -930,10 +975,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
         }
     }
 
+    // Index pending attempts by quest_id for this user
+    $pending_by_quest = [];
+    foreach ($attempts as $a) {
+        $u = $a['username'] ?? ($a['usename'] ?? '');
+        if ($u === $username && ($a['status'] ?? '') === 'pending') {
+            $pending_by_quest[(int)($a['quest_id'] ?? 0)] = (int)($a['id'] ?? 0);
+        }
+    }
+
     $result = [];
     foreach ($quests as $q) {
         if (($q['status'] ?? '') !== 'open') continue;
-        if (in_array((int)($q['id'] ?? 0), $done, true)) continue;
+        $qid = (int)($q['id'] ?? 0);
+        if (in_array($qid, $done, true)) continue;
         // Check authorization
         $allowed = (array)($q['allowed'] ?? ['all']);
         if (!in_array('all', $allowed, true) && !in_array($username, $allowed, true)) continue;
@@ -941,11 +996,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
         $total = 0;
         foreach ($q['queries'] as $g) $total += (int)($g['queries'] ?? 0);
         $result[] = [
-            'id'         => $q['id'],
-            'name'       => $q['name'],
-            'date'       => $q['date'],
-            'total_q'    => $total,
-            'revisable'  => $q['revisable'] ?? false,
+            'id'                => $q['id'],
+            'name'              => $q['name'],
+            'date'              => $q['date'],
+            'total_q'           => $total,
+            'revisable'         => $q['revisable'] ?? false,
+            'pending_attempt_id' => $pending_by_quest[$qid] ?? null,
         ];
     }
     json_out(200, $result);
@@ -954,7 +1010,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-ope
 // POST ?action=start-quest  — body: {quest_id}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-quest') {
     $claims   = require_auth();
-  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
+    if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $body     = json_decode(file_get_contents('php://input'), true);
@@ -964,7 +1020,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
     // Load quest
     $quests = qs_load_quests();
     $quest  = null;
-    foreach ($quests as $q) { if ((int)($q['id'] ?? 0) === $quest_id) { $quest = $q; break; } }
+    foreach ($quests as $q) {
+        if ((int)($q['id'] ?? 0) === $quest_id) {
+            $quest = $q;
+            break;
+        }
+    }
     if (!$quest) json_out(404, ['error' => 'Quest not found']);
     if (($quest['status'] ?? '') !== 'open') json_out(403, ['error' => 'Quest is not open']);
 
@@ -983,31 +1044,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
         }
     }
 
-    // Remove any stale pending attempt for this user+quest
-    $attempts = array_values(array_filter($attempts, function ($a) use ($username, $quest_id) {
+    // Reuse an existing pending attempt for this user+quest (allows draft restoration after reload)
+    $existing_attempt = null;
+    foreach ($attempts as $a) {
         $u = $a['username'] ?? ($a['usename'] ?? '');
-        return !($u === $username && (int)($a['quest_id'] ?? 0) === $quest_id && ($a['status'] ?? '') === 'pending');
-    }));
+        if ($u === $username && (int)($a['quest_id'] ?? 0) === $quest_id && ($a['status'] ?? '') === 'pending') {
+            $existing_attempt = $a;
+            break;
+        }
+    }
 
-    // Select questions
-    $all_queries  = qs_load_queries();
-    $question_ids = qs_select_questions($quest, $all_queries);
-    if (empty($question_ids)) json_out(500, ['error' => 'No matching questions found for this quest']);
+    $all_queries = qs_load_queries();
 
-    // Create pending attempt
-    $attempt_id = data_next_id($attempts);
-    $attempts[] = [
-        'id'           => $attempt_id,
-        'username'     => $username,
-        'quest_id'     => $quest_id,
-        'status'       => 'pending',
-        'question_ids' => $question_ids,
-        'queries'      => [],
-        'score'        => null,
-        'started_at'   => date('c'),
-        'submitted_at' => null,
-    ];
-    qs_save_attempts($attempts);
+    if ($existing_attempt) {
+        // Resume the existing pending attempt with the same question set
+        $attempt_id   = (int)$existing_attempt['id'];
+        $question_ids = $existing_attempt['question_ids'] ?? [];
+    } else {
+        // Select questions and create a new pending attempt
+        $question_ids = qs_select_questions($quest, $all_queries);
+        if (empty($question_ids)) json_out(500, ['error' => 'No matching questions found for this quest']);
+
+        $attempt_id = data_next_id($attempts);
+        $attempts[] = [
+            'id'           => $attempt_id,
+            'username'     => $username,
+            'quest_id'     => $quest_id,
+            'status'       => 'pending',
+            'question_ids' => $question_ids,
+            'queries'      => [],
+            'score'        => null,
+            'started_at'   => date('c'),
+            'submitted_at' => null,
+        ];
+        qs_save_attempts($attempts);
+    }
 
     // Return questions without correct answers
     $q_map = [];
@@ -1046,7 +1117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'start-
 // POST ?action=submit-attempt  — body: {attempt_id, answers:[{id, answer}]}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit-attempt') {
     $claims    = require_auth();
-  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
+    if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username  = $claims['sub'] ?? '';
 
     $body      = json_decode(file_get_contents('php://input'), true);
@@ -1058,7 +1129,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
     $idx      = -1;
     foreach ($attempts as $i => $a) {
         $u = $a['username'] ?? ($a['usename'] ?? '');
-        if ((int)($a['id'] ?? 0) === $attempt_id && $u === $username) { $idx = $i; break; }
+        if ((int)($a['id'] ?? 0) === $attempt_id && $u === $username) {
+            $idx = $i;
+            break;
+        }
     }
     if ($idx === -1) json_out(404, ['error' => 'Attempt not found']);
     if (($attempts[$idx]['status'] ?? '') === 'completed') json_out(409, ['error' => 'Already submitted']);
@@ -1068,7 +1142,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
 
     $quests = qs_load_quests();
     $quest  = null;
-    foreach ($quests as $q) { if ((int)($q['id'] ?? 0) === $quest_id) { $quest = $q; break; } }
+    foreach ($quests as $q) {
+        if ((int)($q['id'] ?? 0) === $quest_id) {
+            $quest = $q;
+            break;
+        }
+    }
     if (!$quest) json_out(500, ['error' => 'Quest not found']);
 
     $all_queries = qs_load_queries();
@@ -1099,7 +1178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'submit
 // GET ?action=get-my-attempts
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-my-attempts') {
     $claims   = require_auth();
-  if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
+    if (($claims['role'] ?? '') === 'admin') json_out(403, ['error' => 'Admin users cannot take quests']);
     $username = $claims['sub'] ?? '';
 
     $attempts = qs_load_attempts();
@@ -1117,7 +1196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get-my-
             'quest_id'    => $a['quest_id'],
             'quest_name'  => $quest['name'] ?? '—',
             'score'       => $a['score'],
-            'submitted_at'=> $a['submitted_at'] ?? null,
+            'submitted_at' => $a['submitted_at'] ?? null,
             'revisable'   => ($quest['revisable'] ?? false),
         ];
     }
@@ -1138,7 +1217,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
         $u = $a['username'] ?? ($a['usename'] ?? '');
         // Admin can review any; user can only review their own
         if ((int)($a['id'] ?? 0) === $attempt_id) {
-            if ($username === $u || ($claims['role'] ?? '') === 'admin') { $attempt = $a; break; }
+            if ($username === $u || ($claims['role'] ?? '') === 'admin') {
+                $attempt = $a;
+                break;
+            }
         }
     }
     if (!$attempt) json_out(404, ['error' => 'Attempt not found']);
@@ -1146,7 +1228,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
 
     $quests = qs_load_quests();
     $quest  = null;
-    foreach ($quests as $q) { if ((int)($q['id'] ?? 0) === (int)($attempt['quest_id'] ?? 0)) { $quest = $q; break; } }
+    foreach ($quests as $q) {
+        if ((int)($q['id'] ?? 0) === (int)($attempt['quest_id'] ?? 0)) {
+            $quest = $q;
+            break;
+        }
+    }
     if (!$quest) json_out(404, ['error' => 'Quest not found']);
     if (!($quest['revisable'] ?? false) && ($claims['role'] ?? '') !== 'admin') json_out(403, ['error' => 'This quest is not revisable']);
 
@@ -1194,4 +1281,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'review-
         'questions'    => $questions_out,
     ]);
 }
-
